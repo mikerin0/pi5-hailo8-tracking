@@ -64,6 +64,12 @@ if _new_dirs:
 # /usr/lib/hailo-tappas/gstreamer/ from hailo-tappas-core).  Ask the Debian
 # package manager for the authoritative install location and add it to
 # GST_PLUGIN_PATH before Gst.init() is called below.
+#
+# _DPKG_SO_REPORTED accumulates every path that dpkg says the file should be
+# at, regardless of whether the file physically exists.  This is used later by
+# _check_hailo_plugins() to distinguish a "broken install" (dpkg knows the
+# path but the file is absent) from a "never installed" scenario.
+_DPKG_SO_REPORTED = set()
 if not _new_dirs:
     try:
         _dpkg_out = subprocess.run(
@@ -75,6 +81,10 @@ if not _new_dirs:
             if ":" not in _dpkg_line:
                 continue
             _dpkg_so = _dpkg_line.split(":", 1)[1].strip()
+            if not _dpkg_so:
+                continue
+            # Record every path dpkg reports (file may or may not exist on disk).
+            _DPKG_SO_REPORTED.add(_dpkg_so)
             _dpkg_dir = os.path.dirname(_dpkg_so)
             _is_new = _dpkg_dir and _dpkg_dir not in _existing_gst_dirs
             if _is_new and os.path.isfile(_dpkg_so):
@@ -88,7 +98,7 @@ if not _new_dirs:
 
 # Increment this whenever a new version is pushed so users can confirm they
 # are running the latest code after a git pull.
-_VERSION = "2026.02.28-4"
+_VERSION = "2026.02.28-5"
 
 # All remaining imports come after the environment is prepared.
 import time, threading, gi, hailo, numpy as np, robot_brain as brain
@@ -157,21 +167,39 @@ def _check_hailo_plugins():
         _inspect_available = False
 
     if not _found_so:
-        # libgsthailotools.so not found by globs, dpkg, or GST_PLUGIN_PATH scan.
-        print(
-            f"ERROR: GStreamer element(s) not found: {', '.join(missing)}\n"
-            f"  GST_PLUGIN_PATH = {_gst_path}\n"
-            "  libgsthailotools.so could not be located on this system.\n"
-            "  Diagnostic steps:\n"
-            "  1. Check which hailo packages are installed:\n"
-            "       dpkg -l | grep hailo\n"
-            "  2. Find the plugin file across all installed hailo packages:\n"
-            "       dpkg -S libgsthailotools.so\n"
-            "  3. Search the whole filesystem as a last resort:\n"
-            "       find / -name 'libgsthailotools.so' 2>/dev/null\n"
-            "  If the file is genuinely missing, install and reboot:\n"
-            "    sudo apt install hailo-all && sudo reboot"
-        )
+        if _DPKG_SO_REPORTED:
+            # dpkg knows where the file should be, but it is absent from disk.
+            # The hailo-tappas-core package is broken (registered in dpkg's
+            # database but the files were never unpacked or were later deleted).
+            _dpkg_paths = "\n".join(f"    {p}" for p in sorted(_DPKG_SO_REPORTED))
+            print(
+                f"ERROR: GStreamer element(s) not found: {', '.join(missing)}\n"
+                f"  GST_PLUGIN_PATH = {_gst_path}\n"
+                "  dpkg reports libgsthailotools.so should be at:\n"
+                f"{_dpkg_paths}\n"
+                "  but none of those files exist on disk.  The hailo-tappas-core\n"
+                "  package is broken (registered in dpkg but files absent).\n"
+                "  Reinstall the package to restore missing files:\n"
+                "    sudo apt reinstall hailo-tappas-core && sudo ldconfig\n"
+                "  If that is not enough, do a full reinstall and reboot:\n"
+                "    sudo apt install --reinstall hailo-all && sudo reboot"
+            )
+        else:
+            # libgsthailotools.so not found by globs, dpkg, or GST_PLUGIN_PATH scan.
+            print(
+                f"ERROR: GStreamer element(s) not found: {', '.join(missing)}\n"
+                f"  GST_PLUGIN_PATH = {_gst_path}\n"
+                "  libgsthailotools.so could not be located on this system.\n"
+                "  Diagnostic steps:\n"
+                "  1. Check which hailo packages are installed:\n"
+                "       dpkg -l | grep hailo\n"
+                "  2. Find the plugin file across all installed hailo packages:\n"
+                "       dpkg -S libgsthailotools.so\n"
+                "  3. Search the whole filesystem as a last resort:\n"
+                "       find / -name 'libgsthailotools.so' 2>/dev/null\n"
+                "  If the file is genuinely missing, install and reboot:\n"
+                "    sudo apt install hailo-all && sudo reboot"
+            )
     elif _inspect_available:
         # gst-inspect-1.0 found the element but our in-process GStreamer didn't.
         # This usually means the plugin loaded in a clean shell but not inside
