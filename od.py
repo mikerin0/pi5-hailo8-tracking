@@ -57,6 +57,10 @@ if _new_dirs:
     _prefix = ":".join(_new_dirs)
     os.environ["GST_PLUGIN_PATH"] = f"{_prefix}:{_existing_gst_path}" if _existing_gst_path else _prefix
 
+# Increment this whenever a new version is pushed so users can confirm they
+# are running the latest code after a git pull.
+_VERSION = "2026.02.28-2"
+
 # All remaining imports come after the environment is prepared.
 import time, threading, gi, hailo, numpy as np, robot_brain as brain
 import config
@@ -217,5 +221,6 @@ def camera_loop():
             time.sleep(2)
 
 if __name__ == "__main__":
+    print(f"--- od.py version {_VERSION} ---")
     threading.Thread(target=brain.start_brain_ui, daemon=True).start()
     camera_loop()
