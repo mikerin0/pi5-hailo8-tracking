@@ -37,13 +37,21 @@ Open a terminal on your Raspberry Pi (or SSH into it) and run:
 ```bash
 git clone https://github.com/mikerin0/pi5-hailo8-tracking.git
 cd pi5-hailo8-tracking
+git checkout copilot/add-face-tracking-module
 ```
+
+> **Why `git checkout`?**  
+> The full codebase (`config.py`, `face_tracking.py`, and the updated scripts) lives on
+> the `copilot/add-face-tracking-module` branch while the PR is open.  
+> The `git checkout` line switches you to that branch so you have all five files.
 
 > **Already cloned before?**  
 > If you see `fatal: destination path 'pi5-hailo8-tracking' already exists`, the
-> folder is already there. Just enter it and pull the latest changes:
+> folder is already there. Enter it, fetch, and switch to the right branch:
 > ```bash
 > cd pi5-hailo8-tracking
+> git fetch
+> git checkout copilot/add-face-tracking-module
 > git pull
 > ```
 
@@ -51,12 +59,13 @@ cd pi5-hailo8-tracking
 > `sudo apt install -y git` then repeat the commands above.
 >
 > **Prefer a zip download?**  
-> On the GitHub page click **Code → Download ZIP**, copy the zip to the Pi
-> (e.g. with `scp`), then `unzip pi5-hailo8-tracking-main.zip`.
+> On the GitHub page use the **branch dropdown** (top-left of the file list, currently showing `main`) to select **`copilot/add-face-tracking-module`**, then click
+> **Code → Download ZIP**, copy the zip to the Pi (e.g. with `scp`), and
+> `unzip pi5-hailo8-tracking-copilot-add-face-tracking-module.zip`.
 
 #### ✅ Verify the files are there
 
-After cloning (or pulling), run:
+After cloning and checking out the branch, run:
 
 ```bash
 ls
@@ -72,7 +81,15 @@ od.py
 robot_brain.py
 ```
 
-If the files are listed, you're ready to move on. If the folder looks empty or the command gives an error, check that you are inside the `pi5-hailo8-tracking` directory (`pwd` prints your current path).
+If `config.py` or `face_tracking.py` are missing, you might still be on the `main` branch (or the clone may have been incomplete).  
+Fix it with:
+
+```bash
+git fetch
+git checkout copilot/add-face-tracking-module
+```
+
+Then run `ls` again — all five files should be there.
 
 ### Step 1 – Install system packages
 
