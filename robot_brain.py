@@ -3,6 +3,12 @@ import numpy as np
 import ikpy.chain
 import ikpy.link
 
+# --- SAFETY FLAG ---
+# Set to True to disable ALL servo movement (prevents hardware damage).
+# The arm went to an impossible position and burned out a servo;
+# keep this True until GStreamer/Hailo is working and safe limits are verified.
+ARM_MOVEMENT_DISABLED = True
+
 # --- 1. SETTINGS & HARDWARE ---
 # Physical lengths of your 6DOF arm (L4 includes your 19cm claw)
 L1, L2, L3, L4 = 0.05, 0.055, 0.091, 0.170
@@ -104,6 +110,9 @@ def switch_camera(mode):
 # --- 4. MOVEMENT LOGIC ---
 
 def move_servo(id, pos, time_ms=800):
+    if ARM_MOVEMENT_DISABLED:
+        print(f"ARM_MOVEMENT_DISABLED: servo {id} pos {pos} suppressed")
+        return
     pos = max(500, min(2500, pos))
     packet = bytearray([0x55, 0x55, 0x08, 0x03, 0x01, time_ms & 0xFF, (time_ms >> 8) & 0xFF, id, pos & 0xFF, (pos >> 8) & 0xFF])
     ser.write(packet)
