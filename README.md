@@ -97,14 +97,13 @@ Then run `ls` again — all five files should be there.
 sudo apt update
 sudo apt install -y python3-gi python3-opencv \
     gstreamer1.0-tools gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
-    gstreamer1.0-libcamera libcamera-tools libcamera-apps
+    gstreamer1.0-libcamera libcamera-tools rpicam-apps
 ```
 
-> **`libcamera-apps` provides `libcamera-hello`** (and `libcamera-still`, `libcamera-vid`, etc.).  
-> Without it you will see `bash: libcamera-hello: command not found`.  
-> On newer Pi OS Bookworm images the tools were renamed; if `libcamera-hello` still isn't
-> found after installing `libcamera-apps`, use `rpicam-hello` instead — it is the exact
-> equivalent.
+> **`rpicam-apps` provides `rpicam-hello`** (and `rpicam-still`, `rpicam-vid`, etc.) on Pi OS Bookworm.  
+> It also installs transitional `libcamera-*` symlinks so old scripts keep working.  
+> On Pi OS Bullseye (the older release) the package was called `libcamera-apps`; replace
+> `rpicam-apps` with `libcamera-apps` if you are on Bullseye.
 
 ### Step 2 – Create a virtual environment and install Python packages
 
@@ -143,21 +142,20 @@ cp /path/to/hand_landmark_lite.hef /home/arm/models/
 
 ```bash
 # Pi Camera (port 1) – should list the imx708 sensor
-libcamera-hello --list-cameras
+rpicam-hello --list-cameras
 
-# On newer Pi OS Bookworm images the command was renamed; use this if the above fails:
-# rpicam-hello --list-cameras
+# On Pi OS Bullseye (the older release) the command is still called:
+# libcamera-hello --list-cameras
 
 # ArduCAM Module 3 – should show /dev/video0 (or similar)
 v4l2-ctl --list-devices
 ```
 
-> If you see `bash: libcamera-hello: command not found`, install the missing package:
+> If you see `bash: rpicam-hello: command not found`, install the missing package:
 > ```bash
-> sudo apt install -y libcamera-apps
+> sudo apt install -y rpicam-apps
 > ```
-> Then retry. If the error persists, your Pi OS image uses the newer name — use
-> `rpicam-hello --list-cameras` instead.
+> On Pi OS Bullseye, use `sudo apt install -y libcamera-apps` and `libcamera-hello` instead.
 
 If the Pi Camera device name in the output differs from the default in `config.py`,
 update `PI_CAMERA_DEVICE` accordingly.
@@ -260,7 +258,7 @@ Hand landmarks (Hailo8)
 # System packages
 sudo apt install python3-gi python3-opencv gstreamer1.0-tools \
      gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
-     libcamera-tools libcamera-apps
+     libcamera-tools rpicam-apps
 
 # Python packages (use a venv to avoid the PEP 668 error on Pi OS Bookworm)
 python3 -m venv --system-site-packages ~/hailo-venv
