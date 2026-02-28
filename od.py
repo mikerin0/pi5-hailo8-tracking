@@ -59,9 +59,36 @@ if _new_dirs:
     _prefix = ":".join(_new_dirs)
     os.environ["GST_PLUGIN_PATH"] = f"{_prefix}:{_existing_gst_path}" if _existing_gst_path else _prefix
 
+# dpkg fallback: if the globs found no new directories, the package may have
+# installed libgsthailotools.so to a non-standard path (e.g.
+# /usr/lib/hailo-tappas/gstreamer/ from hailo-tappas-core).  Ask the Debian
+# package manager for the authoritative install location and add it to
+# GST_PLUGIN_PATH before Gst.init() is called below.
+if not _new_dirs:
+    try:
+        _dpkg_out = subprocess.run(
+            ["dpkg", "-S", "libgsthailotools.so"],
+            capture_output=True, text=True, check=False, timeout=5
+        ).stdout
+        for _dpkg_line in _dpkg_out.splitlines():
+            # Each line has the form "package-name: /absolute/path/to/file"
+            if ":" not in _dpkg_line:
+                continue
+            _dpkg_so = _dpkg_line.split(":", 1)[1].strip()
+            _dpkg_dir = os.path.dirname(_dpkg_so)
+            _is_new = _dpkg_dir and _dpkg_dir not in _existing_gst_dirs
+            if _is_new and os.path.isfile(_dpkg_so):
+                _cur_gst = os.environ.get("GST_PLUGIN_PATH", "")
+                os.environ["GST_PLUGIN_PATH"] = (
+                    f"{_dpkg_dir}:{_cur_gst}" if _cur_gst else _dpkg_dir
+                )
+                _existing_gst_dirs.add(_dpkg_dir)
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
 # Increment this whenever a new version is pushed so users can confirm they
 # are running the latest code after a git pull.
-_VERSION = "2026.02.28-3"
+_VERSION = "2026.02.28-4"
 
 # All remaining imports come after the environment is prepared.
 import time, threading, gi, hailo, numpy as np, robot_brain as brain
@@ -108,7 +135,14 @@ def _check_hailo_plugins():
 
     # Still missing after rescan.  Gather as much diagnostic information as
     # possible so the user can identify the root cause immediately.
+    # Search both the known glob patterns and every directory in the current
+    # GST_PLUGIN_PATH (which may include the dpkg-discovered path).
     _found_so = [_hit for _pat in _HAILO_SO_GLOB_PATTERNS for _hit in _glob.glob(_pat)]
+    # Also search every directory in GST_PLUGIN_PATH (includes dpkg-discovered paths).
+    for _d in [d for d in os.environ.get("GST_PLUGIN_PATH", "").split(":") if d]:
+        _candidate = os.path.join(_d, "libgsthailotools.so")
+        if os.path.isfile(_candidate) and _candidate not in _found_so:
+            _found_so.append(_candidate)
     _gst_path = os.environ.get("GST_PLUGIN_PATH", "(not set)")
 
     # Ask the system-level gst-inspect-1.0 tool whether it can see the plugin.
@@ -123,14 +157,19 @@ def _check_hailo_plugins():
         _inspect_available = False
 
     if not _found_so:
-        # libgsthailotools.so not found anywhere under /lib or /usr/lib.
+        # libgsthailotools.so not found by globs, dpkg, or GST_PLUGIN_PATH scan.
         print(
             f"ERROR: GStreamer element(s) not found: {', '.join(missing)}\n"
             f"  GST_PLUGIN_PATH = {_gst_path}\n"
-            "  libgsthailotools.so was not found under /lib or /usr/lib.\n"
-            "  To confirm whether the file exists anywhere on this system:\n"
-            "    find /usr/lib /lib -name 'libgsthailotools.so' 2>/dev/null\n"
-            "  If the file is missing, install the package and reboot:\n"
+            "  libgsthailotools.so could not be located on this system.\n"
+            "  Diagnostic steps:\n"
+            "  1. Check which hailo packages are installed:\n"
+            "       dpkg -l | grep hailo\n"
+            "  2. Find the plugin file across all installed hailo packages:\n"
+            "       dpkg -S libgsthailotools.so\n"
+            "  3. Search the whole filesystem as a last resort:\n"
+            "       find / -name 'libgsthailotools.so' 2>/dev/null\n"
+            "  If the file is genuinely missing, install and reboot:\n"
             "    sudo apt install hailo-all && sudo reboot"
         )
     elif _inspect_available:
