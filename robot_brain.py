@@ -10,6 +10,10 @@ PORT, BAUD = "/dev/ttyAMA10", 9600
 CRESTRON_PORT = 50005
 last_angles = [0, 0, 0.2, 0.5, 0.1]
 
+# --- Camera switch callbacks (populated by external modules at runtime) ---
+# Keys: "HIGH_CAM", "TABLE_CAM"  →  callable with no arguments
+camera_switch_handlers = {}
+
 # Global for the persistent Crestron connection
 crestron_conn = None
 
@@ -54,6 +58,14 @@ def tcp_listener():
                         if data == "HOME": go_home()
                         elif data == "OPEN": move_servo(1, 1500, 900)
                         elif data == "CLOSE": move_servo(1, 2300, 900)
+                        elif data == "HAND_OPEN":
+                            print("Hand open received – gripper open")
+                            move_servo(1, 1500, 900)
+                        elif data == "HAND_CLOSED":
+                            print("Hand closed received – gripper close")
+                            move_servo(1, 2300, 900)
+                        elif data in ("HIGH_CAM", "TABLE_CAM"):
+                            switch_camera(data)
             except Exception as e:
                 print(f"Connection Lost: {e}")
             finally:
@@ -72,6 +84,22 @@ def send_to_crestron(command):
             crestron_conn = None
     else:
         print("Error: Crestron is not connected to Pi Server.")
+
+
+def switch_camera(mode):
+    """Switch the active camera pipeline and update the GUI indicator."""
+    tuner.shared_params["camera_mode"] = mode
+    handler = camera_switch_handlers.get(mode)
+    if handler:
+        threading.Thread(target=handler, daemon=True).start()
+    # Update GUI label from the main thread if the root window exists
+    try:
+        tuner.root.after(0, lambda: tuner.cam_mode_label.config(
+            text=f"Mode: {mode.replace('_', ' ')}"
+        ))
+    except AttributeError:
+        pass
+    print(f"Camera switched to: {mode}")
 
 # --- 4. MOVEMENT LOGIC ---
 
@@ -103,7 +131,8 @@ class RobotTuner:
     def __init__(self):
         self.shared_params = {
             "ry_m":0.3, "rz_m":0.3, "z_off":0.0, "speed":1200, "smooth":0.5,
-            "busy": 1, "tune_x":0.20, "tune_y":0.0, "tune_z":0.15, "nose_x":0.5, "nose_y":0.5
+            "busy": 1, "tune_x":0.20, "tune_y":0.0, "tune_z":0.15, "nose_x":0.5, "nose_y":0.5,
+            "camera_mode": "HIGH_CAM",
         }
         self.manual_mode = True 
         self.needs_camera_restart = False
@@ -113,8 +142,19 @@ class RobotTuner:
     def create_gui(self):
         self.root = tk.Tk()
         self.root.title("Robot Master - Pi Server Mode")
-        self.root.geometry("400x750")
+        self.root.geometry("400x850")
         
+        # --- Camera Mode Frame ---
+        tk.Label(self.root, text="--- CAMERA MODE ---", font=("Arial", 12, "bold")).pack(pady=5)
+        cam_frame = tk.Frame(self.root)
+        cam_frame.pack()
+        tk.Button(cam_frame, text="HIGH CAM\n(Face Tracking)", bg="blue", fg="white",
+                  width=14, command=lambda: switch_camera("HIGH_CAM")).pack(side="left", padx=5)
+        tk.Button(cam_frame, text="TABLE CAM\n(Manipulation)", bg="green", fg="white",
+                  width=14, command=lambda: switch_camera("TABLE_CAM")).pack(side="left", padx=5)
+        self.cam_mode_label = tk.Label(self.root, text="Mode: HIGH CAM", font=("Arial", 10))
+        self.cam_mode_label.pack(pady=3)
+
         # --- Robot Frame ---
         tk.Label(self.root, text="--- ROBOT CONTROL ---", font=("Arial", 12, "bold")).pack(pady=5)
         self.manual_var = tk.BooleanVar(value=True)
