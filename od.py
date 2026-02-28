@@ -1,7 +1,7 @@
 # These imports must come first so that libgomp and GST_PLUGIN_PATH are
 # configured BEFORE any other package (hailo, robot_brain, gi) can trigger a
 # GStreamer initialisation internally.
-import os, sys, platform, glob as _glob
+import os, sys, platform, glob as _glob, subprocess
 
 # libgsthailotools.so depends on libgomp.so.1 (OpenMP), which has a static TLS
 # block that must be mapped before the dynamic linker exhausts glibc's fixed
@@ -35,15 +35,17 @@ _HAILO_GST_CANDIDATES = [
     f"/lib/{_arch}-linux-gnu/gstreamer-1.0",
     f"/usr/lib/{_arch}-linux-gnu/gstreamer-1.0",
 ]
-# Glob patterns at depth 0 and 1 below each lib root to catch non-standard
-# install locations (e.g. /usr/lib/{arch}-linux-gnu/hailo/gstreamer/) without
-# traversing the entire tree.  Shared by module-level setup and
+# Glob patterns at depth 0, 1, and 2 below each lib root to catch all known
+# install layouts (e.g. /usr/lib/{arch}-linux-gnu/hailo/gstreamer-1.0/)
+# without traversing the entire tree.  Shared by module-level setup and
 # _check_hailo_plugins() so there is a single source of truth.
 _HAILO_SO_GLOB_PATTERNS = (
     f"/lib/{_arch}-linux-gnu/libgsthailotools.so",
     f"/lib/{_arch}-linux-gnu/*/libgsthailotools.so",
+    f"/lib/{_arch}-linux-gnu/*/*/libgsthailotools.so",
     f"/usr/lib/{_arch}-linux-gnu/libgsthailotools.so",
     f"/usr/lib/{_arch}-linux-gnu/*/libgsthailotools.so",
+    f"/usr/lib/{_arch}-linux-gnu/*/*/libgsthailotools.so",
 )
 for _so in (_hit for _pat in _HAILO_SO_GLOB_PATTERNS for _hit in _glob.glob(_pat)):
     _so_dir = os.path.dirname(_so)
@@ -59,7 +61,7 @@ if _new_dirs:
 
 # Increment this whenever a new version is pushed so users can confirm they
 # are running the latest code after a git pull.
-_VERSION = "2026.02.28-2"
+_VERSION = "2026.02.28-3"
 
 # All remaining imports come after the environment is prepared.
 import time, threading, gi, hailo, numpy as np, robot_brain as brain
@@ -104,31 +106,65 @@ def _check_hailo_plugins():
     if not missing:
         return True
 
-    # Still missing after rescan — this is a genuine installation problem.
-    # Distinguish between "package not installed" and "package installed but
-    # the plugin won't load" so the error message is immediately actionable.
+    # Still missing after rescan.  Gather as much diagnostic information as
+    # possible so the user can identify the root cause immediately.
     _found_so = [_hit for _pat in _HAILO_SO_GLOB_PATTERNS for _hit in _glob.glob(_pat)]
+    _gst_path = os.environ.get("GST_PLUGIN_PATH", "(not set)")
+
+    # Ask the system-level gst-inspect-1.0 tool whether it can see the plugin.
+    # This tool runs in the same environment so it is the most reliable oracle.
+    try:
+        _inspect_rc = subprocess.run(
+            ["gst-inspect-1.0", "--exists", "hailonet"],
+            capture_output=True, check=False, timeout=10
+        ).returncode
+        _inspect_available = (_inspect_rc == 0)
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        _inspect_available = False
+
     if not _found_so:
-        # The .so file is absent from both /lib and /usr/lib — package not installed.
+        # libgsthailotools.so not found anywhere under /lib or /usr/lib.
         print(
             f"ERROR: GStreamer element(s) not found: {', '.join(missing)}\n"
-            "  The Hailo GStreamer plugin file is missing from this system.\n"
-            "  Install the package and reboot:\n"
+            f"  GST_PLUGIN_PATH = {_gst_path}\n"
+            "  libgsthailotools.so was not found under /lib or /usr/lib.\n"
+            "  To confirm whether the file exists anywhere on this system:\n"
+            "    find /usr/lib /lib -name 'libgsthailotools.so' 2>/dev/null\n"
+            "  If the file is missing, install the package and reboot:\n"
             "    sudo apt install hailo-all && sudo reboot"
         )
-    else:
-        # The .so file exists but the plugin won't load — a shared-library
-        # dependency (most likely libgomp) is missing or inaccessible.
+    elif _inspect_available:
+        # gst-inspect-1.0 found the element but our in-process GStreamer didn't.
+        # This usually means the plugin loaded in a clean shell but not inside
+        # the current virtualenv / environment.
         _so_path = _found_so[0]
         print(
             f"ERROR: GStreamer element(s) not found: {', '.join(missing)}\n"
-            "  The Hailo GStreamer plugins could not be loaded.\n"
-            f"  Plugin found at: {_so_path}\n"
+            f"  GST_PLUGIN_PATH = {_gst_path}\n"
+            f"  Plugin file found at: {_so_path}\n"
+            "  gst-inspect-1.0 reports the element IS available at the system level,\n"
+            "  but the Python process could not load it.  Likely causes:\n"
+            "  1. A stale virtualenv GStreamer cache — try deleting it:\n"
+            "       rm -rf ~/.cache/gstreamer-1.0\n"
+            "  2. LD_LIBRARY_PATH inside the virtualenv may be hiding a needed .so —\n"
+            "     check for hailo or gstreamer entries that shadow system libraries:\n"
+            f"       echo $LD_LIBRARY_PATH\n"
+            "  3. Re-run without the virtualenv to confirm: python3 od.py"
+        )
+    else:
+        # The .so file exists but the plugin won't load system-wide either.
+        _so_path = _found_so[0]
+        print(
+            f"ERROR: GStreamer element(s) not found: {', '.join(missing)}\n"
+            f"  GST_PLUGIN_PATH = {_gst_path}\n"
+            f"  Plugin file found at: {_so_path}\n"
+            "  The plugin file exists but GStreamer cannot load it.\n"
             "  1. Check for missing shared-library dependencies:\n"
-            f"     ldd {_so_path} | grep 'not found'\n"
-            "  2. If libgomp appears missing, add to ~/.bashrc and open a new terminal:\n"
-            f"     export LD_PRELOAD={_LIBGOMP}\n"
-            "  3. Verify the Hailo device is connected: hailortcli fw-control identify"
+            f"       ldd {_so_path} | grep 'not found'\n"
+            "  2. If libgomp appears missing, add to ~/.bashrc and reopen the terminal:\n"
+            f"       export LD_PRELOAD={_LIBGOMP}\n"
+            "  3. Verify the Hailo device is connected:\n"
+            "       hailortcli fw-control identify"
         )
     return False
 
