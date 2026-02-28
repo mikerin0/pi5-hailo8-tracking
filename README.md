@@ -149,8 +149,14 @@ Use a virtual environment instead.
 ```bash
 python3 -m venv --system-site-packages ~/hailo-venv
 source ~/hailo-venv/bin/activate
-pip install numpy ikpy pyserial
+pip install -r requirements.txt
 ```
+
+> **Why `numpy<2`?**  
+> The Hailo SDK Python bindings (`hailo`) and `ikpy` are compiled against the
+> NumPy 1.x C ABI.  NumPy 2.0 changed that ABI; running either package with
+> NumPy ≥ 2 causes an immediate crash on import.  `requirements.txt` pins
+> `numpy<2` so the correct version is always installed.
 
 > **What `--system-site-packages` does**  
 > It lets the venv reuse packages installed via `apt` (like `gi`, `cv2`, and `hailo`
@@ -321,7 +327,7 @@ sudo apt install python3-gi python3-opencv gstreamer1.0-tools \
 # Python packages (use a venv to avoid the PEP 668 error on Pi OS Bookworm)
 python3 -m venv --system-site-packages ~/hailo-venv
 source ~/hailo-venv/bin/activate
-pip install numpy ikpy pyserial
+pip install -r requirements.txt
 ```
 
 ### Hailo8 Models
