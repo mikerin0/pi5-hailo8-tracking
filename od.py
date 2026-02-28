@@ -98,7 +98,7 @@ if not _new_dirs:
 
 # Increment this whenever a new version is pushed so users can confirm they
 # are running the latest code after a git pull.
-_VERSION = "2026.02.28-5"
+_VERSION = "2026.02.28-6"
 
 # All remaining imports come after the environment is prepared.
 import time, threading, gi, hailo, numpy as np, robot_brain as brain
@@ -220,18 +220,81 @@ def _check_hailo_plugins():
         )
     else:
         # The .so file exists but the plugin won't load system-wide either.
+        # Run ldd now so we can embed the specific missing libraries in the
+        # error output rather than asking the user to run it manually.
         _so_path = _found_so[0]
+        _run_cmd = sys.argv[0]
+        _ldd_missing = []
+        _ldd_stderr = ""
+        try:
+            _ldd_result = subprocess.run(
+                ["ldd", _so_path],
+                capture_output=True, text=True, check=False, timeout=15
+            )
+            for _ldd_line in _ldd_result.stdout.splitlines():
+                if "not found" in _ldd_line:
+                    _ldd_missing.append(_ldd_line.strip())
+            if _ldd_result.returncode != 0 and _ldd_result.stderr.strip():
+                _ldd_stderr = _ldd_result.stderr.strip()
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+
+        _ldd_section = ""
+        if _ldd_missing:
+            _ldd_section = (
+                "  Missing shared-library dependencies reported by ldd:\n"
+                + "\n".join(f"    {ln}" for ln in _ldd_missing)
+                + "\n"
+            )
+            _gomp_missing = any("libgomp" in ln for ln in _ldd_missing)
+        elif _ldd_stderr:
+            _ldd_section = f"  ldd reported an error: {_ldd_stderr}\n"
+            # ldd couldn't run — fall back to checking whether libgomp exists,
+            # since that is the most common reason for load failure.
+            _gomp_missing = not os.path.isfile(_LIBGOMP)
+        else:
+            # ldd ran cleanly but found nothing missing.  The load failure is
+            # likely a stale GStreamer cache entry (recorded before libgomp was
+            # pre-loaded via LD_PRELOAD).  Infer that libgomp may be involved
+            # if it is absent from disk.
+            _gomp_missing = not os.path.isfile(_LIBGOMP)
+
+        if _gomp_missing:
+            if os.path.isfile(_LIBGOMP):
+                # libgomp is on disk but ldd still shows it missing — the
+                # LD_PRELOAD re-exec at module init should have resolved this.
+                # Most likely the re-exec ran but the GStreamer registry cache
+                # still records the plugin as unloadable.  Clear it and retry.
+                _gomp_hint = (
+                    "  libgomp is present but the GStreamer cache may be stale.\n"
+                    "  Clear the cache and re-run:\n"
+                    f"    rm -rf ~/.cache/gstreamer-1.0 && python {_run_cmd}\n"
+                )
+            else:
+                # libgomp.so.1 is not installed at all.
+                _gomp_hint = (
+                    "  libgomp (OpenMP runtime) is not installed.  Install it:\n"
+                    "    sudo apt install libgomp1\n"
+                    "  Then clear the GStreamer cache and re-run:\n"
+                    f"    rm -rf ~/.cache/gstreamer-1.0 && python {_run_cmd}\n"
+                )
+        else:
+            _gomp_hint = (
+                "  If libgomp appears in the list above, set LD_PRELOAD:\n"
+                f"    export LD_PRELOAD={_LIBGOMP}\n"
+                "  Then clear the GStreamer cache and re-run:\n"
+                f"    rm -rf ~/.cache/gstreamer-1.0 && python {_run_cmd}\n"
+            )
+
         print(
             f"ERROR: GStreamer element(s) not found: {', '.join(missing)}\n"
             f"  GST_PLUGIN_PATH = {_gst_path}\n"
             f"  Plugin file found at: {_so_path}\n"
             "  The plugin file exists but GStreamer cannot load it.\n"
-            "  1. Check for missing shared-library dependencies:\n"
-            f"       ldd {_so_path} | grep 'not found'\n"
-            "  2. If libgomp appears missing, add to ~/.bashrc and reopen the terminal:\n"
-            f"       export LD_PRELOAD={_LIBGOMP}\n"
-            "  3. Verify the Hailo device is connected:\n"
-            "       hailortcli fw-control identify"
+            + _ldd_section
+            + _gomp_hint
+            + "  Verify the Hailo device is connected:\n"
+            "    hailortcli fw-control identify"
         )
     return False
 
