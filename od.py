@@ -76,16 +76,29 @@ def _check_hailo_plugins():
         return True
 
     # Still missing after rescan — this is a genuine installation problem.
-    print(
-        f"ERROR: GStreamer element(s) not found: {', '.join(missing)}\n"
-        "  The Hailo GStreamer plugins could not be loaded.\n"
-        "  1. Confirm the package is installed: sudo apt install hailo-all\n"
-        "  2. Check for missing shared-library dependencies:\n"
-        f"     ldd /usr/lib/{_arch}-linux-gnu/gstreamer-1.0/libgsthailotools.so | grep 'not found'\n"
-        "  3. If libgomp appears missing, add to ~/.bashrc and open a new terminal:\n"
-        f"     export LD_PRELOAD={_LIBGOMP}\n"
-        "  4. Verify the Hailo device is connected: hailortcli fw-control identify"
-    )
+    # Distinguish between "package not installed" and "package installed but
+    # the plugin won't load" so the error message is immediately actionable.
+    _HAILO_PLUGIN_SO = f"/usr/lib/{_arch}-linux-gnu/gstreamer-1.0/libgsthailotools.so"
+    if not os.path.isfile(_HAILO_PLUGIN_SO):
+        # The .so file itself is absent — the package has never been installed.
+        print(
+            f"ERROR: GStreamer element(s) not found: {', '.join(missing)}\n"
+            "  The Hailo GStreamer plugin file is missing from this system.\n"
+            "  Install the package and reboot:\n"
+            "    sudo apt install hailo-all && sudo reboot"
+        )
+    else:
+        # The .so file exists but the plugin won't load — a shared-library
+        # dependency (most likely libgomp) is missing or inaccessible.
+        print(
+            f"ERROR: GStreamer element(s) not found: {', '.join(missing)}\n"
+            "  The Hailo GStreamer plugins could not be loaded.\n"
+            "  1. Check for missing shared-library dependencies:\n"
+            f"     ldd {_HAILO_PLUGIN_SO} | grep 'not found'\n"
+            "  2. If libgomp appears missing, add to ~/.bashrc and open a new terminal:\n"
+            f"     export LD_PRELOAD={_LIBGOMP}\n"
+            "  3. Verify the Hailo device is connected: hailortcli fw-control identify"
+        )
     return False
 
 # --- Configuration (canonical values live in config.py) ---
