@@ -17,6 +17,14 @@ git clone https://github.com/mikerin0/pi5-hailo8-tracking.git
 cd pi5-hailo8-tracking
 ```
 
+> **Already cloned before?**  
+> If you see `fatal: destination path 'pi5-hailo8-tracking' already exists`, the
+> folder is already there. Just enter it and pull the latest changes:
+> ```bash
+> cd pi5-hailo8-tracking
+> git pull
+> ```
+
 > **No `git` installed?**  
 > `sudo apt install -y git` then repeat the commands above.
 >
