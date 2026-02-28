@@ -97,8 +97,20 @@ Then run `ls` again — all five files should be there.
 sudo apt update
 sudo apt install -y python3-gi python3-opencv \
     gstreamer1.0-tools gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
-    gstreamer1.0-libcamera libcamera-tools rpicam-apps
+    gstreamer1.0-libcamera libcamera-tools rpicam-apps \
+    hailo-all
 ```
+
+> **`hailo-all`** installs the Hailo8 firmware, runtime (`hailort`), Python bindings, and
+> the GStreamer plug-ins (`hailonet`, `hailofilter`, `hailooverlay`) that `od.py` requires.
+> After installing, verify the GStreamer elements are visible with:
+> ```bash
+> gst-inspect-1.0 hailonet
+> ```
+> If you see `No such element or plugin 'hailonet'`, the Hailo apt repository may not be
+> configured on your Pi yet. Follow the
+> [Hailo Raspberry Pi 5 setup guide](https://hailo.ai/developer-zone/) to add the
+> repository, then re-run `sudo apt update && sudo apt install hailo-all`.
 
 > **`rpicam-apps` provides `rpicam-hello`** (and `rpicam-still`, `rpicam-vid`, etc.) on Pi OS Bookworm.  
 > It also installs transitional `libcamera-*` symlinks so old scripts keep working.  
@@ -267,7 +279,7 @@ Hand landmarks (Hailo8)
 # System packages
 sudo apt install python3-gi python3-opencv gstreamer1.0-tools \
      gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
-     libcamera-tools rpicam-apps
+     libcamera-tools rpicam-apps hailo-all
 
 # Python packages (use a venv to avoid the PEP 668 error on Pi OS Bookworm)
 python3 -m venv --system-site-packages ~/hailo-venv

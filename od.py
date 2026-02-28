@@ -2,6 +2,21 @@ import os, sys, time, threading, gi, hailo, numpy as np, robot_brain as brain
 import config
 gi.require_version('Gst', '1.0'); from gi.repository import Gst; Gst.init(None)
 
+_HAILO_ELEMENTS = ("hailonet", "hailofilter", "hailooverlay")
+
+def _check_hailo_plugins():
+    """Return True if all Hailo GStreamer elements are registered; print help if not."""
+    missing = [e for e in _HAILO_ELEMENTS if Gst.ElementFactory.find(e) is None]
+    if missing:
+        print(
+            f"ERROR: GStreamer element(s) not found: {', '.join(missing)}\n"
+            "  The Hailo GStreamer plugins are missing or not on the plugin path.\n"
+            "  Install them with:  sudo apt install hailo-all\n"
+            "  Then verify with:   gst-inspect-1.0 hailonet"
+        )
+        return False
+    return True
+
 # --- Configuration (canonical values live in config.py) ---
 HEF_PATH = config.HEF_PATH
 SO_PATH = config.SO_PATH
@@ -59,6 +74,9 @@ def app_callback(pad, info, user_data):
 def camera_loop():
     # Force the device type for the Pro chip before starting
     os.environ["hailort_device_type"] = "hailo8"
+
+    if not _check_hailo_plugins():
+        return
     
     while True:
         os.system("sudo pkill -9 -f hailonet")
