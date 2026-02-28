@@ -98,7 +98,7 @@ if not _new_dirs:
 
 # Increment this whenever a new version is pushed so users can confirm they
 # are running the latest code after a git pull.
-_VERSION = "2026.02.28-7"
+_VERSION = "2026.02.28-8"
 
 # Maximum number of GST_DEBUG log lines to embed in the runtime-failure error.
 _GST_DEBUG_MAX_LINES = 25
@@ -259,11 +259,16 @@ def _check_hailo_plugins():
             _gomp_missing = not os.path.isfile(_LIBGOMP)
         else:
             # ldd ran cleanly — all shared-library dependencies are resolved.
-            # The load failure is a runtime error, not a missing-library error.
-            # Collect GStreamer plugin diagnostics and installed hailo package
-            # versions so the user can identify the root cause (most commonly a
-            # firmware/driver version mismatch between libhailort and the Hailo
-            # firmware actually running on the device).
+            # The load failure is a runtime error.  Use ctypes.CDLL() to call
+            # dlopen() directly: unlike ldd it catches undefined-symbol errors
+            # (ABI / version-tag mismatches inside present .so files).
+            import ctypes as _ctypes
+            _dlopen_error = ""
+            try:
+                _ctypes.CDLL(_so_path)
+            except OSError as _dlopen_exc:
+                _dlopen_error = str(_dlopen_exc)
+
             _gst_debug_lines = []
             try:
                 # Build a minimal environment: keep standard path/library vars
@@ -310,10 +315,14 @@ def _check_hailo_plugins():
 
             _ldd_section = (
                 "  All shared-library dependencies are resolved (ldd: no missing libs).\n"
-                "  The plugin fails to load at runtime — most common cause:\n"
-                "    Hailo firmware/driver version mismatch.\n"
+                "  The plugin fails to load at runtime.\n"
             )
-            if _gst_debug_lines:
+            if _dlopen_error:
+                _ldd_section += (
+                    "  dlopen() error (ctypes):\n"
+                    f"    {_dlopen_error}\n"
+                )
+            elif _gst_debug_lines:
                 _ldd_section += (
                     "  GStreamer plugin diagnostics (GST_DEBUG=3):\n"
                     + "\n".join(f"    {ln}" for ln in _gst_debug_lines)
@@ -348,17 +357,52 @@ def _check_hailo_plugins():
                 )
         else:
             if not _ldd_missing and not _ldd_stderr:
-                # Clean ldd — runtime failure, not a missing-library issue.
-                _gomp_hint = (
-                    "  Steps to resolve:\n"
-                    "  1. Check firmware vs driver version match:\n"
-                    "       hailortcli fw-control identify\n"
-                    "       dpkg -l | grep hailo\n"
-                    "  2. If versions differ, reinstall to match firmware:\n"
-                    "       sudo apt install --reinstall hailo-all && sudo reboot\n"
-                    "  3. Verify device node is accessible:\n"
-                    "       ls -la /dev/hailo*\n"
-                )
+                # Clean ldd — runtime dlopen failure.  Give targeted advice
+                # based on whether ctypes could identify the error.
+                if _dlopen_error and "undefined symbol" in _dlopen_error:
+                    # Extract the symbol name for a targeted nm lookup command.
+                    # dlerror format: "path.so: undefined symbol: sym_name"
+                    # Sanitise to safe characters (C symbol chars + version tags)
+                    # before embedding in the suggested shell command.
+                    _sym_raw = _dlopen_error.rsplit("undefined symbol:", 1)[-1].strip()
+                    _sym = "".join(
+                        c for c in _sym_raw if c.isalnum() or c in "_@."
+                    )[:120]
+                    _gomp_hint = (
+                        "  Undefined symbol at dlopen — the .so was built against\n"
+                        "  a different libhailort ABI than the one installed.\n"
+                        "  Steps to try:\n"
+                        "  1. Verify the symbol exists in the installed libhailort:\n"
+                        f"       nm -D /usr/lib/aarch64-linux-gnu/libhailort.so"
+                        f" | grep '{_sym}'\n"
+                        "  2. Reload the kernel module:\n"
+                        "       sudo modprobe -r hailo_pci && sudo modprobe hailo_pci\n"
+                        "  3. Re-run with a clean GStreamer cache:\n"
+                        f"       rm -rf ~/.cache/gstreamer-1.0 && python {_run_cmd}\n"
+                        "  4. If the symbol is absent, the tappas-core and hailort\n"
+                        "     packages are mismatched — contact Hailo support.\n"
+                    )
+                elif _dlopen_error:
+                    _gomp_hint = (
+                        "  dlopen failed (see error above).\n"
+                        "  Steps to try:\n"
+                        "  1. Reload the kernel module:\n"
+                        "       sudo modprobe -r hailo_pci && sudo modprobe hailo_pci\n"
+                        "  2. Re-run with a clean GStreamer cache:\n"
+                        f"       rm -rf ~/.cache/gstreamer-1.0 && python {_run_cmd}\n"
+                        "  3. Check device node permissions:\n"
+                        "       ls -la /dev/hailo*\n"
+                    )
+                else:
+                    # ctypes loaded the .so fine; plugin init may be failing.
+                    _gomp_hint = (
+                        "  The .so loads (ctypes OK) but GStreamer cannot\n"
+                        "  initialise the plugin.  Run with GST_DEBUG=5 for details:\n"
+                        f"    GST_DEBUG=5 gst-inspect-1.0 hailonet 2>&1 | head -60\n"
+                        "  Then reload the kernel module and retry:\n"
+                        "    sudo modprobe -r hailo_pci && sudo modprobe hailo_pci\n"
+                        f"    rm -rf ~/.cache/gstreamer-1.0 && python {_run_cmd}\n"
+                    )
             else:
                 # ldd found missing deps not involving libgomp (or ldd errored).
                 _gomp_hint = (
