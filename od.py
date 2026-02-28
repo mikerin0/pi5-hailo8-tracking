@@ -1,20 +1,19 @@
-import ctypes
-import os, sys, time, threading, platform, gi, hailo, numpy as np, robot_brain as brain
-import config
+# These three imports must come first so that libgomp and GST_PLUGIN_PATH are
+# configured BEFORE any other package (hailo, robot_brain, gi) can trigger a
+# GStreamer initialisation internally.
+import ctypes, os, platform
 
 # On aarch64 Linux, libgomp.so.1 has a static TLS block that must be allocated
 # before any shared library that depends on it is loaded via dlopen().  If it
-# is not already mapped when Gst.init() calls dlopen("libgsthailotools.so"),
-# the dynamic linker cannot satisfy the TLS requirement and the plugin silently
-# fails to load.
+# is not already mapped when Gst.init() (or an internal hailo/gi init) calls
+# dlopen("libgsthailotools.so"), the dynamic linker cannot satisfy the TLS
+# requirement and the plugin silently fails to load.
 #
-# Setting os.environ["LD_PRELOAD"] only affects *new subprocesses* (it calls
-# putenv in C, which the dynamic linker reads at process startup).  It does
-# not retroactively load libgomp into the *current* Python process.
-#
-# The correct fix is to call ctypes.CDLL() which uses dlopen() immediately,
-# pre-allocating the static TLS before Gst.init() runs.  We also keep the
-# os.environ setting so that subprocesses (gst-plugin-scanner) inherit it.
+# Setting os.environ["LD_PRELOAD"] only affects *new subprocesses*; it does
+# NOT retroactively load libgomp into the already-running Python process.
+# ctypes.CDLL() uses dlopen() immediately, pre-allocating the TLS block.
+# We also set the env var so that any spawned subprocesses (gst-plugin-scanner)
+# inherit it.
 # See: https://github.com/hailo-ai/hailo-rpi5-examples/blob/main/doc/install-raspberry-pi5.md
 _arch = platform.machine()
 _LIBGOMP = f"/usr/lib/{_arch}-linux-gnu/libgomp.so.1"
@@ -27,14 +26,18 @@ if os.path.isfile(_LIBGOMP):
     if _LIBGOMP not in _ld_preload.split(":"):
         os.environ["LD_PRELOAD"] = f"{_LIBGOMP}:{_ld_preload}" if _ld_preload else _LIBGOMP
 
-# Also ensure the standard GStreamer plugin directory is on the search path
-# in case GST_PLUGIN_PATH was overridden (e.g. inside a venv).
+# Ensure the system GStreamer plugin directory is on the search path before
+# any import can call Gst.init() (e.g. gi, hailo, robot_brain).
 _HAILO_GST_DIR = f"/usr/lib/{_arch}-linux-gnu/gstreamer-1.0"
 _existing_gst_path = os.environ.get("GST_PLUGIN_PATH", "")
 if _HAILO_GST_DIR not in _existing_gst_path.split(":"):
     os.environ["GST_PLUGIN_PATH"] = (
         f"{_HAILO_GST_DIR}:{_existing_gst_path}" if _existing_gst_path else _HAILO_GST_DIR
     )
+
+# All remaining imports come after the environment is prepared.
+import sys, time, threading, gi, hailo, numpy as np, robot_brain as brain
+import config
 
 gi.require_version('Gst', '1.0')
 from gi.repository import Gst
