@@ -1,30 +1,26 @@
-# These three imports must come first so that libgomp and GST_PLUGIN_PATH are
+# These imports must come first so that libgomp and GST_PLUGIN_PATH are
 # configured BEFORE any other package (hailo, robot_brain, gi) can trigger a
 # GStreamer initialisation internally.
-import ctypes, os, platform
+import os, sys, platform
 
-# On aarch64 Linux, libgomp.so.1 has a static TLS block that must be allocated
-# before any shared library that depends on it is loaded via dlopen().  If it
-# is not already mapped when Gst.init() (or an internal hailo/gi init) calls
-# dlopen("libgsthailotools.so"), the dynamic linker cannot satisfy the TLS
-# requirement and the plugin silently fails to load.
+# libgsthailotools.so depends on libgomp.so.1 (OpenMP), which has a static TLS
+# block that must be mapped before the dynamic linker exhausts glibc's fixed
+# surplus-TLS budget.  A mid-process ctypes.CDLL() call cannot guarantee this
+# because Python startup may have already consumed part of that budget.  The
+# only fully reliable approach is LD_PRELOAD set *before the process starts*.
 #
-# Setting os.environ["LD_PRELOAD"] only affects *new subprocesses*; it does
-# NOT retroactively load libgomp into the already-running Python process.
-# ctypes.CDLL() uses dlopen() immediately, pre-allocating the TLS block.
-# We also set the env var so that any spawned subprocesses (gst-plugin-scanner)
-# inherit it.
+# Strategy: if LD_PRELOAD does not already contain libgomp, set it and re-exec
+# this script.  The replacement process inherits the updated environment and
+# starts with libgomp pre-mapped at dynamic-linker init time.  The re-exec is
+# one-shot: the new process finds libgomp in LD_PRELOAD and skips this branch.
 # See: https://github.com/hailo-ai/hailo-rpi5-examples/blob/main/doc/install-raspberry-pi5.md
 _arch = platform.machine()
 _LIBGOMP = f"/usr/lib/{_arch}-linux-gnu/libgomp.so.1"
 if os.path.isfile(_LIBGOMP):
-    try:
-        ctypes.CDLL(_LIBGOMP, ctypes.RTLD_GLOBAL)  # RTLD_GLOBAL: symbols visible to later dlopen() calls (GStreamer plugin loader)
-    except OSError:
-        pass
     _ld_preload = os.environ.get("LD_PRELOAD", "")
     if _LIBGOMP not in _ld_preload.split(":"):
         os.environ["LD_PRELOAD"] = f"{_LIBGOMP}:{_ld_preload}" if _ld_preload else _LIBGOMP
+        os.execv(sys.executable, [sys.executable] + sys.argv)
 
 # Ensure the system GStreamer plugin directory is on the search path before
 # any import can call Gst.init() (e.g. gi, hailo, robot_brain).
@@ -36,7 +32,7 @@ if _HAILO_GST_DIR not in _existing_gst_path.split(":"):
     )
 
 # All remaining imports come after the environment is prepared.
-import sys, time, threading, gi, hailo, numpy as np, robot_brain as brain
+import time, threading, gi, hailo, numpy as np, robot_brain as brain
 import config
 
 gi.require_version('Gst', '1.0')
