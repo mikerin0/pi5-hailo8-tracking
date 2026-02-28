@@ -1,7 +1,7 @@
 # These imports must come first so that libgomp and GST_PLUGIN_PATH are
 # configured BEFORE any other package (hailo, robot_brain, gi) can trigger a
 # GStreamer initialisation internally.
-import os, sys, platform
+import os, sys, platform, glob as _glob
 
 # libgsthailotools.so depends on libgomp.so.1 (OpenMP), which has a static TLS
 # block that must be mapped before the dynamic linker exhausts glibc's fixed
@@ -22,14 +22,40 @@ if os.path.isfile(_LIBGOMP):
         os.environ["LD_PRELOAD"] = f"{_LIBGOMP}:{_ld_preload}" if _ld_preload else _LIBGOMP
         os.execv(sys.executable, [sys.executable] + sys.argv)
 
-# Ensure the system GStreamer plugin directory is on the search path before
+# Ensure the Hailo GStreamer plugin directory is on the search path before
 # any import can call Gst.init() (e.g. gi, hailo, robot_brain).
-_HAILO_GST_DIR = f"/usr/lib/{_arch}-linux-gnu/gstreamer-1.0"
+#
+# The canonical install path documented by Hailo is:
+#   /lib/{arch}-linux-gnu/gstreamer-1.0/libgsthailotools.so
+# On some Raspberry Pi OS releases /lib and /usr/lib are separate real
+# directories (not symlinks), so we add both.  We also glob-search for
+# non-standard locations (e.g. /usr/lib/{arch}-linux-gnu/hailo/gstreamer/)
+# so that any installation layout is handled automatically.
+_HAILO_GST_CANDIDATES = [
+    f"/lib/{_arch}-linux-gnu/gstreamer-1.0",
+    f"/usr/lib/{_arch}-linux-gnu/gstreamer-1.0",
+]
+# Glob patterns at depth 0 and 1 below each lib root to catch non-standard
+# install locations (e.g. /usr/lib/{arch}-linux-gnu/hailo/gstreamer/) without
+# traversing the entire tree.  Shared by module-level setup and
+# _check_hailo_plugins() so there is a single source of truth.
+_HAILO_SO_GLOB_PATTERNS = (
+    f"/lib/{_arch}-linux-gnu/libgsthailotools.so",
+    f"/lib/{_arch}-linux-gnu/*/libgsthailotools.so",
+    f"/usr/lib/{_arch}-linux-gnu/libgsthailotools.so",
+    f"/usr/lib/{_arch}-linux-gnu/*/libgsthailotools.so",
+)
+for _so in (_hit for _pat in _HAILO_SO_GLOB_PATTERNS for _hit in _glob.glob(_pat)):
+    _so_dir = os.path.dirname(_so)
+    if _so_dir not in _HAILO_GST_CANDIDATES:
+        _HAILO_GST_CANDIDATES.append(_so_dir)
 _existing_gst_path = os.environ.get("GST_PLUGIN_PATH", "")
-if _HAILO_GST_DIR not in _existing_gst_path.split(":"):
-    os.environ["GST_PLUGIN_PATH"] = (
-        f"{_HAILO_GST_DIR}:{_existing_gst_path}" if _existing_gst_path else _HAILO_GST_DIR
-    )
+_existing_gst_dirs = set(filter(None, _existing_gst_path.split(":"))) if _existing_gst_path else set()
+_new_dirs = [d for d in _HAILO_GST_CANDIDATES
+             if d not in _existing_gst_dirs and os.path.isdir(d)]
+if _new_dirs:
+    _prefix = ":".join(_new_dirs)
+    os.environ["GST_PLUGIN_PATH"] = f"{_prefix}:{_existing_gst_path}" if _existing_gst_path else _prefix
 
 # All remaining imports come after the environment is prepared.
 import time, threading, gi, hailo, numpy as np, robot_brain as brain
@@ -43,9 +69,8 @@ _HAILO_ELEMENTS = ("hailonet", "hailofilter", "hailooverlay")
 
 def _clear_gst_registry():
     """Delete stale GStreamer registry cache files so the next scan starts fresh."""
-    import glob
     cache_dir = os.path.expanduser("~/.cache/gstreamer-1.0")
-    for path in glob.glob(os.path.join(cache_dir, "registry.*.bin")):
+    for path in _glob.glob(os.path.join(cache_dir, "registry.*.bin")):
         try:
             os.remove(path)
         except OSError:
@@ -78,9 +103,9 @@ def _check_hailo_plugins():
     # Still missing after rescan — this is a genuine installation problem.
     # Distinguish between "package not installed" and "package installed but
     # the plugin won't load" so the error message is immediately actionable.
-    _HAILO_PLUGIN_SO = f"/usr/lib/{_arch}-linux-gnu/gstreamer-1.0/libgsthailotools.so"
-    if not os.path.isfile(_HAILO_PLUGIN_SO):
-        # The .so file itself is absent — the package has never been installed.
+    _found_so = [_hit for _pat in _HAILO_SO_GLOB_PATTERNS for _hit in _glob.glob(_pat)]
+    if not _found_so:
+        # The .so file is absent from both /lib and /usr/lib — package not installed.
         print(
             f"ERROR: GStreamer element(s) not found: {', '.join(missing)}\n"
             "  The Hailo GStreamer plugin file is missing from this system.\n"
@@ -90,11 +115,13 @@ def _check_hailo_plugins():
     else:
         # The .so file exists but the plugin won't load — a shared-library
         # dependency (most likely libgomp) is missing or inaccessible.
+        _so_path = _found_so[0]
         print(
             f"ERROR: GStreamer element(s) not found: {', '.join(missing)}\n"
             "  The Hailo GStreamer plugins could not be loaded.\n"
+            f"  Plugin found at: {_so_path}\n"
             "  1. Check for missing shared-library dependencies:\n"
-            f"     ldd {_HAILO_PLUGIN_SO} | grep 'not found'\n"
+            f"     ldd {_so_path} | grep 'not found'\n"
             "  2. If libgomp appears missing, add to ~/.bashrc and open a new terminal:\n"
             f"     export LD_PRELOAD={_LIBGOMP}\n"
             "  3. Verify the Hailo device is connected: hailortcli fw-control identify"
