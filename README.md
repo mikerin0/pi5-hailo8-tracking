@@ -100,11 +100,29 @@ sudo apt install -y python3-gi python3-opencv \
     gstreamer1.0-libcamera libcamera-tools
 ```
 
-### Step 2 – Install Python packages
+### Step 2 – Create a virtual environment and install Python packages
+
+Raspberry Pi OS Bookworm (Debian 12) enforces [PEP 668](http://rptl.io/venv) and
+blocks bare `pip install` system-wide.  
+Use a virtual environment instead.
 
 ```bash
+python3 -m venv --system-site-packages ~/hailo-venv
+source ~/hailo-venv/bin/activate
 pip install numpy ikpy pyserial
 ```
+
+> **What `--system-site-packages` does**  
+> It lets the venv reuse packages installed via `apt` (like `gi`, `cv2`, and `hailo`
+> from the Hailo SDK) while still allowing `pip` to install `numpy`, `ikpy`, and
+> `pyserial` cleanly inside the venv.
+
+> **Activate the venv every session**  
+> Whenever you open a new terminal to run the code, run:
+> ```bash
+> source ~/hailo-venv/bin/activate
+> ```
+> You'll see `(hailo-venv)` at the start of your prompt when it's active.
 
 ### Step 3 – Place the Hailo8 model
 
@@ -140,6 +158,9 @@ value before running.
 ### Step 6 – Run the full system
 
 ```bash
+# Activate the virtual environment first (if not already active)
+source ~/hailo-venv/bin/activate
+
 # Starts both the GUI brain and the hand-gesture AI pipeline
 python od.py
 ```
@@ -224,7 +245,9 @@ Hand landmarks (Hailo8)
 sudo apt install python3-gi python3-opencv gstreamer1.0-tools \
      gstreamer1.0-plugins-good gstreamer1.0-plugins-bad
 
-# Python packages
+# Python packages (use a venv to avoid the PEP 668 error on Pi OS Bookworm)
+python3 -m venv --system-site-packages ~/hailo-venv
+source ~/hailo-venv/bin/activate
 pip install numpy ikpy pyserial
 ```
 
@@ -273,12 +296,14 @@ The post-processing shared library ships with the Hailo Pi 5 SDK:
 ### Run hand-gesture tracking (default / Hailo8)
 
 ```bash
+source ~/hailo-venv/bin/activate
 python od.py
 ```
 
 ### Run face tracking only
 
 ```bash
+source ~/hailo-venv/bin/activate
 python face_tracking.py
 ```
 
