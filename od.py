@@ -1,14 +1,28 @@
+import ctypes
 import os, sys, time, threading, platform, gi, hailo, numpy as np, robot_brain as brain
 import config
 
-# On aarch64 Linux, libgomp sometimes cannot allocate memory in its static
-# TLS block, which silently prevents Hailo GStreamer plugins from loading when
-# gst-plugin-scanner is spawned by Gst.init().  Pre-loading the library here
-# ensures it is already mapped before that subprocess starts.
+# On aarch64 Linux, libgomp.so.1 has a static TLS block that must be allocated
+# before any shared library that depends on it is loaded via dlopen().  If it
+# is not already mapped when Gst.init() calls dlopen("libgsthailotools.so"),
+# the dynamic linker cannot satisfy the TLS requirement and the plugin silently
+# fails to load.
+#
+# Setting os.environ["LD_PRELOAD"] only affects *new subprocesses* (it calls
+# putenv in C, which the dynamic linker reads at process startup).  It does
+# not retroactively load libgomp into the *current* Python process.
+#
+# The correct fix is to call ctypes.CDLL() which uses dlopen() immediately,
+# pre-allocating the static TLS before Gst.init() runs.  We also keep the
+# os.environ setting so that subprocesses (gst-plugin-scanner) inherit it.
 # See: https://github.com/hailo-ai/hailo-rpi5-examples/blob/main/doc/install-raspberry-pi5.md
 _arch = platform.machine()
 _LIBGOMP = f"/usr/lib/{_arch}-linux-gnu/libgomp.so.1"
 if os.path.isfile(_LIBGOMP):
+    try:
+        ctypes.CDLL(_LIBGOMP)  # load into the current process immediately
+    except OSError:
+        pass
     _ld_preload = os.environ.get("LD_PRELOAD", "")
     if _LIBGOMP not in _ld_preload.split(":"):
         os.environ["LD_PRELOAD"] = f"{_LIBGOMP}:{_ld_preload}" if _ld_preload else _LIBGOMP

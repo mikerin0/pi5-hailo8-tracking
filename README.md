@@ -105,25 +105,19 @@ sudo apt install -y python3-gi python3-opencv \
 > the GStreamer plug-ins (`hailonet`, `hailofilter`, `hailooverlay`) that `od.py` requires.
 >
 > **`od.py` handles GStreamer plugin discovery automatically.**
-> At startup it sets `LD_PRELOAD` and `GST_PLUGIN_PATH` before calling `Gst.init()`, and
-> if the plugins are still not found it clears the registry cache and forces a fresh
-> `gst-plugin-scanner` run — so in most cases just running `python od.py` is enough.
+> At startup it uses `ctypes.CDLL()` to load `libgomp.so.1` directly into the running
+> Python process (which pre-allocates its static TLS block), then calls `Gst.init()`.
+> If the plugins are still not found it also clears the registry cache and forces a
+> fresh rescan — so in most cases just running `python od.py` is enough with no
+> extra setup.
 >
-> If `od.py` still prints `ERROR: GStreamer element(s) not found` after the auto-rescan,
-> there is a genuine installation problem.  Check the details it prints; the most common
-> causes are:
+> If `od.py` still prints `ERROR: GStreamer element(s) not found`, there is a genuine
+> installation problem.  Check the details it prints; the most common causes are:
 >
-> **a) `libgomp` static TLS block issue** – On aarch64, `libgomp.so.1` sometimes cannot
-> allocate memory in a static TLS block when `gst-plugin-scanner` loads the Hailo
-> plugin.  Add `LD_PRELOAD` to `~/.bashrc` so it is set for the Python process itself,
-> then open a **new** terminal and retry:
+> **a) Missing or broken package** – Reinstall:
 > ```bash
-> echo 'export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1' >> ~/.bashrc
-> # Open a new terminal, then:
-> source ~/hailo-venv/bin/activate
-> python od.py
+> sudo apt update && sudo apt install --reinstall hailo-all
 > ```
-> *(The path is for Raspberry Pi 5 which is always `aarch64`.)*
 >
 > **b) Missing shared-library dependencies** – Run:
 > ```bash
@@ -131,8 +125,13 @@ sudo apt install -y python3-gi python3-opencv \
 > ```
 > Any library listed as "not found" must be installed before the plugin can load.
 >
-> **c) Hailo apt repository not configured** – If `hailo-all` is unavailable or
-> out-of-date, follow the
+> **c) Hailo device not connected or driver not loaded** – Run:
+> ```bash
+> hailortcli fw-control identify
+> ```
+> If this fails, check the HAT connection and that `hailort` service is running.
+>
+> **d) Hailo apt repository not configured** – Follow the
 > [Hailo Raspberry Pi 5 setup guide](https://hailo.ai/developer-zone/) to add the
 > repository, then re-run `sudo apt update && sudo apt install hailo-all`.
 
@@ -158,14 +157,17 @@ pip install numpy ikpy pyserial
 > from the Hailo SDK) while still allowing `pip` to install `numpy`, `ikpy`, and
 > `pyserial` cleanly inside the venv.
 
-> **`GST_PLUGIN_PATH`, `LD_PRELOAD`, and plugin discovery are all handled by `od.py`**  
-> At startup, `od.py` sets `GST_PLUGIN_PATH` and pre-loads `libgomp.so.1` before
-> calling `Gst.init()`.  If the Hailo GStreamer plugins are not found after init, it
-> automatically clears the stale registry cache and forces a full rescan — so simply
-> running `python od.py` is the right first step if you see plugin errors.  Manual
-> cache clearing is only needed if you want `gst-inspect-1.0` to work from the shell:
+> **GStreamer plugin discovery is fully automatic in `od.py`**  
+> At startup, `od.py` uses `ctypes.CDLL()` to load `libgomp.so.1` directly into the
+> running process, sets `GST_PLUGIN_PATH`, and then calls `Gst.init()`.  If plugins
+> are still not found it also clears the stale registry cache and forces a full
+> rescan.  No `LD_PRELOAD` changes to `~/.bashrc` are needed — just run:
 > ```bash
-> rm ~/.cache/gstreamer-1.0/registry.*.bin
+> python od.py
+> ```
+> If you want `gst-inspect-1.0` to work from the shell separately, you still need:
+> ```bash
+> export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1
 > gst-inspect-1.0 hailotools
 > ```
 
