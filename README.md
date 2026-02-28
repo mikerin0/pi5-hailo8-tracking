@@ -103,35 +103,36 @@ sudo apt install -y python3-gi python3-opencv \
 
 > **`hailo-all`** installs the Hailo8 firmware, runtime (`hailort`), Python bindings, and
 > the GStreamer plug-ins (`hailonet`, `hailofilter`, `hailooverlay`) that `od.py` requires.
-> After installing, verify the GStreamer elements are visible with:
-> ```bash
-> gst-inspect-1.0 hailotools
-> ```
-> If you see `No such element or plugin 'hailotools'` even though `hailo-all` is installed,
-> there are two common causes on aarch64 Raspberry Pi OS:
 >
-> **a) Stale GStreamer registry cache** – The registry was built before the Hailo plugins
-> arrived.  Clear it and retry:
-> ```bash
-> rm ~/.cache/gstreamer-1.0/registry.*.bin
-> gst-inspect-1.0 hailotools
-> ```
+> **`od.py` handles GStreamer plugin discovery automatically.**
+> At startup it sets `LD_PRELOAD` and `GST_PLUGIN_PATH` before calling `Gst.init()`, and
+> if the plugins are still not found it clears the registry cache and forces a fresh
+> `gst-plugin-scanner` run — so in most cases just running `python od.py` is enough.
 >
-> **b) `libgomp` static TLS block issue** – On aarch64, `libgomp.so.1` sometimes cannot
-> allocate memory in a static TLS block, silently preventing the Hailo plugin from
-> loading.  Pre-load the library by adding this line to `~/.bashrc`:
+> If `od.py` still prints `ERROR: GStreamer element(s) not found` after the auto-rescan,
+> there is a genuine installation problem.  Check the details it prints; the most common
+> causes are:
+>
+> **a) `libgomp` static TLS block issue** – On aarch64, `libgomp.so.1` sometimes cannot
+> allocate memory in a static TLS block when `gst-plugin-scanner` loads the Hailo
+> plugin.  Add `LD_PRELOAD` to `~/.bashrc` so it is set for the Python process itself,
+> then open a **new** terminal and retry:
 > ```bash
 > echo 'export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1' >> ~/.bashrc
-> source ~/.bashrc
-> rm ~/.cache/gstreamer-1.0/registry.*.bin
-> gst-inspect-1.0 hailotools
+> # Open a new terminal, then:
+> source ~/hailo-venv/bin/activate
+> python od.py
 > ```
-> *(The path above is for Raspberry Pi 5 which is always `aarch64`.  `od.py` resolves
-> it at runtime via `platform.machine()`, so no manual adjustment is needed there.)*
-> `od.py` applies this workaround automatically at startup, but you need it in `~/.bashrc`
-> for `gst-inspect-1.0` to work from the shell.
+> *(The path is for Raspberry Pi 5 which is always `aarch64`.)*
 >
-> If neither fix helps, the Hailo apt repository may not be configured.  Follow the
+> **b) Missing shared-library dependencies** – Run:
+> ```bash
+> ldd /lib/aarch64-linux-gnu/gstreamer-1.0/libgsthailotools.so | grep 'not found'
+> ```
+> Any library listed as "not found" must be installed before the plugin can load.
+>
+> **c) Hailo apt repository not configured** – If `hailo-all` is unavailable or
+> out-of-date, follow the
 > [Hailo Raspberry Pi 5 setup guide](https://hailo.ai/developer-zone/) to add the
 > repository, then re-run `sudo apt update && sudo apt install hailo-all`.
 
@@ -157,14 +158,15 @@ pip install numpy ikpy pyserial
 > from the Hailo SDK) while still allowing `pip` to install `numpy`, `ikpy`, and
 > `pyserial` cleanly inside the venv.
 
-> **`GST_PLUGIN_PATH` and `LD_PRELOAD` are set automatically by `od.py`**  
-> At startup, `od.py` ensures the standard GStreamer plugin directory is on
-> `GST_PLUGIN_PATH` and pre-loads `libgomp.so.1` to prevent the aarch64 static
-> TLS block issue (see Step 1 notes).  If you still see `GStreamer element(s)
-> not found`, clear the stale cache and retry:
+> **`GST_PLUGIN_PATH`, `LD_PRELOAD`, and plugin discovery are all handled by `od.py`**  
+> At startup, `od.py` sets `GST_PLUGIN_PATH` and pre-loads `libgomp.so.1` before
+> calling `Gst.init()`.  If the Hailo GStreamer plugins are not found after init, it
+> automatically clears the stale registry cache and forces a full rescan — so simply
+> running `python od.py` is the right first step if you see plugin errors.  Manual
+> cache clearing is only needed if you want `gst-inspect-1.0` to work from the shell:
 > ```bash
 > rm ~/.cache/gstreamer-1.0/registry.*.bin
-> python od.py
+> gst-inspect-1.0 hailotools
 > ```
 
 > **Activate the venv every session**  

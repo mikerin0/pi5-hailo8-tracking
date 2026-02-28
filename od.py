@@ -28,22 +28,52 @@ Gst.init(None)
 
 _HAILO_ELEMENTS = ("hailonet", "hailofilter", "hailooverlay")
 
+def _clear_gst_registry():
+    """Delete stale GStreamer registry cache files so the next scan starts fresh."""
+    import glob
+    cache_dir = os.path.expanduser("~/.cache/gstreamer-1.0")
+    for path in glob.glob(os.path.join(cache_dir, "registry.*.bin")):
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
 def _check_hailo_plugins():
-    """Return True if all Hailo GStreamer elements are registered; print help if not."""
+    """Return True if all Hailo GStreamer elements are registered.
+
+    If the initial check fails, automatically clears the GStreamer registry
+    cache and forces a fresh plugin scan (via Gst.update_registry()).  The
+    rescan inherits the LD_PRELOAD set at module level (_LIBGOMP), so
+    gst-plugin-scanner can load libgomp and, in turn, the Hailo plugin shared
+    libraries.  This recovers the common case where the cache was rebuilt
+    without LD_PRELOAD (e.g. by running gst-inspect-1.0 before configuring
+    ~/.bashrc).
+    """
     missing = [e for e in _HAILO_ELEMENTS if Gst.ElementFactory.find(e) is None]
-    if missing:
-        print(
-            f"ERROR: GStreamer element(s) not found: {', '.join(missing)}\n"
-            "  The Hailo GStreamer plugins are missing or not on the plugin path.\n"
-            "  1. Install the package:   sudo apt install hailo-all\n"
-            "  2. Clear the stale cache: rm ~/.cache/gstreamer-1.0/registry.*.bin\n"
-            "     Then retry:            python od.py\n"
-            "  3. Verify directly:       gst-inspect-1.0 hailotools\n"
-            "  4. If still missing, add to ~/.bashrc and restart the terminal:\n"
-            f"     export LD_PRELOAD={_LIBGOMP}"
-        )
-        return False
-    return True
+    if not missing:
+        return True
+
+    # Plugins not found — the registry cache may pre-date our LD_PRELOAD
+    # configuration.  Clear the cache files and force a full rescan.
+    _clear_gst_registry()
+    Gst.update_registry()
+
+    missing = [e for e in _HAILO_ELEMENTS if Gst.ElementFactory.find(e) is None]
+    if not missing:
+        return True
+
+    # Still missing after rescan — this is a genuine installation problem.
+    print(
+        f"ERROR: GStreamer element(s) not found: {', '.join(missing)}\n"
+        "  The Hailo GStreamer plugins could not be loaded.\n"
+        "  1. Confirm the package is installed: sudo apt install hailo-all\n"
+        "  2. Check for missing shared-library dependencies:\n"
+        f"     ldd /lib/{_arch}-linux-gnu/gstreamer-1.0/libgsthailotools.so | grep 'not found'\n"
+        "  3. If libgomp appears missing, add to ~/.bashrc and open a new terminal:\n"
+        f"     export LD_PRELOAD={_LIBGOMP}\n"
+        "  4. Verify the Hailo device is connected: hailortcli fw-control identify"
+    )
+    return False
 
 # --- Configuration (canonical values live in config.py) ---
 HEF_PATH = config.HEF_PATH
