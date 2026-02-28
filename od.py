@@ -19,7 +19,7 @@ _arch = platform.machine()
 _LIBGOMP = f"/usr/lib/{_arch}-linux-gnu/libgomp.so.1"
 if os.path.isfile(_LIBGOMP):
     try:
-        ctypes.CDLL(_LIBGOMP)  # load into the current process immediately
+        ctypes.CDLL(_LIBGOMP, ctypes.RTLD_GLOBAL)  # RTLD_GLOBAL: symbols visible to later dlopen() calls (GStreamer plugin loader)
     except OSError:
         pass
     _ld_preload = os.environ.get("LD_PRELOAD", "")
@@ -85,7 +85,7 @@ def _check_hailo_plugins():
         "  The Hailo GStreamer plugins could not be loaded.\n"
         "  1. Confirm the package is installed: sudo apt install hailo-all\n"
         "  2. Check for missing shared-library dependencies:\n"
-        f"     ldd /lib/{_arch}-linux-gnu/gstreamer-1.0/libgsthailotools.so | grep 'not found'\n"
+        f"     ldd /usr/lib/{_arch}-linux-gnu/gstreamer-1.0/libgsthailotools.so | grep 'not found'\n"
         "  3. If libgomp appears missing, add to ~/.bashrc and open a new terminal:\n"
         f"     export LD_PRELOAD={_LIBGOMP}\n"
         "  4. Verify the Hailo device is connected: hailortcli fw-control identify"
