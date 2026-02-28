@@ -4,7 +4,10 @@
 # Pi Camera on port 1 (high camera, used for face tracking)
 PI_CAMERA_DEVICE = "/base/axi/pcie@1000120000/rp1/i2c@80000/imx708@1a"
 # ArduCAM Module 3 (table/bottom camera, used for manipulation)
-ARDUCAM_DEVICE_ID = 0  # v4l2 device index (e.g. /dev/video0)
+ARDUCAM_DEVICE_ID = 0  # v4l2 device index for the USB ArduCAM; on Pi 5 Bookworm
+                       # the CSI driver registers /dev/video0–15, so the USB camera
+                       # typically appears at /dev/video16 or higher – confirm with:
+                       # v4l2-ctl --list-devices
 
 # --- Model Paths ---
 HEF_PATH = "/home/arm/models/hand_landmark_lite.hef"

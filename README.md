@@ -147,7 +147,7 @@ rpicam-hello --list-cameras
 # On Pi OS Bullseye (the older release) the command is still called:
 # libcamera-hello --list-cameras
 
-# ArduCAM Module 3 – should show /dev/video0 (or similar)
+# All V4L2 devices – look for an "ArduCAM" or "USB Video" entry for the table camera
 v4l2-ctl --list-devices
 ```
 
@@ -157,8 +157,17 @@ v4l2-ctl --list-devices
 > ```
 > On Pi OS Bullseye, use `sudo apt install -y libcamera-apps` and `libcamera-hello` instead.
 
-If the Pi Camera device name in the output differs from the default in `config.py`,
-update `PI_CAMERA_DEVICE` accordingly.
+> **Understanding the `v4l2-ctl --list-devices` output on Pi 5:**  
+> On Pi 5 Bookworm you will always see two `rp1-cfe` entries (each owning `/dev/video0`–`7`
+> and `/dev/video8`–`15`) plus `pispbe` and `rpi-hevc-dec` — these are the built-in CSI
+> camera interfaces and ISP; they are **not** the ArduCAM USB camera.  
+> The USB ArduCAM appears as a separate named entry (e.g. `ArduCAM USB Camera` or
+> `USB Video Device`) at a higher device number (typically `/dev/video16` or above).  
+> Note its `/dev/videoX` number and update `ARDUCAM_DEVICE_ID` in `config.py` if it
+> differs from `0`.
+
+If the libcamera path shown by `rpicam-hello --list-cameras` differs from the default
+`/base/axi/.../imx708@1a` in `config.py`, update `PI_CAMERA_DEVICE` accordingly.
 
 ### Step 5 – Check serial port for the arm
 
@@ -287,7 +296,7 @@ The post-processing shared library ships with the Hailo Pi 5 SDK:
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `PI_CAMERA_DEVICE` | `/base/axi/…/imx708@1a` | libcamerasrc camera-name for port 1 |
-| `ARDUCAM_DEVICE_ID` | `0` | v4l2 device index for ArduCAM |
+| `ARDUCAM_DEVICE_ID` | `0` | v4l2 device index for the USB ArduCAM (see Step 4) |
 | `HEF_PATH` | `/home/arm/models/…` | Hailo8 HEF model path |
 | `SO_PATH` | `/usr/lib/…` | Hand-landmark post-processing .so |
 | `HAAR_CASCADE_PATH` | `/usr/share/opencv4/…` | OpenCV Haar Cascade XML |
