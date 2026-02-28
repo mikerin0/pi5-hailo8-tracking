@@ -134,6 +134,16 @@ pip install numpy ikpy pyserial
 > from the Hailo SDK) while still allowing `pip` to install `numpy`, `ikpy`, and
 > `pyserial` cleanly inside the venv.
 
+> **`GST_PLUGIN_PATH` is set automatically**  
+> `od.py` prepends `/usr/lib/aarch64-linux-gnu/gstreamer-1.0` to `GST_PLUGIN_PATH`
+> before GStreamer initialises, so the Hailo elements (`hailonet`, `hailofilter`,
+> `hailooverlay`) are found even when the venv doesn't inherit the system GStreamer
+> environment.  If you still see `GStreamer element(s) not found` after installing
+> `hailo-all`, confirm that the `.so` files are in that directory:
+> ```bash
+> ls /usr/lib/aarch64-linux-gnu/gstreamer-1.0/libgst*hailo*
+> ```
+
 > **Activate the venv every session**  
 > Whenever you open a new terminal to run the code, run:
 > ```bash

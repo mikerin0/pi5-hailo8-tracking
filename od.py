@@ -1,6 +1,19 @@
-import os, sys, time, threading, gi, hailo, numpy as np, robot_brain as brain
+import os, sys, time, threading, platform, gi, hailo, numpy as np, robot_brain as brain
 import config
-gi.require_version('Gst', '1.0'); from gi.repository import Gst; Gst.init(None)
+
+# Prepend the Hailo GStreamer plugin directory to GST_PLUGIN_PATH before
+# Gst.init() so that hailonet / hailofilter / hailooverlay are discovered
+# even when the environment variable is unset or overridden (e.g. in a venv).
+_HAILO_GST_DIR = f"/usr/lib/{platform.machine()}-linux-gnu/gstreamer-1.0"
+_existing_gst_path = os.environ.get("GST_PLUGIN_PATH", "")
+if _HAILO_GST_DIR not in _existing_gst_path.split(":"):
+    os.environ["GST_PLUGIN_PATH"] = (
+        f"{_HAILO_GST_DIR}:{_existing_gst_path}" if _existing_gst_path else _HAILO_GST_DIR
+    )
+
+gi.require_version('Gst', '1.0')
+from gi.repository import Gst
+Gst.init(None)
 
 _HAILO_ELEMENTS = ("hailonet", "hailofilter", "hailooverlay")
 
@@ -11,8 +24,9 @@ def _check_hailo_plugins():
         print(
             f"ERROR: GStreamer element(s) not found: {', '.join(missing)}\n"
             "  The Hailo GStreamer plugins are missing or not on the plugin path.\n"
-            "  Install them with:  sudo apt install hailo-all\n"
-            "  Then verify with:   gst-inspect-1.0 hailonet"
+            "  1. Install the package:  sudo apt install hailo-all\n"
+            "  2. Verify the elements:  gst-inspect-1.0 hailonet\n"
+            f"  3. If still missing, check that GST_PLUGIN_PATH includes {_HAILO_GST_DIR}"
         )
         return False
     return True
