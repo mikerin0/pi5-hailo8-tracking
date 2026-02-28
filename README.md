@@ -4,6 +4,80 @@ Face and hand tracking with Raspberry Pi 5, Hailo8 AI accelerator, and ArduCAM.
 
 ---
 
+## Quick Start
+
+Follow these steps in order to go from a fresh clone to a running system.
+
+### Step 1 – Install system packages
+
+```bash
+sudo apt update
+sudo apt install -y python3-gi python3-opencv \
+    gstreamer1.0-tools gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
+    gstreamer1.0-libcamera libcamera-tools
+```
+
+### Step 2 – Install Python packages
+
+```bash
+pip install numpy ikpy pyserial
+```
+
+### Step 3 – Place the Hailo8 model
+
+Copy the hand-landmark HEF from the Hailo Pi 5 SDK into the expected location:
+
+```bash
+mkdir -p /home/arm/models
+cp /path/to/hand_landmark_lite.hef /home/arm/models/
+```
+
+### Step 4 – Verify cameras are visible
+
+```bash
+# Pi Camera (port 1) – should list the imx708 sensor
+libcamera-hello --list-cameras
+
+# ArduCAM Module 3 – should show /dev/video0 (or similar)
+v4l2-ctl --list-devices
+```
+
+If the Pi Camera device name in the output differs from the default in `config.py`,
+update `PI_CAMERA_DEVICE` accordingly.
+
+### Step 5 – Check serial port for the arm
+
+```bash
+ls /dev/ttyAMA*
+```
+
+If the port is not `/dev/ttyAMA10`, edit `PORT` in `robot_brain.py` or set the correct
+value before running.
+
+### Step 6 – Run the full system
+
+```bash
+# Starts both the GUI brain and the hand-gesture AI pipeline
+python od.py
+```
+
+The Tkinter GUI window opens automatically.  Use the **HIGH CAM** / **TABLE CAM**
+buttons in the GUI to switch camera modes at any time.
+
+### Step 7 – Verify each feature
+
+| Feature | How to test |
+|---------|-------------|
+| Arm moves to home | Click **HOME ARM** in the GUI |
+| Manual arm control | Enable manual sliders, drag the **Reach X / Swing Y / Height Z** sliders |
+| Face tracking | Click **HIGH CAM** – the arm should follow your face smoothly |
+| Hand open event | Show an open flat hand to the Pi Camera – terminal prints `HAND_OPEN` |
+| Hand closed event | Make a fist – terminal prints `HAND_CLOSED` |
+| Index-finger light | Point index finger up – terminal prints `LIGHTS ON` |
+| Crestron connection | Connect Crestron client to port **50005**; send `HOME` to confirm two-way comms |
+
+---
+
 ## Architecture Overview
 
 ```
