@@ -98,7 +98,12 @@ if not _new_dirs:
 
 # Increment this whenever a new version is pushed so users can confirm they
 # are running the latest code after a git pull.
-_VERSION = "2026.02.28-6"
+_VERSION = "2026.02.28-7"
+
+# Maximum number of GST_DEBUG log lines to embed in the runtime-failure error.
+_GST_DEBUG_MAX_LINES = 25
+# Timeout (seconds) for gst-inspect-1.0 when collecting runtime diagnostics.
+_GST_INSPECT_TIMEOUT = 20
 
 # All remaining imports come after the environment is prepared.
 import time, threading, gi, hailo, numpy as np, robot_brain as brain
@@ -253,11 +258,74 @@ def _check_hailo_plugins():
             # since that is the most common reason for load failure.
             _gomp_missing = not os.path.isfile(_LIBGOMP)
         else:
-            # ldd ran cleanly but found nothing missing.  The load failure is
-            # likely a stale GStreamer cache entry (recorded before libgomp was
-            # pre-loaded via LD_PRELOAD).  Infer that libgomp may be involved
-            # if it is absent from disk.
-            _gomp_missing = not os.path.isfile(_LIBGOMP)
+            # ldd ran cleanly — all shared-library dependencies are resolved.
+            # The load failure is a runtime error, not a missing-library error.
+            # Collect GStreamer plugin diagnostics and installed hailo package
+            # versions so the user can identify the root cause (most commonly a
+            # firmware/driver version mismatch between libhailort and the Hailo
+            # firmware actually running on the device).
+            _gst_debug_lines = []
+            try:
+                # Build a minimal environment: keep standard path/library vars
+                # and the hailo plugin path we set earlier, but avoid
+                # propagating any credentials or tokens from the current env.
+                _gst_debug_env = {
+                    k: v for k, v in os.environ.items()
+                    if k in (
+                        "PATH", "HOME", "USER", "LOGNAME",
+                        "LD_PRELOAD", "LD_LIBRARY_PATH",
+                        "GST_PLUGIN_PATH", "GST_REGISTRY",
+                        "XDG_RUNTIME_DIR", "XDG_CACHE_HOME",
+                        "DBUS_SESSION_BUS_ADDRESS",
+                    )
+                }
+                _gst_debug_env["GST_DEBUG"] = "3"
+                _gst_debug_result = subprocess.run(
+                    ["gst-inspect-1.0", "hailonet"],
+                    capture_output=True, text=True, check=False,
+                    timeout=_GST_INSPECT_TIMEOUT, env=_gst_debug_env
+                )
+                _gst_combined = (
+                    _gst_debug_result.stdout + _gst_debug_result.stderr
+                ).strip()
+                if _gst_combined:
+                    _gst_debug_lines = _gst_combined.splitlines()[:_GST_DEBUG_MAX_LINES]
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                pass
+
+            _hailo_pkgs = []
+            try:
+                _dpkg_list_out = subprocess.run(
+                    ["dpkg", "-l"],
+                    capture_output=True, text=True, check=False, timeout=5
+                ).stdout
+                for _pl in _dpkg_list_out.splitlines():
+                    _cols = _pl.split()
+                    # Column layout: status, name, version, ...
+                    # Only include rows whose package name starts with 'hailo'.
+                    if len(_cols) >= 3 and _cols[1].startswith("hailo"):
+                        _hailo_pkgs.append(f"{_cols[1]}  {_cols[2]}")
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                pass
+
+            _ldd_section = (
+                "  All shared-library dependencies are resolved (ldd: no missing libs).\n"
+                "  The plugin fails to load at runtime — most common cause:\n"
+                "    Hailo firmware/driver version mismatch.\n"
+            )
+            if _gst_debug_lines:
+                _ldd_section += (
+                    "  GStreamer plugin diagnostics (GST_DEBUG=3):\n"
+                    + "\n".join(f"    {ln}" for ln in _gst_debug_lines)
+                    + "\n"
+                )
+            if _hailo_pkgs:
+                _ldd_section += (
+                    "  Installed Hailo packages:\n"
+                    + "\n".join(f"    {p}" for p in _hailo_pkgs)
+                    + "\n"
+                )
+            _gomp_missing = False
 
         if _gomp_missing:
             if os.path.isfile(_LIBGOMP):
@@ -279,12 +347,26 @@ def _check_hailo_plugins():
                     f"    rm -rf ~/.cache/gstreamer-1.0 && python {_run_cmd}\n"
                 )
         else:
-            _gomp_hint = (
-                "  If libgomp appears in the list above, set LD_PRELOAD:\n"
-                f"    export LD_PRELOAD={_LIBGOMP}\n"
-                "  Then clear the GStreamer cache and re-run:\n"
-                f"    rm -rf ~/.cache/gstreamer-1.0 && python {_run_cmd}\n"
-            )
+            if not _ldd_missing and not _ldd_stderr:
+                # Clean ldd — runtime failure, not a missing-library issue.
+                _gomp_hint = (
+                    "  Steps to resolve:\n"
+                    "  1. Check firmware vs driver version match:\n"
+                    "       hailortcli fw-control identify\n"
+                    "       dpkg -l | grep hailo\n"
+                    "  2. If versions differ, reinstall to match firmware:\n"
+                    "       sudo apt install --reinstall hailo-all && sudo reboot\n"
+                    "  3. Verify device node is accessible:\n"
+                    "       ls -la /dev/hailo*\n"
+                )
+            else:
+                # ldd found missing deps not involving libgomp (or ldd errored).
+                _gomp_hint = (
+                    "  If libgomp appears in the list above, set LD_PRELOAD:\n"
+                    f"    export LD_PRELOAD={_LIBGOMP}\n"
+                    "  Then clear the GStreamer cache and re-run:\n"
+                    f"    rm -rf ~/.cache/gstreamer-1.0 && python {_run_cmd}\n"
+                )
 
         print(
             f"ERROR: GStreamer element(s) not found: {', '.join(missing)}\n"
