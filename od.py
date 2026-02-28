@@ -1,10 +1,21 @@
 import os, sys, time, threading, platform, gi, hailo, numpy as np, robot_brain as brain
 import config
 
-# Prepend the Hailo GStreamer plugin directory to GST_PLUGIN_PATH before
-# Gst.init() so that hailonet / hailofilter / hailooverlay are discovered
-# even when the environment variable is unset or overridden (e.g. in a venv).
-_HAILO_GST_DIR = f"/usr/lib/{platform.machine()}-linux-gnu/gstreamer-1.0"
+# On aarch64 Linux, libgomp sometimes cannot allocate memory in its static
+# TLS block, which silently prevents Hailo GStreamer plugins from loading when
+# gst-plugin-scanner is spawned by Gst.init().  Pre-loading the library here
+# ensures it is already mapped before that subprocess starts.
+# See: https://github.com/hailo-ai/hailo-rpi5-examples/blob/main/doc/install-raspberry-pi5.md
+_arch = platform.machine()
+_LIBGOMP = f"/usr/lib/{_arch}-linux-gnu/libgomp.so.1"
+if os.path.isfile(_LIBGOMP):
+    _ld_preload = os.environ.get("LD_PRELOAD", "")
+    if _LIBGOMP not in _ld_preload.split(":"):
+        os.environ["LD_PRELOAD"] = f"{_LIBGOMP}:{_ld_preload}" if _ld_preload else _LIBGOMP
+
+# Also ensure the standard GStreamer plugin directory is on the search path
+# in case GST_PLUGIN_PATH was overridden (e.g. inside a venv).
+_HAILO_GST_DIR = f"/usr/lib/{_arch}-linux-gnu/gstreamer-1.0"
 _existing_gst_path = os.environ.get("GST_PLUGIN_PATH", "")
 if _HAILO_GST_DIR not in _existing_gst_path.split(":"):
     os.environ["GST_PLUGIN_PATH"] = (
@@ -24,9 +35,12 @@ def _check_hailo_plugins():
         print(
             f"ERROR: GStreamer element(s) not found: {', '.join(missing)}\n"
             "  The Hailo GStreamer plugins are missing or not on the plugin path.\n"
-            "  1. Install the package:  sudo apt install hailo-all\n"
-            "  2. Verify the elements:  gst-inspect-1.0 hailonet\n"
-            f"  3. If still missing, check that GST_PLUGIN_PATH includes {_HAILO_GST_DIR}"
+            "  1. Install the package:   sudo apt install hailo-all\n"
+            "  2. Clear the stale cache: rm ~/.cache/gstreamer-1.0/registry.*.bin\n"
+            "     Then retry:            python od.py\n"
+            "  3. Verify directly:       gst-inspect-1.0 hailotools\n"
+            "  4. If still missing, add to ~/.bashrc and restart the terminal:\n"
+            f"     export LD_PRELOAD={_LIBGOMP}"
         )
         return False
     return True

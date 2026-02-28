@@ -105,10 +105,33 @@ sudo apt install -y python3-gi python3-opencv \
 > the GStreamer plug-ins (`hailonet`, `hailofilter`, `hailooverlay`) that `od.py` requires.
 > After installing, verify the GStreamer elements are visible with:
 > ```bash
-> gst-inspect-1.0 hailonet
+> gst-inspect-1.0 hailotools
 > ```
-> If you see `No such element or plugin 'hailonet'`, the Hailo apt repository may not be
-> configured on your Pi yet. Follow the
+> If you see `No such element or plugin 'hailotools'` even though `hailo-all` is installed,
+> there are two common causes on aarch64 Raspberry Pi OS:
+>
+> **a) Stale GStreamer registry cache** – The registry was built before the Hailo plugins
+> arrived.  Clear it and retry:
+> ```bash
+> rm ~/.cache/gstreamer-1.0/registry.*.bin
+> gst-inspect-1.0 hailotools
+> ```
+>
+> **b) `libgomp` static TLS block issue** – On aarch64, `libgomp.so.1` sometimes cannot
+> allocate memory in a static TLS block, silently preventing the Hailo plugin from
+> loading.  Pre-load the library by adding this line to `~/.bashrc`:
+> ```bash
+> echo 'export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1' >> ~/.bashrc
+> source ~/.bashrc
+> rm ~/.cache/gstreamer-1.0/registry.*.bin
+> gst-inspect-1.0 hailotools
+> ```
+> *(The path above is for Raspberry Pi 5 which is always `aarch64`.  `od.py` resolves
+> it at runtime via `platform.machine()`, so no manual adjustment is needed there.)*
+> `od.py` applies this workaround automatically at startup, but you need it in `~/.bashrc`
+> for `gst-inspect-1.0` to work from the shell.
+>
+> If neither fix helps, the Hailo apt repository may not be configured.  Follow the
 > [Hailo Raspberry Pi 5 setup guide](https://hailo.ai/developer-zone/) to add the
 > repository, then re-run `sudo apt update && sudo apt install hailo-all`.
 
@@ -134,14 +157,14 @@ pip install numpy ikpy pyserial
 > from the Hailo SDK) while still allowing `pip` to install `numpy`, `ikpy`, and
 > `pyserial` cleanly inside the venv.
 
-> **`GST_PLUGIN_PATH` is set automatically**  
-> `od.py` prepends `/usr/lib/aarch64-linux-gnu/gstreamer-1.0` to `GST_PLUGIN_PATH`
-> before GStreamer initialises, so the Hailo elements (`hailonet`, `hailofilter`,
-> `hailooverlay`) are found even when the venv doesn't inherit the system GStreamer
-> environment.  If you still see `GStreamer element(s) not found` after installing
-> `hailo-all`, confirm that the `.so` files are in that directory:
+> **`GST_PLUGIN_PATH` and `LD_PRELOAD` are set automatically by `od.py`**  
+> At startup, `od.py` ensures the standard GStreamer plugin directory is on
+> `GST_PLUGIN_PATH` and pre-loads `libgomp.so.1` to prevent the aarch64 static
+> TLS block issue (see Step 1 notes).  If you still see `GStreamer element(s)
+> not found`, clear the stale cache and retry:
 > ```bash
-> ls /usr/lib/aarch64-linux-gnu/gstreamer-1.0/libgst*hailo*
+> rm ~/.cache/gstreamer-1.0/registry.*.bin
+> python od.py
 > ```
 
 > **Activate the venv every session**  
