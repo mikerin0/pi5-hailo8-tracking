@@ -4,6 +4,28 @@ Face and hand tracking with Raspberry Pi 5, Hailo8 AI accelerator, and ArduCAM.
 
 ---
 
+## What You'll Need
+
+### Hardware
+
+| Item | Notes |
+|------|-------|
+| Raspberry Pi 5 | 4 GB or 8 GB RAM recommended |
+| Hailo8 AI HAT+ | Plugs into the Pi 5 PCIe slot |
+| Raspberry Pi Camera Module 3 | Connected to Camera port 1 (the far port from USB); this is the official Pi camera |
+| ArduCAM USB Camera Module 3 | USB camera used as the table/bottom view; this is ArduCAM's separate product |
+| 6DOF robot arm (Hiwonder) | Connected via `/dev/ttyAMA10` serial port |
+| MicroSD card | 16 GB+ with Raspberry Pi OS (64-bit, Bookworm) |
+
+### Software (pre-installed on Raspberry Pi OS Bookworm)
+
+- **Python 3.11+** – `python3 --version`
+- **Git** – `git --version` (install with `sudo apt install -y git` if missing)
+- **Hailo Pi 5 SDK** – follow the [Hailo documentation](https://hailo.ai/developer-zone/) to install `hailort` and the GStreamer plug-ins
+- **GStreamer 1.0** – installed in Step 1 below
+
+---
+
 ## Quick Start
 
 Follow these steps in order to go from a fresh clone to a running system.
@@ -31,6 +53,26 @@ cd pi5-hailo8-tracking
 > **Prefer a zip download?**  
 > On the GitHub page click **Code → Download ZIP**, copy the zip to the Pi
 > (e.g. with `scp`), then `unzip pi5-hailo8-tracking-main.zip`.
+
+#### ✅ Verify the files are there
+
+After cloning (or pulling), run:
+
+```bash
+ls
+```
+
+You should see exactly these five files:
+
+```
+README.md
+config.py
+face_tracking.py
+od.py
+robot_brain.py
+```
+
+If the files are listed, you're ready to move on. If the folder looks empty or the command gives an error, check that you are inside the `pi5-hailo8-tracking` directory (`pwd` prints your current path).
 
 ### Step 1 – Install system packages
 
