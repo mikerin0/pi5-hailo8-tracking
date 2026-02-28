@@ -8,6 +8,22 @@ Face and hand tracking with Raspberry Pi 5, Hailo8 AI accelerator, and ArduCAM.
 
 Follow these steps in order to go from a fresh clone to a running system.
 
+### Step 0 – Get the code onto your Pi
+
+Open a terminal on your Raspberry Pi (or SSH into it) and run:
+
+```bash
+git clone https://github.com/mikerin0/pi5-hailo8-tracking.git
+cd pi5-hailo8-tracking
+```
+
+> **No `git` installed?**  
+> `sudo apt install -y git` then repeat the commands above.
+>
+> **Prefer a zip download?**  
+> On the GitHub page click **Code → Download ZIP**, copy the zip to the Pi
+> (e.g. with `scp`), then `unzip pi5-hailo8-tracking-main.zip`.
+
 ### Step 1 – Install system packages
 
 ```bash
