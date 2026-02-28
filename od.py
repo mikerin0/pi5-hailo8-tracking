@@ -98,7 +98,7 @@ if not _new_dirs:
 
 # Increment this whenever a new version is pushed so users can confirm they
 # are running the latest code after a git pull.
-_VERSION = "2026.02.28-9"
+_VERSION = "2026.02.28-10"
 
 # Maximum number of GST_DEBUG log lines to embed in the runtime-failure error.
 _GST_DEBUG_MAX_LINES = 25
@@ -106,7 +106,7 @@ _GST_DEBUG_MAX_LINES = 25
 _GST_INSPECT_TIMEOUT = 20
 
 # All remaining imports come after the environment is prepared.
-import time, threading, gi, hailo, numpy as np, robot_brain as brain
+import time, threading, gi, hailo, numpy as np, cv2, robot_brain as brain
 import config
 
 gi.require_version('Gst', '1.0')
@@ -478,11 +478,77 @@ def app_callback(pad, info, user_data):
     except Exception: pass
     return Gst.PadProbeReturn.OK
 
+def _cpu_fallback_loop():
+    """CPU-only fallback: live video window with Haar-cascade face detection.
+
+    Called when the Hailo GStreamer plugin is unavailable.  Uses the same
+    libcamerasrc pipeline as face_tracking.py (no hailonet required) and
+    displays detected faces in an OpenCV window so the user always gets a
+    live feed with AI bounding-box indicators regardless of Hailo status.
+    """
+    print("--- CPU Fallback Mode: live video + Haar face detection ---")
+    face_cascade = cv2.CascadeClassifier(config.HAAR_CASCADE_PATH)
+    launch_str = (
+        f"libcamerasrc camera-name={config.PI_CAMERA_DEVICE} ! "
+        f"videoconvert ! "
+        f"video/x-raw,format=RGB,width={config.FRAME_W},height={config.FRAME_H} ! "
+        f"queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
+        f"appsink name=sink emit-signals=false sync=false drop=true max-buffers=1"
+    )
+    try:
+        pipe = Gst.parse_launch(launch_str)
+    except Exception as e:
+        print(f"CPU Fallback: pipeline build failed: {e}")
+        return
+    sink = pipe.get_by_name("sink")
+    pipe.set_state(Gst.State.PLAYING)
+    print("--- CPU Fallback Active: Pi5 AI Vision window (press Q to quit) ---")
+    try:
+        while True:
+            sample = sink.emit("try-pull-sample", int(0.1 * Gst.SECOND))
+            if sample is None:
+                continue
+            buf = sample.get_buffer()
+            caps = sample.get_caps()
+            struct = caps.get_structure(0)
+            w = struct.get_value("width")
+            h = struct.get_value("height")
+            ok, mapinfo = buf.map(Gst.MapFlags.READ)
+            if not ok:
+                continue
+            try:
+                frame_rgb = np.frombuffer(mapinfo.data, dtype=np.uint8).reshape((h, w, 3))
+                frame = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+                gray = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2GRAY)
+                faces = face_cascade.detectMultiScale(
+                    gray,
+                    scaleFactor=config.FACE_SCALE_FACTOR,
+                    minNeighbors=config.FACE_MIN_NEIGHBORS,
+                    minSize=config.FACE_MIN_SIZE,
+                )
+                for (fx, fy, fw, fh) in faces:
+                    cv2.rectangle(frame, (fx, fy), (fx + fw, fy + fh), (0, 255, 0), 2)
+                    cv2.putText(frame, "FACE", (fx, fy - 6),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                label = f"Faces: {len(faces)}  |  Hailo: UNAVAILABLE (CPU mode)"
+                cv2.putText(frame, label, (10, 25),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 80, 255), 2)
+                cv2.imshow("Pi5 AI Vision", frame)
+            finally:
+                buf.unmap(mapinfo)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+    finally:
+        pipe.set_state(Gst.State.NULL)
+        cv2.destroyAllWindows()
+
+
 def camera_loop():
     # Force the device type for the Pro chip before starting
     os.environ["hailort_device_type"] = "hailo8"
 
     if not _check_hailo_plugins():
+        _cpu_fallback_loop()
         return
     
     while True:
