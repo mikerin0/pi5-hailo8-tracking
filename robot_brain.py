@@ -5,9 +5,8 @@ import ikpy.link
 
 # --- SAFETY FLAG ---
 # Set to True to disable ALL servo movement (prevents hardware damage).
-# The arm went to an impossible position and burned out a servo;
-# keep this True until GStreamer/Hailo is working and safe limits are verified.
-ARM_MOVEMENT_DISABLED = True
+# Set to False once the Hailo pipeline is confirmed working and arm limits are safe.
+ARM_MOVEMENT_DISABLED = False
 
 # --- 1. SETTINGS & HARDWARE ---
 # Physical lengths of your 6DOF arm (L4 includes your 19cm claw)
@@ -72,6 +71,16 @@ def tcp_listener():
                             move_servo(1, 2300, 900)
                         elif data in ("HIGH_CAM", "TABLE_CAM"):
                             switch_camera(data)
+                        elif data == "FLAGPOLE":
+                            tuner.shared_params["busy"] = 1
+                            reach_for_coordinate(0.05, 0.0, 0.46, speed=500)
+                            say("Flagpole Mode. Manual lock engaged.")
+                        elif data == "RESUME":
+                            tuner.shared_params["busy"] = 0
+                            global last_angles
+                            last_angles = [0, 0, 0.2, 0.5, 0.1]
+                            reach_for_coordinate(0.2, 0.0, 0.25, speed=1000)
+                            say("Resuming tracking")
             except Exception as e:
                 print(f"Connection Lost: {e}")
             finally:
@@ -113,12 +122,18 @@ def move_servo(id, pos, time_ms=800):
     if ARM_MOVEMENT_DISABLED:
         print(f"ARM_MOVEMENT_DISABLED: servo {id} pos {pos} suppressed")
         return
-    pos = max(500, min(2500, pos))
+    # Servo 1 is the claw – limit its closing range to protect the mechanism
+    if id == 1:
+        pos = max(1500, min(2326, pos))
+    else:
+        pos = max(500, min(2500, pos))
     packet = bytearray([0x55, 0x55, 0x08, 0x03, 0x01, time_ms & 0xFF, (time_ms >> 8) & 0xFF, id, pos & 0xFF, (pos >> 8) & 0xFF])
     ser.write(packet)
 
 def go_home():
-    for id in [6, 5, 4, 3, 2]: move_servo(id, 1500, 2000)
+    # Calibrated safe-rest positions for each servo (from field tuning)
+    for id, pos in {6: 1883, 5: 700, 4: 655, 3: 720, 2: 1500, 1: 1500}.items():
+        move_servo(id, pos, 2000)
 
 def reach_for_coordinate(x, y, z, speed=800):
     global last_angles
@@ -134,19 +149,41 @@ def reach_for_coordinate(x, y, z, speed=800):
         for id, pos in new_p.items(): move_servo(id, pos, speed)
     except Exception as e: print(f"IK Error: {e}")
 
+def say(text):
+    """Non-blocking Piper TTS speech via PipeWire audio output."""
+    PIPER_BIN = "/home/arm/piper/piper/piper"
+    MODEL_PATH = "/home/arm/piper/en_US-lessac-medium.onnx"
+    if not os.path.exists(PIPER_BIN) or not os.path.exists(MODEL_PATH):
+        print(f"Speech (TTS unavailable): {text}")
+        return
+    try:
+        piper_proc = subprocess.Popen(
+            [PIPER_BIN, "--model", MODEL_PATH, "--output-raw"],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
+        )
+        play_proc = subprocess.Popen(  # noqa: F841
+            ["pw-play", "--rate", "22050", "--channels", "1", "--format", "s16", "-"],
+            stdin=piper_proc.stdout, stderr=subprocess.DEVNULL
+        )
+        piper_proc.stdout.close()
+        piper_proc.stdin.write((text + "\n").encode())
+        piper_proc.stdin.close()
+    except Exception as e:
+        print(f"Speech Error: {e}")
+
 # --- 5. THE TUNER DASHBOARD ---
 
 class RobotTuner:
     def __init__(self):
         self.shared_params = {
-            "ry_m":0.3, "rz_m":0.3, "z_off":0.0, "speed":1200, "smooth":0.5,
-            "busy": 1, "tune_x":0.20, "tune_y":0.0, "tune_z":0.15,
+            "ry_m":0.42, "rz_m":0.45, "z_off":0.0, "speed":950, "smooth":0.20,
+            "busy": 0, "tune_x":0.20, "tune_y":0.0, "tune_z":0.15,
             "nose_x":0.5, "nose_y":0.5,
             "left_hand_x":0.5, "left_hand_y":0.5,
             "right_hand_x":0.5, "right_hand_y":0.5,
             "camera_mode": "HIGH_CAM",
         }
-        self.manual_mode = True 
+        self.manual_mode = False 
         self.needs_camera_restart = False
 
     def get_params(self): return self.shared_params
@@ -169,7 +206,7 @@ class RobotTuner:
 
         # --- Robot Frame ---
         tk.Label(self.root, text="--- ROBOT CONTROL ---", font=("Arial", 12, "bold")).pack(pady=5)
-        self.manual_var = tk.BooleanVar(value=True)
+        self.manual_var = tk.BooleanVar(value=False)
         tk.Checkbutton(self.root, text="ENABLE MANUAL SLIDERS (AI LOCKED)", variable=self.manual_var, command=self.toggle_manual_mode, font=("Arial", 10, "bold"), fg="blue").pack(pady=10)
 
         for lbl, k, mn, mx in [("Reach X", "tune_x", 0.1, 0.35), ("Swing Y", "tune_y", -0.2, 0.2), ("Height Z", "tune_z", 0.02, 0.4)]:
