@@ -98,7 +98,7 @@ if not _new_dirs:
 
 # Increment this whenever a new version is pushed so users can confirm they
 # are running the latest code after a git pull.
-_VERSION = "2026.02.28-13"
+_VERSION = "2026.02.28-14"
 
 # Maximum number of GST_DEBUG log lines to embed in the runtime-failure error.
 _GST_DEBUG_MAX_LINES = 25
@@ -499,6 +499,9 @@ def _cpu_fallback_loop():
                   f" or {_fallback_xml} – face detection disabled")
         else:
             print(f"CPU Fallback: cascade loaded from {_fallback_xml}")
+    # CLAHE normalises local contrast without over-amplifying uniform backgrounds,
+    # which equalizeHist can do (causing false positives). Create once, reuse per frame.
+    _clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     launch_str = (
         f"libcamerasrc camera-name={config.PI_CAMERA_DEVICE} ! "
         f"videoconvert ! "
@@ -531,7 +534,7 @@ def _cpu_fallback_loop():
                 frame_rgb = np.frombuffer(mapinfo.data, dtype=np.uint8).reshape((h, w, 3))
                 frame = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
                 gray = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2GRAY)
-                gray = cv2.equalizeHist(gray)
+                gray = _clahe.apply(gray)
                 faces = face_cascade.detectMultiScale(
                     gray,
                     scaleFactor=config.FACE_SCALE_FACTOR,

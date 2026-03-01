@@ -16,8 +16,8 @@ SO_PATH = "/usr/lib/aarch64-linux-gnu/hailo/libhand_landmark_post.so"
 # --- Face Detection Parameters (OpenCV Haar Cascade) ---
 HAAR_CASCADE_PATH = "/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml"
 FACE_SCALE_FACTOR = 1.1    # scaleFactor for detectMultiScale (lower = more thorough scan)
-FACE_MIN_NEIGHBORS = 3     # minNeighbors for detectMultiScale (lower = more sensitive)
-FACE_MIN_SIZE = (30, 30)   # minimum face size in pixels (width, height)
+FACE_MIN_NEIGHBORS = 5     # minNeighbors for detectMultiScale (higher = fewer false positives)
+FACE_MIN_SIZE = (50, 50)   # minimum face size in pixels – small enough for ~2 m distance
 
 # --- Hand Gesture Thresholds (normalised 0-1 landmark coordinates) ---
 HAND_OPEN_THRESHOLD = 0.15    # tip-to-wrist distance > this → finger extended
