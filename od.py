@@ -22,6 +22,21 @@ if os.path.isfile(_LIBGOMP):
         os.environ["LD_PRELOAD"] = f"{_LIBGOMP}:{_ld_preload}" if _ld_preload else _LIBGOMP
         os.execv(sys.executable, [sys.executable] + sys.argv)
 
+# Qt warns "wrong permissions on runtime directory … 0770 instead of 0700" when
+# /run/user/<uid> is group-writable (common on Raspberry Pi OS multi-user setups).
+# We create our own runtime dir in /tmp with the correct 0700 mode and point Qt
+# there, preventing the noisy startup warning.  Done here – before any import
+# that may call Qt/GLib init – so the variable is inherited by every sub-system.
+_qt_rt = f"/tmp/runtime-{os.getuid()}"
+os.makedirs(_qt_rt, mode=0o700, exist_ok=True)
+# Enforce permissions even if the directory already existed, and verify ownership
+# before using it (TOCTOU guard: only trust directories we own).
+_qt_rt_stat = os.stat(_qt_rt)
+if _qt_rt_stat.st_uid == os.getuid():
+    os.chmod(_qt_rt, 0o700)
+    if not os.environ.get("XDG_RUNTIME_DIR"):
+        os.environ["XDG_RUNTIME_DIR"] = _qt_rt
+
 # Ensure the Hailo GStreamer plugin directory is on the search path before
 # any import can call Gst.init() (e.g. gi, hailo, robot_brain).
 #
@@ -98,7 +113,7 @@ if not _new_dirs:
 
 # Increment this whenever a new version is pushed so users can confirm they
 # are running the latest code after a git pull.
-_VERSION = "2026.02.28-14"
+_VERSION = "2026.03.01-01"
 
 # Maximum number of GST_DEBUG log lines to embed in the runtime-failure error.
 _GST_DEBUG_MAX_LINES = 25

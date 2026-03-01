@@ -26,7 +26,9 @@ GESTURE_COOLDOWN_SEC = 1.5    # minimum seconds between consecutive gesture even
 
 # --- Arm Coordinate Mapping (face position → arm reach, metres) ---
 FRAME_W = 640              # expected frame width for face tracking pipeline
-FRAME_H = 480              # expected frame height for face tracking pipeline
+FRAME_H = 360              # expected frame height – 16:9 matches the IMX708 native
+                           # aspect ratio so libcamera uses the full sensor FOV
+                           # (480 causes a 4:3 crop, losing the wide field of view)
 ARM_X_CENTER = 0.20        # arm reach when face is at horizontal frame centre
 ARM_X_RANGE = 0.10         # ± reach variation across full frame width
 ARM_Y_RANGE = 0.15         # ± lateral swing across full frame height
