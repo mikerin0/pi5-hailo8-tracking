@@ -54,13 +54,26 @@ _HAILO_GST_CANDIDATES = [
 # install layouts (e.g. /usr/lib/{arch}-linux-gnu/hailo/gstreamer-1.0/)
 # without traversing the entire tree.  Shared by module-level setup and
 # _check_hailo_plugins() so there is a single source of truth.
+#
+# Two separate plugin files must be located:
+#   libgsthailotools.so  – hailo-tappas-core package (hailofilter, hailooverlay, hailotracker)
+#   libgsthailo.so       – hailort package            (hailonet)
+# Both must be in GST_PLUGIN_PATH for the full pipeline to work.
 _HAILO_SO_GLOB_PATTERNS = (
+    # hailo-tappas-core: hailofilter, hailooverlay, hailotracker
     f"/lib/{_arch}-linux-gnu/libgsthailotools.so",
     f"/lib/{_arch}-linux-gnu/*/libgsthailotools.so",
     f"/lib/{_arch}-linux-gnu/*/*/libgsthailotools.so",
     f"/usr/lib/{_arch}-linux-gnu/libgsthailotools.so",
     f"/usr/lib/{_arch}-linux-gnu/*/libgsthailotools.so",
     f"/usr/lib/{_arch}-linux-gnu/*/*/libgsthailotools.so",
+    # hailort: hailonet
+    f"/lib/{_arch}-linux-gnu/libgsthailo.so",
+    f"/lib/{_arch}-linux-gnu/*/libgsthailo.so",
+    f"/lib/{_arch}-linux-gnu/*/*/libgsthailo.so",
+    f"/usr/lib/{_arch}-linux-gnu/libgsthailo.so",
+    f"/usr/lib/{_arch}-linux-gnu/*/libgsthailo.so",
+    f"/usr/lib/{_arch}-linux-gnu/*/*/libgsthailo.so",
 )
 for _so in (_hit for _pat in _HAILO_SO_GLOB_PATTERNS for _hit in _glob.glob(_pat)):
     _so_dir = os.path.dirname(_so)
@@ -111,9 +124,37 @@ if not _new_dirs:
     except (FileNotFoundError, subprocess.TimeoutExpired):
         pass
 
+# hailonet lives in libgsthailo.so (hailort package), which is a separate file
+# from libgsthailotools.so (hailo-tappas-core).  Its directory may differ from
+# the tappas path and might not have been found by the globs above (e.g. if
+# libgsthailotools.so is already at a standard path so _new_dirs was non-empty
+# and the dpkg fallback above was skipped).  Search for libgsthailo.so
+# unconditionally so hailonet's directory is always added when needed.
+try:
+    _dpkg_hailo_out = subprocess.run(
+        ["dpkg", "-S", "libgsthailo.so"],
+        capture_output=True, text=True, check=False, timeout=5
+    ).stdout
+    for _dpkg_line in _dpkg_hailo_out.splitlines():
+        if ":" not in _dpkg_line:
+            continue
+        _dpkg_so = _dpkg_line.split(":", 1)[1].strip()
+        if not _dpkg_so:
+            continue
+        _DPKG_SO_REPORTED.add(_dpkg_so)
+        _dpkg_dir = os.path.dirname(_dpkg_so)
+        _cur_gst = os.environ.get("GST_PLUGIN_PATH", "")
+        _cur_gst_dirs = set(filter(None, _cur_gst.split(":")))
+        if _dpkg_dir and _dpkg_dir not in _cur_gst_dirs and os.path.isfile(_dpkg_so):
+            os.environ["GST_PLUGIN_PATH"] = (
+                f"{_dpkg_dir}:{_cur_gst}" if _cur_gst else _dpkg_dir
+            )
+except (FileNotFoundError, subprocess.TimeoutExpired):
+    pass
+
 # Increment this whenever a new version is pushed so users can confirm they
 # are running the latest code after a git pull.
-_VERSION = "2026.03.01-02"
+_VERSION = "2026.03.01-03"
 
 # Maximum number of GST_DEBUG log lines to embed in the runtime-failure error.
 _GST_DEBUG_MAX_LINES = 25
@@ -170,10 +211,46 @@ def _check_hailo_plugins():
     _found_so = [_hit for _pat in _HAILO_SO_GLOB_PATTERNS for _hit in _glob.glob(_pat)]
     # Also search every directory in GST_PLUGIN_PATH (includes dpkg-discovered paths).
     for _d in [d for d in os.environ.get("GST_PLUGIN_PATH", "").split(":") if d]:
-        _candidate = os.path.join(_d, "libgsthailotools.so")
-        if os.path.isfile(_candidate) and _candidate not in _found_so:
-            _found_so.append(_candidate)
+        for _so_name in ("libgsthailotools.so", "libgsthailo.so"):
+            _candidate = os.path.join(_d, _so_name)
+            if os.path.isfile(_candidate) and _candidate not in _found_so:
+                _found_so.append(_candidate)
     _gst_path = os.environ.get("GST_PLUGIN_PATH", "(not set)")
+
+    # Special case: hailonet is in libgsthailo.so (hailort package), not in
+    # libgsthailotools.so (hailo-tappas-core).  If hailonet is missing but
+    # libgsthailo.so is nowhere on disk, give a targeted diagnosis pointing to
+    # the correct package instead of running ldd against the wrong file.
+    _found_hailo_so = [p for p in _found_so if os.path.basename(p) == "libgsthailo.so"]
+    if "hailonet" in missing and not _found_hailo_so:
+        _dpkg_paths = "\n".join(f"    {p}" for p in sorted(_DPKG_SO_REPORTED))
+        if _dpkg_paths:
+            print(
+                f"ERROR: GStreamer element(s) not found: {', '.join(missing)}\n"
+                f"  GST_PLUGIN_PATH = {_gst_path}\n"
+                "  libgsthailo.so (hailort package, provides 'hailonet') not found.\n"
+                "  dpkg reports it should be at:\n"
+                f"{_dpkg_paths}\n"
+                "  but the file is absent from disk.  Reinstall hailort:\n"
+                "    sudo apt reinstall hailort hailo-all && sudo ldconfig && sudo reboot"
+            )
+        else:
+            print(
+                f"ERROR: GStreamer element(s) not found: {', '.join(missing)}\n"
+                f"  GST_PLUGIN_PATH = {_gst_path}\n"
+                "  libgsthailo.so (hailort package, provides 'hailonet') could not\n"
+                "  be located on this system.  The hailort GStreamer plugin is\n"
+                "  separate from hailo-tappas-core; it may not have been installed.\n"
+                "  Diagnostic steps:\n"
+                "  1. Check if hailort is installed:\n"
+                "       dpkg -l | grep hailo\n"
+                "  2. Find the plugin file:\n"
+                "       dpkg -S libgsthailo.so\n"
+                "       find / -name 'libgsthailo.so' 2>/dev/null\n"
+                "  3. Install/reinstall the full stack and reboot:\n"
+                "       sudo apt install hailo-all && sudo ldconfig && sudo reboot"
+            )
+        return False
 
     # Ask the system-level gst-inspect-1.0 tool whether it can see the plugin.
     # This tool runs in the same environment so it is the most reliable oracle.
