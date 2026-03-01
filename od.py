@@ -98,7 +98,7 @@ if not _new_dirs:
 
 # Increment this whenever a new version is pushed so users can confirm they
 # are running the latest code after a git pull.
-_VERSION = "2026.02.28-11"
+_VERSION = "2026.02.28-12"
 
 # Maximum number of GST_DEBUG log lines to embed in the runtime-failure error.
 _GST_DEBUG_MAX_LINES = 25
@@ -581,4 +581,7 @@ def camera_loop():
 if __name__ == "__main__":
     print(f"--- od.py version {_VERSION} ---")
     threading.Thread(target=brain.start_brain_ui, daemon=True).start()
-    camera_loop()
+    try:
+        camera_loop()
+    except KeyboardInterrupt:
+        pass
