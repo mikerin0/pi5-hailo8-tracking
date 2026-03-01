@@ -140,7 +140,10 @@ class RobotTuner:
     def __init__(self):
         self.shared_params = {
             "ry_m":0.3, "rz_m":0.3, "z_off":0.0, "speed":1200, "smooth":0.5,
-            "busy": 1, "tune_x":0.20, "tune_y":0.0, "tune_z":0.15, "nose_x":0.5, "nose_y":0.5,
+            "busy": 1, "tune_x":0.20, "tune_y":0.0, "tune_z":0.15,
+            "nose_x":0.5, "nose_y":0.5,
+            "left_hand_x":0.5, "left_hand_y":0.5,
+            "right_hand_x":0.5, "right_hand_y":0.5,
             "camera_mode": "HIGH_CAM",
         }
         self.manual_mode = True 

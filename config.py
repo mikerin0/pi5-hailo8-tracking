@@ -1,28 +1,53 @@
 # config.py – Central configuration for pi5-hailo8-tracking
 
 # --- Camera Paths ---
-# Pi Camera on port 1 (high camera, used for face tracking)
+# Pi Camera on port 1 (high camera, used for pose tracking via Hailo)
 PI_CAMERA_DEVICE = "/base/axi/pcie@1000120000/rp1/i2c@80000/imx708@1a"
-# ArduCAM Module 3 (table/bottom camera, used for manipulation)
-ARDUCAM_DEVICE_ID = 0  # v4l2 device index for the USB ArduCAM; on Pi 5 Bookworm
-                       # the CSI driver registers /dev/video0–15, so the USB camera
-                       # typically appears at /dev/video16 or higher – confirm with:
-                       # v4l2-ctl --list-devices
+# Second IMX708 on port 0 (table / manipulation view)
+ARDUCAM_DEVICE = "/base/axi/pcie@1000120000/rp1/i2c@88000/imx708@1a"
+# USB ArduCAM fallback device index (used only when CSI port 0 is unavailable)
+ARDUCAM_DEVICE_ID = 0
 
-# --- Model Paths ---
-HEF_PATH = "/home/arm/models/hand_landmark_lite.hef"
-SO_PATH = "/usr/lib/aarch64-linux-gnu/hailo/libhand_landmark_post.so"
+# --- Hailo Pose Model Paths (yolov8m_pose + post-processing .so) ---
+HEF_PATH = "/usr/local/hailo/resources/models/hailo8/yolov8m_pose.hef"
+SO_PATH  = "/usr/local/hailo/resources/so/libyolov8pose_postprocess.so"
 
-# --- Face Detection Parameters (OpenCV Haar Cascade) ---
+# --- Camera / Model Resolution ---
+# libcamerasrc captures at the IMX708 native 16:9 resolution and the
+# pipeline downscales to MODEL_INPUT_SIZE for the yolov8m_pose network.
+CAM_SENSOR_W = 1536        # libcamerasrc capture width
+CAM_SENSOR_H = 864         # libcamerasrc capture height
+MODEL_INPUT_SIZE = 640     # hailonet input size (yolov8 expects 640×640)
+
+# --- Pose Tracking Parameters ---
+TRACKING_TARGET = "nose"   # default keypoint to follow: "nose" | "left_hand" | "right_hand"
+KEYPOINTS = {              # Keypoint indices from the yolov8m_pose COCO skeleton
+                           # COCO names them 'left_wrist' (9) and 'right_wrist' (10);
+                           # the keys 'left_hand'/'right_hand' are kept so that the
+                           # robot_brain.py params (left_hand_x etc.) stay consistent
+                           # with the old working configuration.
+    'nose': 0,
+    'left_hand': 9,        # COCO: left_wrist
+    'right_hand': 10,      # COCO: right_wrist
+}
+MOVE_COOLDOWN = 0.30       # minimum seconds between consecutive arm-move commands
+FLAGPOLE_TIMEOUT = 2.0     # seconds without a detected person before entering standby
+
+# --- Pose-to-arm coordinate constants ---
+# Hailo returns normalised (0-1) coordinates.  The constants below map them
+# to metres in the robot arm's workspace.
+POSE_TELEPORT_THRESHOLD = 0.30  # max normalised jump between frames – larger deltas
+                                 # are treated as noisy/invalid detections and dropped
+ARM_REACH_X = 0.25         # fixed forward reach (metres) while pose tracking
+ARM_RZ_BASE = 0.18         # arm height at the vertical centre of the frame (metres)
+ARM_MIN_Z   = 0.05         # minimum safe arm height (metres)
+ARM_MAX_Z   = 0.50         # maximum arm height (metres)
+
+# --- Face Detection Parameters (OpenCV Haar Cascade) – used in CPU fallback ---
 HAAR_CASCADE_PATH = "/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml"
 FACE_SCALE_FACTOR = 1.1    # scaleFactor for detectMultiScale (lower = more thorough scan)
 FACE_MIN_NEIGHBORS = 5     # minNeighbors for detectMultiScale (higher = fewer false positives)
 FACE_MIN_SIZE = (50, 50)   # minimum face size in pixels – small enough for ~2 m distance
-
-# --- Hand Gesture Thresholds (normalised 0-1 landmark coordinates) ---
-HAND_OPEN_THRESHOLD = 0.15    # tip-to-wrist distance > this → finger extended
-HAND_CLOSED_THRESHOLD = 0.10  # tip-to-wrist distance < this → finger folded
-GESTURE_COOLDOWN_SEC = 1.5    # minimum seconds between consecutive gesture events
 
 # --- Arm Coordinate Mapping (face position → arm reach, metres) ---
 FRAME_W = 640              # expected frame width for face tracking pipeline

@@ -113,7 +113,7 @@ if not _new_dirs:
 
 # Increment this whenever a new version is pushed so users can confirm they
 # are running the latest code after a git pull.
-_VERSION = "2026.03.01-01"
+_VERSION = "2026.03.01-02"
 
 # Maximum number of GST_DEBUG log lines to embed in the runtime-failure error.
 _GST_DEBUG_MAX_LINES = 25
@@ -128,7 +128,7 @@ gi.require_version('Gst', '1.0')
 from gi.repository import Gst
 Gst.init(None)
 
-_HAILO_ELEMENTS = ("hailonet", "hailofilter", "hailooverlay")
+_HAILO_ELEMENTS = ("hailonet", "hailofilter", "hailooverlay", "hailotracker")
 
 def _clear_gst_registry():
     """Delete stale GStreamer registry cache files so the next scan starts fresh."""
@@ -442,55 +442,97 @@ def _check_hailo_plugins():
 # --- Configuration (canonical values live in config.py) ---
 HEF_PATH = config.HEF_PATH
 SO_PATH = config.SO_PATH
-last_gesture_time = 0
 
-# --- Hand gesture state ---
-_last_hand_state = None  # "OPEN" | "CLOSED" | None
-_FINGER_TIP_IDS = [4, 8, 12, 16, 20]  # thumb, index, middle, ring, pinky tips
-
-
-def _classify_hand(pts):
-    """Return 'OPEN', 'CLOSED', or None if the hand state is ambiguous."""
-    wx, wy = pts[0].x(), pts[0].y()
-    dists = [np.hypot(pts[i].x() - wx, pts[i].y() - wy) for i in _FINGER_TIP_IDS]
-    if all(d > config.HAND_OPEN_THRESHOLD for d in dists):
-        return "OPEN"
-    if all(d < config.HAND_CLOSED_THRESHOLD for d in dists):
-        return "CLOSED"
-    return None
+# --- Pose tracking state ---
+_smooth_x = 0.5
+_smooth_y = 0.5
+_last_move_time = 0.0
+_tracking_target = config.TRACKING_TARGET  # "nose" | "left_hand" | "right_hand"
+# False = actively tracking; True = standby (person lost); "MANUAL" = manual override
+_search_mode = False
+_last_seen_time = 0.0
 
 
 def app_callback(pad, info, user_data):
-    global last_gesture_time, _last_hand_state
+    """GStreamer pad probe: parse Hailo pose detections and drive the arm."""
+    global _smooth_x, _smooth_y, _last_move_time, _search_mode, _last_seen_time
+
     buffer = info.get_buffer()
-    if not buffer: return Gst.PadProbeReturn.OK
-    
-    # Heartbeat print to verify AI is seeing frames
-    if time.time() % 3 < 0.1: print("--- AI Pro Chip Heartbeat: Processing ---")
+    if not buffer:
+        return Gst.PadProbeReturn.OK
 
     try:
         roi = hailo.get_roi_from_buffer(buffer)
-        if roi:
-            landmarks = roi.get_objects_typed(hailo.HAILO_LANDMARKS)
-            if landmarks:
-                pts = landmarks[0].get_points()
-                now = time.time()
-                # Index finger check (Point 8 is Tip, Point 6 is Knuckle)
-                if pts[8].y() < pts[6].y() and (now - last_gesture_time > 2.0):
-                    print(">>> GESTURE DETECTED: LIGHTS ON")
-                    brain.send_to_crestron("LIGHT_ON")
-                    last_gesture_time = now
+        detections = roi.get_objects_typed(hailo.HAILO_DETECTION)
+        person = next(
+            (d for d in detections if d.get_label() == "person"), None
+        )
+        now = time.time()
 
-                # Open / close hand detection
-                if now - last_gesture_time > config.GESTURE_COOLDOWN_SEC:
-                    state = _classify_hand(pts)
-                    if state and state != _last_hand_state:
-                        _last_hand_state = state
-                        event = f"HAND_{state}"
-                        print(f">>> GESTURE DETECTED: {event}")
-                        brain.send_to_crestron(event)
-                        last_gesture_time = now
-    except Exception: pass
+        if person:
+            _last_seen_time = now
+
+            # Manual override: do not move the arm, but keep last_seen fresh
+            if _search_mode == "MANUAL":
+                return Gst.PadProbeReturn.OK
+
+            # Wake up from standby when a person reappears and brain is free
+            if _search_mode is True:
+                p = brain.tuner.get_params()
+                if p.get("busy", 0) == 0:
+                    print("Pose tracking: person reacquired – resuming")
+                    _search_mode = False
+                    _smooth_x, _smooth_y = 0.5, 0.5
+
+            # Extract the target keypoint from the pose landmarks
+            landmarks = person.get_objects_typed(hailo.HAILO_LANDMARKS)
+            if landmarks:
+                points = landmarks[0].get_points()
+                target_idx = config.KEYPOINTS.get(_tracking_target, 0)
+                raw_x = 1.0 - points[target_idx].x()   # Hailo x=0 is the left edge of the
+                raw_y = points[target_idx].y()           # frame; inverting aligns it with the
+                                                         # arm's positive-Y direction (its right)
+
+                # Discard frames where the keypoint teleports across more than
+                # POSE_TELEPORT_THRESHOLD of the frame – these are noisy detections.
+                if (abs(raw_x - _smooth_x) > config.POSE_TELEPORT_THRESHOLD
+                        or abs(raw_y - _smooth_y) > config.POSE_TELEPORT_THRESHOLD):
+                    return Gst.PadProbeReturn.OK
+
+                p = brain.tuner.get_params()
+                sf = p.get("smooth", 0.2)
+                _smooth_x = raw_x * sf + _smooth_x * (1.0 - sf)
+                _smooth_y = raw_y * sf + _smooth_y * (1.0 - sf)
+
+                if (now - _last_move_time > config.MOVE_COOLDOWN
+                        and p.get("busy", 0) == 0
+                        and _search_mode is False):
+                    cx = p.get(f"{_tracking_target}_x", 0.5)
+                    cy = p.get(f"{_tracking_target}_y", 0.5)
+                    ry = (_smooth_x - cx) * p.get("ry_m", 0.3)
+                    rz = (config.ARM_RZ_BASE
+                          + (cy - _smooth_y) * p.get("rz_m", 0.3)
+                          + p.get("z_off", 0.0))
+                    brain.reach_for_coordinate(
+                        config.ARM_REACH_X, ry,
+                        max(config.ARM_MIN_Z, min(config.ARM_MAX_Z, rz)),
+                        speed=int(p.get("speed", 1200)),
+                    )
+                    _last_move_time = now
+
+        else:
+            # No person in frame – enter standby after timeout
+            now = time.time()
+            if now - _last_seen_time > config.FLAGPOLE_TIMEOUT:
+                p = brain.tuner.get_params()
+                if p.get("busy", 0) == 0 and _search_mode is False:
+                    print("Pose tracking: person lost – entering standby")
+                    _search_mode = True
+                    brain.reach_for_coordinate(0.06, 0.0, 0.40, speed=500)
+
+    except Exception as e:
+        print(f"app_callback error: {e}")
+
     return Gst.PadProbeReturn.OK
 
 def _cpu_fallback_loop():
@@ -573,6 +615,9 @@ def _cpu_fallback_loop():
         cv2.destroyAllWindows()
 
 
+_restart_event = threading.Event()
+
+
 def camera_loop():
     # Force the device type for the Pro chip before starting
     os.environ["hailort_device_type"] = "hailo8"
@@ -580,33 +625,67 @@ def camera_loop():
     if not _check_hailo_plugins():
         _cpu_fallback_loop()
         return
-    
+
+    # Register handlers so robot_brain.switch_camera() can restart this pipeline
+    # when the operator switches between HIGH_CAM and TABLE_CAM from the GUI or
+    # via a Crestron command.
+    brain.camera_switch_handlers["HIGH_CAM"] = lambda: _restart_event.set()
+    brain.camera_switch_handlers["TABLE_CAM"] = lambda: _restart_event.set()
+
+    global _last_seen_time
+    _last_seen_time = time.time() + 5.0  # give Hailo 5 s to find a person at startup
+
     while True:
+        cam_path = (
+            config.PI_CAMERA_DEVICE
+            if brain.tuner.shared_params.get("camera_mode", "HIGH_CAM") == "HIGH_CAM"
+            else config.ARDUCAM_DEVICE
+        )
+        _restart_event.clear()
         os.system("sudo pkill -9 -f hailonet")
         time.sleep(1)
+
+        pipe = None
         try:
-            # We use a 'leaky' queue to ensure the high-speed 26 TOPS data 
-            # doesn't overflow the Pi's memory
+            # Capture at IMX708 native 16:9, downscale to the 640×640 square the
+            # yolov8m_pose network expects.  hailotracker provides consistent IDs
+            # across frames; hailooverlay draws skeleton overlays on the preview.
             launch_str = (
-                f"libcamerasrc camera-name={config.PI_CAMERA_DEVICE} ! "
-                f"videoconvert ! video/x-raw,format=RGB,width=224,height=224 ! "
-                f"hailonet name=net hef-path={HEF_PATH} ! "
+                f"libcamerasrc camera-name={cam_path} ! "
+                f"video/x-raw,format=NV12,"
+                f"width={config.CAM_SENSOR_W},height={config.CAM_SENSOR_H} ! "
+                f"videoconvert ! videoscale ! "
+                f"video/x-raw,format=RGB,"
+                f"width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
                 f"queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
-                f"hailofilter so-path={SO_PATH} ! "
-                f"hailooverlay ! videoconvert ! ximagesink sync={config.GST_SYNC}"
+                f"hailonet hef-path={HEF_PATH} ! "
+                f"hailofilter name=hailofilter so-path={SO_PATH} ! "
+                f"hailotracker ! hailooverlay ! "
+                f"videoconvert ! autovideosink sync=false"
             )
-            
+
             pipe = Gst.parse_launch(launch_str)
-            net = pipe.get_by_name("net")
-            net.get_static_pad("src").add_probe(Gst.PadProbeType.BUFFER, app_callback, None)
-            
+            hailofilter = pipe.get_by_name("hailofilter")
+            if hailofilter:
+                hailofilter.get_static_pad("src").add_probe(
+                    Gst.PadProbeType.BUFFER, app_callback, None
+                )
+            else:
+                print("WARNING: hailofilter element not found – probe not attached")
+
             pipe.set_state(Gst.State.PLAYING)
-            print("--- System Active: Hand Landmark AI Running ---")
-            
-            while True: time.sleep(1)
+            print("--- Hailo AI Hat Active: yolov8m_pose running ---")
+
+            while not _restart_event.is_set():
+                time.sleep(0.1)
+
         except Exception as e:
             print(f"Pipeline Error: {e}")
             time.sleep(2)
+        finally:
+            if pipe is not None:
+                pipe.set_state(Gst.State.NULL)
+        time.sleep(0.5)
 
 if __name__ == "__main__":
     print(f"--- od.py version {_VERSION} ---")
