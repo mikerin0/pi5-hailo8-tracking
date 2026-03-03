@@ -346,6 +346,77 @@ Hand landmarks (Hailo8)
 | `face_tracking.py` | Face detection pipeline and smooth arm tracking |
 | `od.py` | Hand-landmark AI pipeline with gesture detection |
 | `robot_brain.py` | IK arm control, Crestron server, Tkinter GUI |
+| `lsc6_controller.py` | LSC-6 serial communication library (move, read, torque) |
+| `rest_positions.py` | Named low-strain arm rest positions |
+| `servo_thermal_monitor.py` | Background servo load monitor and auto-park system |
+| `servo_arm_integration.py` | Integration library wiring thermal management into robot_brain |
+
+---
+
+## Servo Thermal Management
+
+The Hiwonder LDX-218 servos can overheat when the arm holds a pose
+against gravity for a long time.  Four new modules address this:
+
+### How it works
+
+1. **`lsc6_controller.py`** – Replaces the bare `ser.write()` calls with a
+   proper object that builds LSC-6 packets, clamps positions to safe limits,
+   and can read back servo positions via `read_position()`.
+
+2. **`rest_positions.py`** – Defines named low-strain positions
+   (`compact_fold`, `upright_stow`, `lowered_rest`, `home`) where gravity
+   acts closer to the joint axes and servos draw less holding current.
+
+3. **`servo_thermal_monitor.py`** – A background thread that:
+   - Polls each servo's positional deviation (commanded vs actual) every
+     2 seconds as a proxy for holding load.
+   - Logs a `WARNING` when a servo has been under high load for 3+
+     consecutive cycles.
+   - Automatically moves the arm to the `compact_fold` rest position
+     after the arm has been idle for a configurable timeout (default
+     30 seconds) and at least one servo shows a high-load condition.
+
+4. **`servo_arm_integration.py`** – Wires everything together and provides
+   drop-in replacements for `robot_brain.move_servo()` / `go_home()`.
+
+### Normal launch (unchanged)
+
+The full system — Hailo AI pipeline, video feed, and brain GUI — is still
+started with the same command as before:
+
+```bash
+source ~/hailo-venv/bin/activate
+python od.py
+```
+
+`servo_arm_integration` is a **library module**, not a replacement entry point.
+Do not run it directly; import it from `od.py` or your own scripts instead.
+
+### Library usage
+
+```python
+import servo_arm_integration as arm_sys
+
+# These wrappers notify the thermal monitor automatically
+arm_sys.move_servo(6, 1883, time_ms=2000)
+arm_sys.go_home()
+
+# Inspect thermal status
+print(arm_sys.get_thermal_status())
+# → {'parked': False, 'idle_secs': 4.2, 'high_load_counts': {1: 0, 2: 0, ...}}
+```
+
+### Tuning thermal thresholds
+
+Edit the constants at the top of `servo_thermal_monitor.py`:
+
+| Constant | Default | Description |
+|----------|---------|-------------|
+| `HIGH_LOAD_DEVIATION` | `50` | Position deviation (pulse-width units) that triggers a high-load count |
+| `HIGH_LOAD_COUNT_WARN` | `3` | Consecutive high-load cycles before a WARNING is logged |
+| `IDLE_TIMEOUT_S` | `30.0` | Seconds of inactivity before auto-park |
+| `POLL_INTERVAL_S` | `2.0` | Seconds between monitoring cycles |
 
 ---
 
