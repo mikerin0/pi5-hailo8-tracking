@@ -63,7 +63,100 @@ ARM_Z_DEFAULT = 0.15       # fixed height while face tracking
 TRACKING_ALPHA = 0.15      # EMA coefficient (lower = smoother but more lag)
 ARM_Y_DEFAULT = 0.0        # starting lateral position for smooth tracking
 
+# --- Home / park position ---
+# Safer default: use IK coordinates for homing so it is less sensitive to
+# per-servo calibration drift than hardcoded absolute pulse values.
+HOME_USE_COORDINATES = True
+HOME_X = 0.06
+HOME_Y = 0.0
+HOME_Z = 0.40
+HOME_SPEED = 700
+
+# --- Manual slider safety bounds ---
+# Manual mode sends coordinates directly to IK; keep these conservative to
+# avoid kinematic branch flips and below-table targets.
+MANUAL_X_MIN = 0.14
+MANUAL_X_MAX = 0.30
+MANUAL_Y_MIN = -0.12
+MANUAL_Y_MAX = 0.12
+MANUAL_Z_MIN = 0.24
+MANUAL_Z_MAX = 0.40
+MANUAL_TRAVEL_Z = 0.32
+
+# --- Manual IK safety validation ---
+# Reject manual IK solutions that are inconsistent with the requested target
+# or that imply a dangerous branch flip.
+MANUAL_MIN_SOLVED_Z = 0.10
+MANUAL_IK_MAX_POSITION_ERROR_M = 0.10
+MANUAL_IK_MAX_JOINT_STEP_RAD = 1.20
+MANUAL_JOG_STEP_M = 0.002
+MANUAL_JOG_SPEED = 700
+
 # --- GStreamer Pipeline Parameters ---
 # GST_SYNC is used as a string literal inside GStreamer launch strings ("true"/"false")
 GST_LEAKY_QUEUE_SIZE = 5   # max-size-buffers for leaky downstream queue
 GST_SYNC = "false"         # appsink / ximagesink sync flag
+
+# --- Gripper microswitch safety (servo 1 close-stop) ---
+# Set GRIPPER_SWITCH_PIN_BCM to your Raspberry Pi BCM GPIO number (e.g. 17),
+# then set the electrical polarity fields to match your wiring.
+# Physical header wiring: pin 13 (GPIO27) signal, pin 14 (GND) return.
+GRIPPER_SWITCH_PIN_BCM = 27
+GRIPPER_SWITCH_PULL_UP = True
+GRIPPER_SWITCH_PRESSED_STATE = 0
+# Close motion runs in short increments so the switch can stop the gripper early.
+GRIPPER_CLOSE_STEP_US = 35
+GRIPPER_CLOSE_STEP_TIME_MS = 70
+
+# --- Bottom-camera handoff release (automatic give-to-user) ---
+# When enabled, TABLE_CAM mode watches wrist keypoints and opens the gripper
+# when a hand enters the claw zone.
+TABLE_HANDOFF_RELEASE_ENABLED = True
+TABLE_HANDOFF_CLAW_X_NORM = 0.50      # 0..1 horizontal claw center in TABLE_CAM frame
+TABLE_HANDOFF_CLAW_Y_NORM = 0.82      # 0..1 vertical claw center in TABLE_CAM frame
+TABLE_HANDOFF_RADIUS_NORM = 0.14      # trigger distance from claw center (normalized)
+TABLE_HANDOFF_RELEASE_COOLDOWN = 2.5  # seconds between release triggers
+# Minimum time item must be held before auto-release is allowed after a close.
+TABLE_HANDOFF_MIN_HOLD_SEC = 1.5
+# Longer lockout after TAKE ITEM sequence close/lift phase.
+TABLE_HANDOFF_TAKE_LOCKOUT_SEC = 4.0
+# Require this many consecutive qualifying frames before releasing.
+TABLE_HANDOFF_FRAMES_REQUIRED = 5
+# Minimum wrist keypoint confidence to consider a hand valid.
+TABLE_HANDOFF_MIN_CONFIDENCE = 0.45
+# Optional visual marker for release zone (uses cairooverlay). Disabled by
+# default for maximum runtime stability on Pi images where cairooverlay can be
+# unstable with some camera/display combinations.
+TABLE_HANDOFF_OVERLAY_ENABLED = False
+
+# --- Pose gesture events to Crestron (outbound) ---
+# Uses yolov8 pose keypoints (wrists + shoulders). These are coarse gestures,
+# not finger-level hand-pose classification.
+POSE_GESTURE_EVENTS_ENABLED = True
+POSE_GESTURE_Y_MARGIN = 0.025         # wrist must be this much above shoulder (normalized y)
+POSE_GESTURE_MIN_CONFIDENCE = 0.20    # minimum keypoint confidence
+POSE_GESTURE_COOLDOWN_SEC = 0.8       # debounce per event
+# Keep physical left/right mapping by default. Set True only if your camera
+# orientation makes events feel swapped in your installation.
+POSE_GESTURE_MIRROR_LEFT_RIGHT = False
+# Consecutive-frame confirmation before emitting a pose gesture event.
+POSE_GESTURE_FRAMES_REQUIRED = 1
+# After BOTH_HANDS_UP, suppress single-hand events briefly to avoid double-firing.
+POSE_GESTURE_BOTH_SUPPRESS_SEC = 0.9
+# Require this many neutral frames before a held gesture can re-trigger.
+POSE_GESTURE_RESET_FRAMES = 2
+# Runtime debug logging for gesture classifier state (NONE/LEFT/RIGHT/BOTH).
+POSE_GESTURE_DEBUG = False
+POSE_GESTURE_DEBUG_LOG_INTERVAL_SEC = 0.5
+
+# --- MediaPipe finger-count gesture events (outbound, HIGH_CAM) ---
+# NOTE: keep disabled by default for runtime stability on Pi5 + Hailo pipeline.
+# Enable only after validating performance on your setup.
+FINGER_GESTURE_EVENTS_ENABLED = False
+FINGER_GESTURE_MIN_DET_CONF = 0.45
+FINGER_GESTURE_MIN_TRACK_CONF = 0.45
+FINGER_GESTURE_COOLDOWN_SEC = 1.0
+FINGER_GESTURE_FRAMES_REQUIRED = 2
+# Vertical margin for counting a finger as raised (tip.y < pip.y - margin)
+FINGER_GESTURE_Y_MARGIN = 0.02
+FINGER_GESTURE_DEBUG = False

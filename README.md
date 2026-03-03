@@ -251,12 +251,45 @@ buttons in the GUI to switch camera modes at any time.
 | Feature | How to test |
 |---------|-------------|
 | Arm moves to home | Click **HOME ARM** in the GUI |
+| Take item handoff | Click **TAKE ITEM**; robot switches to table cam, opens gripper, waits ~4s, closes and lifts |
+| Exit / stop app | Click **EXIT PROGRAM** in the GUI (or send `EXIT` over Crestron) |
 | Manual arm control | Enable manual sliders, drag the **Reach X / Swing Y / Height Z** sliders |
 | Face tracking | Click **HIGH CAM** – the arm should follow your face smoothly |
 | Hand open event | Show an open flat hand to the Pi Camera – terminal prints `HAND_OPEN` |
 | Hand closed event | Make a fist – terminal prints `HAND_CLOSED` |
 | Index-finger light | Point index finger up – terminal prints `LIGHTS ON` |
-| Crestron connection | Connect Crestron client to port **50005**; send `HOME` to confirm two-way comms |
+| Crestron connection | Connect Crestron client to port **50005**; send `HOME` to confirm two-way comms (`TAKE_ITEM`, `TAKE`, `HANDOFF` also supported) |
+
+Use the **TAKE ITEM TUNE** sliders in the GUI to adjust handoff position (`Take X/Y/Z`), lift height (`Lift Z`), and hold time (`Wait (s)`) for your table height and object size.
+
+### Auto-release to user (bottom camera)
+
+In **TABLE CAM** mode, the script can automatically release a held item when your
+hand is detected near the claw.
+
+Tune these values in [config.py](config.py):
+
+- `TABLE_HANDOFF_RELEASE_ENABLED`
+- `TABLE_HANDOFF_CLAW_X_NORM`, `TABLE_HANDOFF_CLAW_Y_NORM`
+- `TABLE_HANDOFF_RADIUS_NORM`
+- `TABLE_HANDOFF_RELEASE_COOLDOWN`
+- `TABLE_HANDOFF_FRAMES_REQUIRED`
+- `TABLE_HANDOFF_MIN_CONFIDENCE`
+
+The trigger uses wrist keypoints (`left_hand`/`right_hand`) from the Hailo pose model.
+Optional visual trigger marker in **TABLE CAM** can be enabled with
+`TABLE_HANDOFF_OVERLAY_ENABLED = True` in [config.py](config.py). It is disabled by default for stability.
+
+### Gripper microswitch safety stop
+
+If your gripper has a limit microswitch, set these in [config.py](config.py):
+
+- `GRIPPER_SWITCH_PIN_BCM` → your BCM GPIO number (for example `17`)
+- `GRIPPER_SWITCH_PULL_UP` → `True` for pull-up wiring, `False` for pull-down
+- `GRIPPER_SWITCH_PRESSED_STATE` → raw GPIO level when pressed (`0` or `1`)
+
+When configured, close commands (`CLOSE`, `HAND_CLOSED`, and `TAKE ITEM` close phase)
+advance in small steps and stop immediately when the switch is activated.
 
 ---
 
@@ -287,9 +320,11 @@ buttons in the GUI to switch camera modes at any time.
 |------|--------|---------|
 | **HIGH CAM** | Pi Camera (port 1) | Face tracking – arm follows detected face |
 | **TABLE CAM** | ArduCAM Module 3 | Close-up table view for manipulation tasks |
+| **DUAL CAM** | Pi Camera + ArduCAM | Hailo tracking main window + separate table preview window |
 
-Only one pipeline is active at a time.  
-Switching is triggered by a GUI button or a Crestron `HIGH_CAM` / `TABLE_CAM` command.
+`HIGH CAM` and `TABLE CAM` run one active pipeline at a time.  
+`DUAL CAM` runs two pipelines together (tracking + table preview).  
+Switching is triggered by a GUI button or a Crestron `HIGH_CAM` / `TABLE_CAM` / `DUAL_CAM` command.
 
 ### Hand Gesture Detection
 
@@ -391,9 +426,13 @@ python face_tracking.py
 Launch `od.py` (or `robot_brain.py` standalone), then click:
 
 - **HIGH CAM (Face Tracking)** – starts the Pi Camera face-tracking pipeline  
-- **TABLE CAM (Manipulation)** – stops face tracking; table camera view is used
+- **TABLE CAM (Manipulation)** – runs the table camera as the active pipeline
+- **DUAL CAM (Track+Preview)** – tracks on Pi Camera and opens a separate table-camera preview window
 
 The current mode is shown beneath the buttons.
+
+For stability on Pi 5, the secondary DUAL-CAM preview uses `v4l2src` (USB `/dev/videoX`) while
+the primary Hailo pipeline uses `libcamerasrc`.
 
 ### Crestron commands (sent **to** the Pi)
 
@@ -404,6 +443,7 @@ The current mode is shown beneath the buttons.
 | `CLOSE` | Close gripper |
 | `HIGH_CAM` | Switch to face-tracking camera |
 | `TABLE_CAM` | Switch to table camera |
+| `DUAL_CAM` | Enable simultaneous tracking + table preview |
 | `HAND_OPEN` | Open gripper (mirroring gesture) |
 | `HAND_CLOSED` | Close gripper (mirroring gesture) |
 
@@ -414,3 +454,22 @@ The current mode is shown beneath the buttons.
 | `LIGHT_ON` | Index finger pointing up |
 | `HAND_OPEN` | All five fingers extended |
 | `HAND_CLOSED` | All five fingers folded |
+| `LEFT_HAND_UP` | Left wrist raised above left shoulder (HIGH_CAM) |
+| `RIGHT_HAND_UP` | Right wrist raised above right shoulder (HIGH_CAM) |
+| `BOTH_HANDS_UP` | Both wrists raised above shoulders (HIGH_CAM) |
+| `ONE_FINGER_UP` | Index finger only raised (HIGH_CAM) |
+| `TWO_FINGERS_UP` | Index + middle fingers raised (HIGH_CAM) |
+| `ITEM_RELEASED` | Auto-release triggered near claw (TABLE_CAM) |
+
+Gesture-event sensitivity/debounce can be tuned in [config.py](config.py) via:
+`POSE_GESTURE_EVENTS_ENABLED`, `POSE_GESTURE_Y_MARGIN`,
+`POSE_GESTURE_MIN_CONFIDENCE`, `POSE_GESTURE_COOLDOWN_SEC`,
+`POSE_GESTURE_FRAMES_REQUIRED`, and `POSE_GESTURE_BOTH_SUPPRESS_SEC`.
+
+Finger-count events are tuned via:
+`FINGER_GESTURE_EVENTS_ENABLED`, `FINGER_GESTURE_MIN_DET_CONF`,
+`FINGER_GESTURE_MIN_TRACK_CONF`, `FINGER_GESTURE_COOLDOWN_SEC`,
+`FINGER_GESTURE_FRAMES_REQUIRED`, and `FINGER_GESTURE_Y_MARGIN`.
+
+`FINGER_GESTURE_EVENTS_ENABLED` is disabled by default to keep the main Hailo
+video pipeline stable; enable it only after confirming your Pi can sustain it.

@@ -164,6 +164,10 @@ _GST_INSPECT_TIMEOUT = 20
 # All remaining imports come after the environment is prepared.
 import time, threading, gi, hailo, numpy as np, cv2, robot_brain as brain
 import config
+try:
+    import mediapipe as mp
+except Exception:
+    mp = None
 
 gi.require_version('Gst', '1.0')
 from gi.repository import Gst
@@ -528,6 +532,379 @@ _tracking_target = config.TRACKING_TARGET  # "nose" | "left_hand" | "right_hand"
 # False = actively tracking; True = standby (person lost); "MANUAL" = manual override
 _search_mode = False
 _last_seen_time = 0.0
+_last_table_release_time = 0.0
+_overlay_frame_w = config.MODEL_INPUT_SIZE
+_overlay_frame_h = config.MODEL_INPUT_SIZE
+_table_release_hits = 0
+_last_pose_event_times = {}
+_pose_state_streak = {"LEFT": 0, "RIGHT": 0, "BOTH": 0}
+_suppress_single_until = 0.0
+_pose_latched = False
+_pose_neutral_streak = 0
+_last_pose_debug_log_time = 0.0
+_last_pose_debug_state = None
+_mp_hands = None
+_last_finger_event_times = {}
+_finger_state_streak = {"ONE": 0, "TWO": 0}
+
+
+def _point_confidence(point):
+    """Best-effort confidence extraction across Hailo point API variants."""
+    for name in ("confidence", "score", "probability"):
+        member = getattr(point, name, None)
+        if callable(member):
+            try:
+                return float(member())
+            except Exception:
+                pass
+    return 1.0
+
+
+def _pose_event_allowed(event_name, now):
+    cooldown = max(0.2, float(getattr(config, "POSE_GESTURE_COOLDOWN_SEC", 1.5)))
+    last_t = _last_pose_event_times.get(event_name, 0.0)
+    if now - last_t < cooldown:
+        return False
+    _last_pose_event_times[event_name] = now
+    return True
+
+
+def _finger_event_allowed(event_name, now):
+    cooldown = max(0.2, float(getattr(config, "FINGER_GESTURE_COOLDOWN_SEC", 1.0)))
+    last_t = _last_finger_event_times.get(event_name, 0.0)
+    if now - last_t < cooldown:
+        return False
+    _last_finger_event_times[event_name] = now
+    return True
+
+
+def _get_hands_detector():
+    global _mp_hands
+    if _mp_hands is not None:
+        return _mp_hands
+    if mp is None:
+        return None
+    try:
+        _mp_hands = mp.solutions.hands.Hands(
+            static_image_mode=False,
+            max_num_hands=1,
+            min_detection_confidence=float(getattr(config, "FINGER_GESTURE_MIN_DET_CONF", 0.55)),
+            min_tracking_confidence=float(getattr(config, "FINGER_GESTURE_MIN_TRACK_CONF", 0.55)),
+        )
+    except Exception as e:
+        print(f"Finger gesture detector unavailable: {e}")
+        _mp_hands = None
+    return _mp_hands
+
+
+def _classify_finger_count_gesture(hand_landmarks):
+    """Return 'ONE', 'TWO', or None using simple fingertip-vs-PIP geometry."""
+    lm = hand_landmarks.landmark
+    y_margin = float(getattr(config, "FINGER_GESTURE_Y_MARGIN", 0.02))
+
+    index_up = lm[8].y < (lm[6].y - y_margin)
+    middle_up = lm[12].y < (lm[10].y - y_margin)
+    ring_up = lm[16].y < (lm[14].y - y_margin)
+    pinky_up = lm[20].y < (lm[18].y - y_margin)
+
+    # "Down" uses a softer threshold to reduce false negatives when fingers are curled.
+    ring_down = lm[16].y > (lm[14].y + y_margin * 0.5)
+    pinky_down = lm[20].y > (lm[18].y + y_margin * 0.5)
+
+    if index_up and not middle_up and ring_down and pinky_down:
+        return "ONE"
+    if index_up and middle_up and ring_down and pinky_down:
+        return "TWO"
+    return None
+
+
+def _maybe_send_finger_gesture_events_from_sample(sample, now):
+    """Run MediaPipe Hands on side-branch sample and emit one/two-finger events."""
+    if not bool(getattr(config, "FINGER_GESTURE_EVENTS_ENABLED", True)):
+        return
+    if brain.tuner.shared_params.get("camera_mode", "HIGH_CAM") != "HIGH_CAM":
+        return
+
+    hands = _get_hands_detector()
+    if hands is None:
+        return
+
+    buf = sample.get_buffer()
+    caps = sample.get_caps()
+    struct = caps.get_structure(0)
+    w = struct.get_value("width")
+    h = struct.get_value("height")
+    ok, mapinfo = buf.map(Gst.MapFlags.READ)
+    if not ok:
+        return
+    try:
+        frame_rgb = np.frombuffer(mapinfo.data, dtype=np.uint8).reshape((h, w, 3))
+        result = hands.process(frame_rgb)
+    except Exception:
+        return
+    finally:
+        buf.unmap(mapinfo)
+
+    state = None
+    if result and result.multi_hand_landmarks:
+        state = _classify_finger_count_gesture(result.multi_hand_landmarks[0])
+
+    for key in ("ONE", "TWO"):
+        if state == key:
+            _finger_state_streak[key] += 1
+        else:
+            _finger_state_streak[key] = 0
+
+    frames_required = max(1, int(getattr(config, "FINGER_GESTURE_FRAMES_REQUIRED", 3)))
+    if state == "ONE" and _finger_state_streak["ONE"] >= frames_required:
+        if _finger_event_allowed("ONE_FINGER_UP", now):
+            brain.send_to_crestron("ONE_FINGER_UP")
+            if bool(getattr(config, "FINGER_GESTURE_DEBUG", False)):
+                print("Finger gesture: ONE_FINGER_UP")
+            _finger_state_streak["ONE"] = 0
+    elif state == "TWO" and _finger_state_streak["TWO"] >= frames_required:
+        if _finger_event_allowed("TWO_FINGERS_UP", now):
+            brain.send_to_crestron("TWO_FINGERS_UP")
+            if bool(getattr(config, "FINGER_GESTURE_DEBUG", False)):
+                print("Finger gesture: TWO_FINGERS_UP")
+            _finger_state_streak["TWO"] = 0
+
+
+def _maybe_send_pose_gesture_events(points, now):
+    """Send coarse hand-raise gesture events to Crestron using pose keypoints."""
+    global _suppress_single_until, _pose_latched, _pose_neutral_streak
+    global _last_pose_debug_log_time, _last_pose_debug_state
+    if not bool(getattr(config, "POSE_GESTURE_EVENTS_ENABLED", True)):
+        return
+    # Allow outbound gesture events in HIGH_CAM and DUAL_CAM.
+    if brain.tuner.shared_params.get("camera_mode", "HIGH_CAM") not in ("HIGH_CAM", "DUAL_CAM"):
+        return
+
+    min_conf = max(0.0, min(1.0, float(getattr(config, "POSE_GESTURE_MIN_CONFIDENCE", 0.45))))
+    y_margin = max(0.0, float(getattr(config, "POSE_GESTURE_Y_MARGIN", 0.05)))
+    mirror_lr = bool(getattr(config, "POSE_GESTURE_MIRROR_LEFT_RIGHT", True))
+    frames_required = max(1, int(getattr(config, "POSE_GESTURE_FRAMES_REQUIRED", 2)))
+    suppress_sec = max(0.0, float(getattr(config, "POSE_GESTURE_BOTH_SUPPRESS_SEC", 0.9)))
+    reset_frames = max(1, int(getattr(config, "POSE_GESTURE_RESET_FRAMES", 2)))
+    debug_enabled = bool(round(float(
+        brain.tuner.shared_params.get(
+            "pose_gesture_debug",
+            1.0 if getattr(config, "POSE_GESTURE_DEBUG", False) else 0.0,
+        )
+    )))
+    debug_interval = max(0.1, float(getattr(config, "POSE_GESTURE_DEBUG_LOG_INTERVAL_SEC", 0.5)))
+
+    def _debug_log(state_name):
+        nonlocal now
+        global _last_pose_debug_log_time, _last_pose_debug_state
+        if not debug_enabled:
+            return
+        if state_name != _last_pose_debug_state or (now - _last_pose_debug_log_time) >= debug_interval:
+            print(f"Gesture state: {state_name} (latched={int(_pose_latched)}, neutral={_pose_neutral_streak})")
+            _last_pose_debug_state = state_name
+            _last_pose_debug_log_time = now
+
+    if points is None:
+        _debug_log("NONE")
+        _pose_neutral_streak += 1
+        if _pose_neutral_streak >= reset_frames:
+            _pose_latched = False
+            _pose_state_streak["LEFT"] = 0
+            _pose_state_streak["RIGHT"] = 0
+            _pose_state_streak["BOTH"] = 0
+        return
+
+    # COCO keypoints for yolov8 pose
+    left_shoulder_idx = 5
+    right_shoulder_idx = 6
+    left_wrist_idx = config.KEYPOINTS.get("left_hand", 9)
+    right_wrist_idx = config.KEYPOINTS.get("right_hand", 10)
+
+    idxs = [left_shoulder_idx, right_shoulder_idx, left_wrist_idx, right_wrist_idx]
+    if any(i >= len(points) for i in idxs):
+        _debug_log("NONE")
+        _pose_neutral_streak += 1
+        if _pose_neutral_streak >= reset_frames:
+            _pose_latched = False
+        return
+
+    ls, rs = points[left_shoulder_idx], points[right_shoulder_idx]
+    lw, rw = points[left_wrist_idx], points[right_wrist_idx]
+    ls_conf = _point_confidence(ls)
+    rs_conf = _point_confidence(rs)
+    lw_conf = _point_confidence(lw)
+    rw_conf = _point_confidence(rw)
+
+    left_valid = ls_conf >= min_conf and lw_conf >= min_conf
+    right_valid = rs_conf >= min_conf and rw_conf >= min_conf
+
+    left_raised = left_valid and (lw.y() < (ls.y() - y_margin))
+    right_raised = right_valid and (rw.y() < (rs.y() - y_margin))
+
+    state = "NONE"
+    if left_raised and right_raised:
+        state = "BOTH"
+    elif left_raised:
+        state = "LEFT"
+    elif right_raised:
+        state = "RIGHT"
+    _debug_log(state)
+
+    # Update streak counters for simple temporal smoothing.
+    for key in ("LEFT", "RIGHT", "BOTH"):
+        if state == key:
+            _pose_state_streak[key] += 1
+        else:
+            _pose_state_streak[key] = 0
+
+    # Latch reset: require a short neutral period before allowing re-trigger.
+    if state == "NONE":
+        _pose_neutral_streak += 1
+        if _pose_neutral_streak >= reset_frames:
+            _pose_latched = False
+        return
+    _pose_neutral_streak = 0
+
+    # One-shot behavior: once any gesture fires, do not emit again until
+    # we see a neutral window (state == NONE for reset_frames).
+    if _pose_latched:
+        return
+
+    if state == "BOTH":
+        if _pose_state_streak["BOTH"] >= frames_required and _pose_event_allowed("BOTH_HANDS_UP", now):
+            brain.send_to_crestron("BOTH_HANDS_UP")
+            _suppress_single_until = now + suppress_sec
+            _pose_latched = True
+            _pose_state_streak["LEFT"] = 0
+            _pose_state_streak["RIGHT"] = 0
+        return
+
+    if state in ("LEFT", "RIGHT") and now < _suppress_single_until:
+        return
+
+    if state == "LEFT":
+        if _pose_state_streak["LEFT"] < frames_required:
+            return
+        event_name = "RIGHT_HAND_UP" if mirror_lr else "LEFT_HAND_UP"
+        if _pose_event_allowed(event_name, now):
+            brain.send_to_crestron(event_name)
+            _pose_latched = True
+        return
+    if state == "RIGHT":
+        if _pose_state_streak["RIGHT"] < frames_required:
+            return
+        event_name = "LEFT_HAND_UP" if mirror_lr else "RIGHT_HAND_UP"
+        if _pose_event_allowed(event_name, now):
+            brain.send_to_crestron(event_name)
+            _pose_latched = True
+        return
+
+
+def _maybe_release_to_user_from_table(points, now):
+    """Open gripper when a detected wrist is near the claw in TABLE_CAM mode."""
+    global _last_table_release_time, _table_release_hits
+
+    p = brain.tuner.get_params()
+    enabled = bool(round(float(p.get("table_release_enabled", 1.0))))
+
+    if not enabled:
+        _table_release_hits = 0
+        return
+    if not brain.is_holding_item():
+        _table_release_hits = 0
+        return
+    if not brain.can_auto_release_now():
+        _table_release_hits = 0
+        return
+    if brain.tuner.shared_params.get("camera_mode", "HIGH_CAM") != "TABLE_CAM":
+        _table_release_hits = 0
+        return
+
+    cooldown = max(0.5, float(p.get("table_release_cooldown", getattr(config, "TABLE_HANDOFF_RELEASE_COOLDOWN", 2.5))))
+    if now - _last_table_release_time < cooldown:
+        _table_release_hits = 0
+        return
+
+    claw_x = float(p.get("table_claw_x", getattr(config, "TABLE_HANDOFF_CLAW_X_NORM", 0.50)))
+    claw_y = float(p.get("table_claw_y", getattr(config, "TABLE_HANDOFF_CLAW_Y_NORM", 0.82)))
+    radius = max(0.03, float(p.get("table_release_radius", getattr(config, "TABLE_HANDOFF_RADIUS_NORM", 0.14))))
+    min_conf = max(0.0, min(1.0, float(getattr(config, "TABLE_HANDOFF_MIN_CONFIDENCE", 0.45))))
+    frames_required = max(1, int(getattr(config, "TABLE_HANDOFF_FRAMES_REQUIRED", 5)))
+
+    near_detected = False
+    near_label = None
+
+    for key in ("left_hand", "right_hand"):
+        idx = config.KEYPOINTS.get(key)
+        if idx is None or idx >= len(points):
+            continue
+        conf = _point_confidence(points[idx])
+        if conf < min_conf:
+            continue
+        px = points[idx].x()
+        py = points[idx].y()
+        if px is None or py is None:
+            continue
+        dist = ((px - claw_x) ** 2 + (py - claw_y) ** 2) ** 0.5
+        if dist <= radius:
+            near_detected = True
+            near_label = key
+            break
+
+    if near_detected:
+        _table_release_hits += 1
+        if _table_release_hits >= frames_required:
+            if brain.release_item_to_user(reason=f"table hand proximity ({near_label})"):
+                _last_table_release_time = now
+            _table_release_hits = 0
+        return
+
+    _table_release_hits = 0
+
+
+def _release_overlay_caps_changed(_overlay, caps):
+    global _overlay_frame_w, _overlay_frame_h
+    try:
+        s = caps.get_structure(0)
+        _overlay_frame_w = int(s.get_value("width"))
+        _overlay_frame_h = int(s.get_value("height"))
+    except Exception:
+        pass
+
+
+def _release_overlay_draw(_overlay, cr, _timestamp, _duration):
+    try:
+        if brain.tuner.shared_params.get("camera_mode", "HIGH_CAM") != "TABLE_CAM":
+            return
+
+        p = brain.tuner.get_params()
+        enabled = bool(round(float(p.get("table_release_enabled", 1.0))))
+        if not enabled:
+            return
+
+        claw_x = float(p.get("table_claw_x", getattr(config, "TABLE_HANDOFF_CLAW_X_NORM", 0.50)))
+        claw_y = float(p.get("table_claw_y", getattr(config, "TABLE_HANDOFF_CLAW_Y_NORM", 0.82)))
+        radius_n = max(0.03, float(p.get("table_release_radius", getattr(config, "TABLE_HANDOFF_RADIUS_NORM", 0.14))))
+
+        w, h = max(1, _overlay_frame_w), max(1, _overlay_frame_h)
+        cx = claw_x * w
+        cy = claw_y * h
+        r = max(6.0, radius_n * min(w, h))
+
+        cr.set_source_rgba(1.0, 0.85, 0.1, 0.95)
+        cr.set_line_width(3.0)
+        cr.arc(cx, cy, r, 0, 2 * np.pi)
+        cr.stroke()
+
+        cr.set_source_rgba(1.0, 0.2, 0.2, 0.95)
+        cr.set_line_width(2.0)
+        cr.move_to(cx - 8, cy)
+        cr.line_to(cx + 8, cy)
+        cr.move_to(cx, cy - 8)
+        cr.line_to(cx, cy + 8)
+        cr.stroke()
+    except Exception:
+        pass
 
 
 def app_callback(pad, info, user_data):
@@ -565,6 +942,8 @@ def app_callback(pad, info, user_data):
             landmarks = person.get_objects_typed(hailo.HAILO_LANDMARKS)
             if landmarks:
                 points = landmarks[0].get_points()
+                _maybe_send_pose_gesture_events(points, now)
+                _maybe_release_to_user_from_table(points, now)
                 target_idx = config.KEYPOINTS.get(_tracking_target, 0)
                 raw_x = 1.0 - points[target_idx].x()   # Hailo x=0 is the left edge of the
                 raw_y = points[target_idx].y()           # frame; inverting aligns it with the
@@ -596,8 +975,11 @@ def app_callback(pad, info, user_data):
                         speed=int(p.get("speed", 1200)),
                     )
                     _last_move_time = now
+            else:
+                _maybe_send_pose_gesture_events(None, now)
 
         else:
+            _maybe_send_pose_gesture_events(None, now)
             # No person in frame – enter standby after timeout
             now = time.time()
             if now - _last_seen_time > config.FLAGPOLE_TIMEOUT:
@@ -653,6 +1035,8 @@ def _cpu_fallback_loop():
     print("--- CPU Fallback Active: Pi5 AI Vision window (press Q to quit) ---")
     try:
         while True:
+            if brain.shutdown_event.is_set():
+                break
             sample = sink.emit("try-pull-sample", int(0.1 * Gst.SECOND))
             if sample is None:
                 continue
@@ -693,6 +1077,115 @@ def _cpu_fallback_loop():
 
 
 _restart_event = threading.Event()
+_table_preview_stop = threading.Event()
+_table_preview_thread = None
+
+
+def _table_preview_worker():
+    """Run a table-camera preview in a separate rpicam window for DUAL_CAM mode."""
+    preview_cmds = [
+        [
+            "rpicam-hello",
+            "--camera", "0",
+            "--width", str(config.FRAME_W),
+            "--height", str(config.FRAME_H),
+            "-t", "0",
+        ],
+        [
+            "libcamera-hello",
+            "--camera", "0",
+            "--width", str(config.FRAME_W),
+            "--height", str(config.FRAME_H),
+            "-t", "0",
+        ],
+    ]
+
+    preview_proc = None
+    try:
+        for cmd in preview_cmds:
+            try:
+                preview_proc = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                time.sleep(0.6)
+                if preview_proc.poll() is None:
+                    print(f"--- Table preview active (DUAL_CAM, via {' '.join(cmd[:1])}) ---")
+                    break
+                err = (preview_proc.stderr.read() or "").strip()
+                print(f"Table preview command failed ({' '.join(cmd[:1])}): {err[:240]}")
+                preview_proc = None
+            except Exception as e:
+                print(f"Table preview command failed ({' '.join(cmd[:1])}): {e}")
+                preview_proc = None
+
+        if preview_proc is None:
+            print("Table preview unavailable: could not start rpicam/libcamera preview")
+            return
+
+        while not _table_preview_stop.is_set() and not brain.shutdown_event.is_set():
+            if preview_proc.poll() is not None:
+                err_tail = ""
+                try:
+                    err_tail = (preview_proc.stderr.read() or "").strip()
+                except Exception:
+                    pass
+                if err_tail:
+                    print(f"Table preview process exited: {err_tail[:300]}")
+                else:
+                    print("Table preview process exited")
+                break
+            time.sleep(0.1)
+    finally:
+        if preview_proc is not None and preview_proc.poll() is None:
+            try:
+                preview_proc.terminate()
+                preview_proc.wait(timeout=1.5)
+            except Exception:
+                try:
+                    preview_proc.kill()
+                except Exception:
+                    pass
+        print("--- Table preview stopped ---")
+
+
+def _start_table_preview():
+    global _table_preview_thread
+    if _table_preview_thread and _table_preview_thread.is_alive():
+        return
+    _table_preview_stop.clear()
+    _table_preview_thread = threading.Thread(target=_table_preview_worker, daemon=True)
+    _table_preview_thread.start()
+
+
+def _stop_table_preview():
+    global _table_preview_thread
+    _table_preview_stop.set()
+    if _table_preview_thread and _table_preview_thread.is_alive():
+        _table_preview_thread.join(timeout=3.0)
+    _table_preview_thread = None
+
+
+def _graceful_stop_pipeline(pipe):
+    if pipe is None:
+        return
+    try:
+        pipe.send_event(Gst.Event.new_eos())
+        bus = pipe.get_bus()
+        if bus is not None:
+            bus.timed_pop_filtered(
+                int(0.25 * Gst.SECOND),
+                Gst.MessageType.EOS | Gst.MessageType.ERROR,
+            )
+    except Exception:
+        pass
+    try:
+        pipe.set_state(Gst.State.NULL)
+        pipe.get_state(int(0.5 * Gst.SECOND))
+    except Exception:
+        pass
 
 
 def camera_loop():
@@ -704,44 +1197,91 @@ def camera_loop():
         return
 
     # Register handlers so robot_brain.switch_camera() can restart this pipeline
-    # when the operator switches between HIGH_CAM and TABLE_CAM from the GUI or
-    # via a Crestron command.
+    # when the operator switches camera mode from the GUI or via Crestron.
     brain.camera_switch_handlers["HIGH_CAM"] = lambda: _restart_event.set()
     brain.camera_switch_handlers["TABLE_CAM"] = lambda: _restart_event.set()
+    brain.camera_switch_handlers["DUAL_CAM"] = lambda: _restart_event.set()
 
     global _last_seen_time
     _last_seen_time = time.time() + 5.0  # give Hailo 5 s to find a person at startup
 
-    while True:
-        cam_path = (
-            config.PI_CAMERA_DEVICE
-            if brain.tuner.shared_params.get("camera_mode", "HIGH_CAM") == "HIGH_CAM"
-            else config.ARDUCAM_DEVICE
-        )
+    while not brain.shutdown_event.is_set():
+        mode = brain.tuner.shared_params.get("camera_mode", "HIGH_CAM")
+        if mode == "TABLE_CAM":
+            cam_path = config.ARDUCAM_DEVICE
+            _stop_table_preview()
+        elif mode == "DUAL_CAM":
+            # Keep main Hailo feed in this process; table preview runs in a
+            # separate rpicam/libcamera preview process.
+            cam_path = config.PI_CAMERA_DEVICE
+            _start_table_preview()
+        else:
+            cam_path = config.PI_CAMERA_DEVICE
+            _stop_table_preview()
+
         _restart_event.clear()
-        os.system("sudo pkill -9 -f hailonet")
-        time.sleep(1)
 
         pipe = None
         try:
             # Capture at IMX708 native 16:9, downscale to the 640×640 square the
             # yolov8m_pose network expects.  hailotracker provides consistent IDs
             # across frames; hailooverlay draws skeleton overlays on the preview.
-            launch_str = (
-                f"libcamerasrc camera-name={cam_path} ! "
-                f"video/x-raw,format=NV12,"
-                f"width={config.CAM_SENSOR_W},height={config.CAM_SENSOR_H} ! "
-                f"videoconvert ! videoscale ! "
-                f"video/x-raw,format=RGB,"
-                f"width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
-                f"queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
-                f"hailonet hef-path={HEF_PATH} ! "
-                f"hailofilter name=hailofilter so-path={SO_PATH} ! "
-                f"hailotracker ! hailooverlay ! "
-                f"videoconvert ! autovideosink sync=false"
+            overlay_enabled = (
+                mode == "TABLE_CAM"
+                and bool(getattr(config, "TABLE_HANDOFF_OVERLAY_ENABLED", False))
+            )
+            finger_branch_enabled = (
+                mode == "HIGH_CAM"
+                and bool(getattr(config, "FINGER_GESTURE_EVENTS_ENABLED", True))
+                and mp is not None
             )
 
-            pipe = Gst.parse_launch(launch_str)
+            if finger_branch_enabled:
+                launch_str = (
+                    f"libcamerasrc camera-name={cam_path} ! "
+                    f"video/x-raw,format=NV12,width={config.CAM_SENSOR_W},height={config.CAM_SENSOR_H} ! "
+                    f"videoconvert ! videoscale ! "
+                    f"video/x-raw,format=RGB,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
+                    f"hailonet hef-path={HEF_PATH} force-writable=true ! "
+                    f"hailofilter name=hailofilter so-path={SO_PATH} ! "
+                    f"hailotracker ! hailooverlay ! "
+                    f"videoconvert ! tee name=t "
+                    f"t. ! queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
+                    f"autovideosink sync=false "
+                    f"t. ! queue leaky=downstream max-size-buffers=1 ! "
+                    f"video/x-raw,format=RGB,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
+                    f"appsink name=finger_sink emit-signals=false sync=false drop=true max-buffers=1"
+                )
+            else:
+                launch_str = (
+                    f"libcamerasrc camera-name={cam_path} ! "
+                    f"video/x-raw,format=NV12,"
+                    f"width={config.CAM_SENSOR_W},height={config.CAM_SENSOR_H} ! "
+                    f"videoconvert ! videoscale ! "
+                    f"video/x-raw,format=RGB,"
+                    f"width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
+                    f"queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
+                    f"hailonet hef-path={HEF_PATH} force-writable=true ! "
+                    f"hailofilter name=hailofilter so-path={SO_PATH} ! "
+                    f"hailotracker ! hailooverlay ! "
+                    f"videoconvert ! autovideosink sync=false"
+                )
+
+            if overlay_enabled:
+                launch_str = launch_str.replace(
+                    "videoconvert ! autovideosink sync=false",
+                    "cairooverlay name=release_overlay ! videoconvert ! autovideosink sync=false",
+                )
+
+            try:
+                pipe = Gst.parse_launch(launch_str)
+            except Exception as e:
+                # Some images may lack cairooverlay; fall back without the visual marker.
+                fallback = launch_str.replace("cairooverlay name=release_overlay ! ", "")
+                pipe = Gst.parse_launch(fallback)
+                if overlay_enabled:
+                    print(f"WARNING: release overlay disabled ({e})")
+
             hailofilter = pipe.get_by_name("hailofilter")
             if hailofilter:
                 hailofilter.get_static_pad("src").add_probe(
@@ -750,10 +1290,22 @@ def camera_loop():
             else:
                 print("WARNING: hailofilter element not found – probe not attached")
 
+            if overlay_enabled:
+                release_overlay = pipe.get_by_name("release_overlay")
+                if release_overlay:
+                    release_overlay.connect("caps-changed", _release_overlay_caps_changed)
+                    release_overlay.connect("draw", _release_overlay_draw)
+
+            finger_sink = pipe.get_by_name("finger_sink") if finger_branch_enabled else None
+
             pipe.set_state(Gst.State.PLAYING)
             print("--- Hailo AI Hat Active: yolov8m_pose running ---")
 
-            while not _restart_event.is_set():
+            while not _restart_event.is_set() and not brain.shutdown_event.is_set():
+                if finger_sink is not None:
+                    sample = finger_sink.emit("try-pull-sample", int(0.02 * Gst.SECOND))
+                    if sample is not None:
+                        _maybe_send_finger_gesture_events_from_sample(sample, time.time())
                 time.sleep(0.1)
 
         except Exception as e:
@@ -761,8 +1313,10 @@ def camera_loop():
             time.sleep(2)
         finally:
             if pipe is not None:
-                pipe.set_state(Gst.State.NULL)
+                _graceful_stop_pipeline(pipe)
         time.sleep(0.5)
+
+    _stop_table_preview()
 
 if __name__ == "__main__":
     print(f"--- od.py version {_VERSION} ---")
@@ -770,4 +1324,4 @@ if __name__ == "__main__":
     try:
         camera_loop()
     except KeyboardInterrupt:
-        pass
+        brain.request_shutdown()
