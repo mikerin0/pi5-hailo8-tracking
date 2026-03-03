@@ -223,53 +223,63 @@ class RobotTuner:
     def create_gui(self):
         self.root = tk.Tk()
         self.root.title("Robot Master - Pi Server Mode")
-        self.root.geometry("400x1050")
-        
+        self.root.geometry("420x750")
+        self.root.resizable(True, True)
+
+        # Scrollable canvas so the GUI fits on any display height
+        canvas = tk.Canvas(self.root, borderwidth=0)
+        vsb = tk.Scrollbar(self.root, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=vsb.set)
+        vsb.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        f = tk.Frame(canvas)
+        canvas.create_window((0, 0), window=f, anchor="nw")
+        f.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+
         # --- Camera Mode Frame ---
-        tk.Label(self.root, text="--- CAMERA MODE ---", font=("Arial", 12, "bold")).pack(pady=5)
-        cam_frame = tk.Frame(self.root)
+        tk.Label(f, text="--- CAMERA MODE ---", font=("Arial", 12, "bold")).pack(pady=5)
+        cam_frame = tk.Frame(f)
         cam_frame.pack()
         tk.Button(cam_frame, text="HIGH CAM\n(Face Tracking)", bg="blue", fg="white",
                   width=14, command=lambda: switch_camera("HIGH_CAM")).pack(side="left", padx=5)
         tk.Button(cam_frame, text="TABLE CAM\n(Manipulation)", bg="green", fg="white",
                   width=14, command=lambda: switch_camera("TABLE_CAM")).pack(side="left", padx=5)
-        self.cam_mode_label = tk.Label(self.root, text="Mode: HIGH CAM", font=("Arial", 10))
+        self.cam_mode_label = tk.Label(f, text="Mode: HIGH CAM", font=("Arial", 10))
         self.cam_mode_label.pack(pady=3)
 
         # --- Robot Frame ---
-        tk.Label(self.root, text="--- ROBOT CONTROL ---", font=("Arial", 12, "bold")).pack(pady=5)
+        tk.Label(f, text="--- ROBOT CONTROL ---", font=("Arial", 12, "bold")).pack(pady=5)
         self.manual_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(self.root, text="ENABLE MANUAL SLIDERS (AI LOCKED)", variable=self.manual_var, command=self.toggle_manual_mode, font=("Arial", 10, "bold"), fg="blue").pack(pady=10)
+        tk.Checkbutton(f, text="ENABLE MANUAL SLIDERS (AI LOCKED)", variable=self.manual_var, command=self.toggle_manual_mode, font=("Arial", 10, "bold"), fg="blue").pack(pady=10)
 
         for lbl, k, mn, mx in [("Reach X", "tune_x", 0.1, 0.35), ("Swing Y", "tune_y", -0.2, 0.2), ("Height Z", "tune_z", 0.02, 0.4)]:
-            tk.Label(self.root, text=lbl).pack()
-            s = tk.Scale(self.root, from_=mn, to=mx, resolution=0.005, orient='horizontal', length=300, command=lambda v, k=k: self.update_tune(k, v))
+            tk.Label(f, text=lbl).pack()
+            s = tk.Scale(f, from_=mn, to=mx, resolution=0.005, orient='horizontal', length=300, command=lambda v, k=k: self.update_tune(k, v))
             s.set(self.shared_params[k]); s.pack()
 
-        tk.Button(self.root, text="HOME ARM", command=go_home, bg="gray", fg="white").pack(pady=10)
+        tk.Button(f, text="HOME ARM", command=go_home, bg="gray", fg="white").pack(pady=10)
 
         # --- Servo Thermal Frame ---
-        tk.Label(self.root, text="--- SERVO THERMAL ---", font=("Arial", 12, "bold")).pack(pady=5)
-        tk.Button(self.root, text="RELAX ARM (fold to rest)",
+        tk.Label(f, text="--- SERVO THERMAL ---", font=("Arial", 12, "bold")).pack(pady=5)
+        tk.Button(f, text="RELAX ARM (fold to rest)",
                   bg="orange", fg="white", width=22,
                   command=self._do_relax_arm).pack(pady=5)
         self.thermal_label = tk.Label(
-            self.root, text="Thermal monitor: starting…",
+            f, text="Thermal monitor: starting…",
             font=("Arial", 9), wraplength=380, justify="left"
         )
         self.thermal_label.pack(pady=3)
         self._refresh_thermal_status()
 
         # --- Crestron Lights Frame ---
-        tk.Label(self.root, text="--- CRESTRON LIGHTS ---", font=("Arial", 12, "bold")).pack(pady=15)
-        btn_frame = tk.Frame(self.root)
+        tk.Label(f, text="--- CRESTRON LIGHTS ---", font=("Arial", 12, "bold")).pack(pady=15)
+        btn_frame = tk.Frame(f)
         btn_frame.pack()
-        
         tk.Button(btn_frame, text="LIGHTS ON", bg="yellow", width=12, command=lambda: send_to_crestron("LIGHT_ON")).pack(side="left", padx=5)
         tk.Button(btn_frame, text="LIGHTS OFF", bg="black", fg="white", width=12, command=lambda: send_to_crestron("LIGHT_OFF")).pack(side="left", padx=5)
 
         # --- Exit ---
-        tk.Button(self.root, text="EXIT", bg="red", fg="white", width=12,
+        tk.Button(f, text="EXIT", bg="red", fg="white", width=12,
                   command=self.root.destroy).pack(pady=15)
 
     def toggle_manual_mode(self):
