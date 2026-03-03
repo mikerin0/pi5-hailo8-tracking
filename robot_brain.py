@@ -15,6 +15,10 @@ PORT, BAUD = "/dev/ttyAMA10", 9600
 CRESTRON_PORT = 50005
 last_angles = [0, 0, 0.2, 0.5, 0.1]
 
+# Pluggable thermal management callbacks – set by od.py at startup
+on_relax_arm = None          # callable() → moves arm to low-strain rest position
+get_thermal_status_fn = None  # callable() → dict with parked/idle/load info
+
 # --- Camera switch callbacks (populated by external modules at runtime) ---
 # Keys: "HIGH_CAM", "TABLE_CAM"  →  callable with no arguments
 camera_switch_handlers = {}
@@ -191,7 +195,7 @@ class RobotTuner:
     def create_gui(self):
         self.root = tk.Tk()
         self.root.title("Robot Master - Pi Server Mode")
-        self.root.geometry("400x850")
+        self.root.geometry("400x1050")
         
         # --- Camera Mode Frame ---
         tk.Label(self.root, text="--- CAMERA MODE ---", font=("Arial", 12, "bold")).pack(pady=5)
@@ -216,6 +220,18 @@ class RobotTuner:
 
         tk.Button(self.root, text="HOME ARM", command=go_home, bg="gray", fg="white").pack(pady=10)
 
+        # --- Servo Thermal Frame ---
+        tk.Label(self.root, text="--- SERVO THERMAL ---", font=("Arial", 12, "bold")).pack(pady=5)
+        tk.Button(self.root, text="RELAX ARM (fold to rest)",
+                  bg="orange", fg="white", width=22,
+                  command=self._do_relax_arm).pack(pady=5)
+        self.thermal_label = tk.Label(
+            self.root, text="Thermal monitor: starting…",
+            font=("Arial", 9), wraplength=380, justify="left"
+        )
+        self.thermal_label.pack(pady=3)
+        self._refresh_thermal_status()
+
         # --- Crestron Lights Frame ---
         tk.Label(self.root, text="--- CRESTRON LIGHTS ---", font=("Arial", 12, "bold")).pack(pady=15)
         btn_frame = tk.Frame(self.root)
@@ -224,6 +240,10 @@ class RobotTuner:
         tk.Button(btn_frame, text="LIGHTS ON", bg="yellow", width=12, command=lambda: send_to_crestron("LIGHT_ON")).pack(side="left", padx=5)
         tk.Button(btn_frame, text="LIGHTS OFF", bg="black", fg="white", width=12, command=lambda: send_to_crestron("LIGHT_OFF")).pack(side="left", padx=5)
 
+        # --- Exit ---
+        tk.Button(self.root, text="EXIT", bg="red", fg="white", width=12,
+                  command=self.root.destroy).pack(pady=15)
+
     def toggle_manual_mode(self):
         self.manual_mode = self.manual_var.get()
         self.shared_params["busy"] = 1 if self.manual_mode else 0
@@ -231,6 +251,36 @@ class RobotTuner:
     def update_tune(self, k, v):
         self.shared_params[k] = float(v)
         if self.manual_mode: reach_for_coordinate(self.shared_params["tune_x"], self.shared_params["tune_y"], self.shared_params["tune_z"], 1200)
+
+    def _do_relax_arm(self):
+        """Invoke the thermal relax callback, logging any error."""
+        if on_relax_arm:
+            try:
+                on_relax_arm()
+            except Exception as exc:
+                print(f"RELAX ARM error: {exc}")
+
+    def _refresh_thermal_status(self):
+        """Update the thermal status label every 3 seconds via tkinter after()."""
+        if get_thermal_status_fn:
+            try:
+                s = get_thermal_status_fn()
+                parked = "YES" if s.get("parked") else "no"
+                idle = f"{s.get('idle_secs', 0):.0f}s"
+                loads = s.get("high_load_counts", {})
+                hot = [str(sid) for sid, c in loads.items() if c > 0]
+                hot_str = ", ".join(hot) if hot else "none"
+                self.thermal_label.config(
+                    text=f"Parked: {parked}  Idle: {idle}  High-load servos: {hot_str}"
+                )
+            except Exception as exc:
+                self.thermal_label.config(text=f"Thermal status error: {exc}")
+        else:
+            self.thermal_label.config(text="Thermal monitor: not connected")
+        try:
+            self.root.after(3000, self._refresh_thermal_status)
+        except Exception:
+            pass  # window has been destroyed
 
 tuner = RobotTuner()
 

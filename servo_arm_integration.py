@@ -29,7 +29,7 @@ import threading
 
 import robot_brain as brain
 from lsc6_controller import LSC6Controller
-from rest_positions import move_to_home
+from rest_positions import move_to_home, move_to_position
 from servo_thermal_monitor import ServoThermalMonitor
 
 logger = logging.getLogger(__name__)
@@ -39,9 +39,10 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 # Reuse the serial port already opened by robot_brain so that both modules
-# share the same connection without a conflict.
+# share the same connection without a conflict.  getattr() guards against
+# the case where the serial port failed to open (brain.ser is undefined).
 controller = LSC6Controller(
-    ser=brain.ser,
+    ser=getattr(brain, 'ser', None),
     arm_disabled=brain.ARM_MOVEMENT_DISABLED,
 )
 
@@ -77,6 +78,12 @@ def move_servos(positions, time_ms=800):
 def go_home():
     """Move arm to the calibrated home position and notify the monitor."""
     move_to_home(controller, time_ms=2000)
+    thermal_monitor.notify_move()
+
+
+def relax_arm():
+    """Move arm to the compact_fold low-strain rest position."""
+    move_to_position(controller, "compact_fold", time_ms=2000)
     thermal_monitor.notify_move()
 
 

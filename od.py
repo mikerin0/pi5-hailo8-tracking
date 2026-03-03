@@ -169,6 +169,16 @@ gi.require_version('Gst', '1.0')
 from gi.repository import Gst
 Gst.init(None)
 
+# Wire in servo thermal management (optional – degrades gracefully if unavailable)
+try:
+    import servo_arm_integration as _arm_sys
+    brain.on_relax_arm = _arm_sys.relax_arm
+    brain.get_thermal_status_fn = _arm_sys.get_thermal_status
+    _arm_sys.thermal_monitor.start()
+    print("Servo thermal monitor started")
+except Exception as _arm_err:
+    print(f"Thermal monitor unavailable: {_arm_err}")
+
 _HAILO_ELEMENTS = ("hailonet", "hailofilter", "hailooverlay", "hailotracker")
 
 def _clear_gst_registry():
