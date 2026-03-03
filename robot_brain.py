@@ -8,6 +8,34 @@ import ikpy.link
 # Set to False once the Hailo pipeline is confirmed working and arm limits are safe.
 ARM_MOVEMENT_DISABLED = False
 
+# --- Tuner preset persistence ---
+# Only numeric slider values are saved/loaded; string keys (e.g. camera_mode) are skipped.
+_PRESET_PATH = os.path.expanduser("~/.robot_tuner_preset.json")
+_PRESET_FLOAT_KEYS = frozenset({
+    "ry_m", "rz_m", "z_off", "speed", "smooth",
+    "tune_x", "tune_y", "tune_z",
+    "nose_x", "nose_y", "left_hand_x", "left_hand_y", "right_hand_x", "right_hand_y",
+})
+
+def _load_preset(params):
+    try:
+        with open(_PRESET_PATH) as f:
+            data = json.load(f)
+        for k, v in data.items():
+            if k in _PRESET_FLOAT_KEYS:
+                params[k] = float(v)
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print(f"Failed to load tuner preset: {e}")
+
+def _save_preset(params):
+    try:
+        with open(_PRESET_PATH, "w") as f:
+            json.dump({k: params[k] for k in _PRESET_FLOAT_KEYS if k in params}, f)
+    except Exception as e:
+        print(f"Failed to save tuner preset: {e}")
+
 # --- 1. SETTINGS & HARDWARE ---
 # Physical lengths of your 6DOF arm (L4 includes your 19cm claw)
 L1, L2, L3, L4 = 0.05, 0.055, 0.091, 0.170
@@ -287,5 +315,7 @@ tuner = RobotTuner()
 def start_brain_ui():
     # Start the Server thread immediately
     threading.Thread(target=tcp_listener, daemon=True).start()
+    _load_preset(tuner.shared_params)
     tuner.create_gui()
     tuner.root.mainloop()
+    _save_preset(tuner.shared_params)
