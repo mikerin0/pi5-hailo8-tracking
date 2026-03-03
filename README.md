@@ -314,7 +314,7 @@ Hand landmarks (Hailo8)
 | `lsc6_controller.py` | LSC-6 serial communication library (move, read, torque) |
 | `rest_positions.py` | Named low-strain arm rest positions |
 | `servo_thermal_monitor.py` | Background servo load monitor and auto-park system |
-| `servo_arm_integration.py` | Unified entry point wiring all modules together |
+| `servo_arm_integration.py` | Integration library wiring thermal management into robot_brain |
 
 ---
 
@@ -345,15 +345,18 @@ against gravity for a long time.  Four new modules address this:
 4. **`servo_arm_integration.py`** – Wires everything together and provides
    drop-in replacements for `robot_brain.move_servo()` / `go_home()`.
 
-### Standalone launch (replaces `robot_brain.py` entry point)
+### Normal launch (unchanged)
+
+The full system — Hailo AI pipeline, video feed, and brain GUI — is still
+started with the same command as before:
 
 ```bash
 source ~/hailo-venv/bin/activate
-python servo_arm_integration.py
+python od.py
 ```
 
-This starts the brain GUI, Crestron server, and thermal monitor in one
-process.
+`servo_arm_integration` is a **library module**, not a replacement entry point.
+Do not run it directly; import it from `od.py` or your own scripts instead.
 
 ### Library usage
 

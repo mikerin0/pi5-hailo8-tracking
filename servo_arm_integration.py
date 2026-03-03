@@ -10,9 +10,8 @@ It reuses the serial port already opened by ``robot_brain`` (to avoid
 opening the same ``/dev/ttyAMA10`` twice) and exposes drop-in replacements
 for the most commonly used movement helpers.
 
-Usage – standalone launch (brain UI + thermal monitor)::
-
-    python servo_arm_integration.py
+**Do not run this file directly.** The full system (Hailo pipeline + video +
+GUI) is launched with ``python od.py`` as before.
 
 Usage – as an imported library::
 
@@ -90,32 +89,3 @@ def get_thermal_status():
         See :meth:`ServoThermalMonitor.get_status`.
     """
     return thermal_monitor.get_status()
-
-
-# ---------------------------------------------------------------------------
-# Start-up
-# ---------------------------------------------------------------------------
-
-def start_integration():
-    """Start the thermal monitor and the robot brain GUI.
-
-    Starts :class:`ServoThermalMonitor` in its background thread, then
-    calls :func:`robot_brain.start_brain_ui` which blocks until the
-    tkinter window is closed.  Cleans up on exit.
-    """
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
-    logger.info("Servo arm integration layer starting")
-    thermal_monitor.start()
-    try:
-        brain.start_brain_ui()
-    finally:
-        thermal_monitor.stop()
-        controller.close()
-        logger.info("Servo arm integration layer stopped")
-
-
-if __name__ == "__main__":
-    start_integration()
