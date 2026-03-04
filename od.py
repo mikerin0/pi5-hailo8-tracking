@@ -1329,11 +1329,14 @@ if __name__ == "__main__":
     servo_integration.power_up_servos()
     servo_integration.thermal_monitor.start()
     print("--- Servo thermal monitor started ---")
-    threading.Thread(target=brain.start_brain_ui, daemon=True).start()
+    camera_thread = threading.Thread(target=camera_loop, daemon=True, name="CameraLoop")
+    camera_thread.start()
     try:
-        camera_loop()
+        brain.start_brain_ui()
     except KeyboardInterrupt:
         brain.request_shutdown()
     finally:
+        brain.request_shutdown()
+        camera_thread.join(timeout=3.0)
         servo_integration.thermal_monitor.stop()
         print("--- Servo thermal monitor stopped ---")
