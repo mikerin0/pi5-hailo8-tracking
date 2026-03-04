@@ -248,6 +248,21 @@ class RobotTuner:
         self.cam_mode_label = tk.Label(f, text="Mode: HIGH CAM", font=("Arial", 10))
         self.cam_mode_label.pack(pady=3)
 
+        # --- Tracking Tuner Frame ---
+        tk.Label(f, text="--- TRACKING TUNER ---", font=("Arial", 12, "bold")).pack(pady=5)
+        for lbl, k, mn, mx, res in [
+            ("Reach Scale",  "ry_m",  0.10, 0.80, 0.01),
+            ("Vert Scale",   "rz_m",  0.10, 0.80, 0.01),
+            ("Vert Offset",  "z_off", -0.30, 0.30, 0.01),
+            ("Move Speed",   "speed",  300, 2000, 50),
+            ("Smooth",       "smooth", 0.00, 1.00, 0.01),
+        ]:
+            tk.Label(f, text=lbl).pack()
+            s = tk.Scale(f, from_=mn, to=mx, resolution=res, orient='horizontal',
+                         command=lambda v, k=k: self.update_tune(k, v))
+            s.set(self.shared_params[k])
+            s.pack(fill="x", padx=10)
+
         # --- Robot Frame ---
         tk.Label(f, text="--- ROBOT CONTROL ---", font=("Arial", 12, "bold")).pack(pady=5)
         self.manual_var = tk.BooleanVar(value=False)
@@ -282,6 +297,14 @@ class RobotTuner:
         # --- Exit ---
         tk.Button(f, text="EXIT", bg="red", fg="white", width=12,
                   command=lambda: os._exit(0)).pack(pady=15)
+
+        # Ensure the canvas always starts at the top (camera section visible first).
+        # Two-step: immediate after layout pass + deferred call after the Pi window
+        # manager finishes placing the window (avoids a scroll-to-middle artifact
+        # seen on Raspberry Pi displays where <Configure> events re-position the view).
+        self.root.update_idletasks()
+        canvas.yview_moveto(0.0)
+        self.root.after(200, lambda: canvas.yview_moveto(0.0))
 
     def toggle_manual_mode(self):
         self.manual_mode = self.manual_var.get()
