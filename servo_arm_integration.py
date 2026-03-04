@@ -10,7 +10,7 @@ import threading
 import time
 
 import robot_brain as brain
-from lsc6_controller import LSC6Controller
+from lsc6_controller import ALL_SERVO_IDS, LSC6Controller
 from rest_positions import move_to_home, move_to_position
 from servo_thermal_monitor import ServoThermalMonitor
 
@@ -31,6 +31,29 @@ _THERMAL_PARK_SEQUENCE = (
     (5, 2180),
 )
 _THERMAL_PARK_STEP_TIME_MS = 900
+_SERVO_POWER_LOCK = threading.Lock()
+_servo_power_on = True
+
+
+def _set_servo_power(enabled):
+    global _servo_power_on
+    with _SERVO_POWER_LOCK:
+        for servo_id in ALL_SERVO_IDS:
+            controller.set_torque(servo_id, bool(enabled))
+        _servo_power_on = bool(enabled)
+
+
+def power_down_servos():
+    _set_servo_power(False)
+
+
+def power_up_servos():
+    _set_servo_power(True)
+
+
+def is_servo_power_on():
+    with _SERVO_POWER_LOCK:
+        return _servo_power_on
 
 
 def _safe_park_via_sequence():
@@ -38,12 +61,14 @@ def _safe_park_via_sequence():
         for servo_id, pos in _THERMAL_PARK_SEQUENCE:
             controller.move_servo(servo_id, pos, time_ms=_THERMAL_PARK_STEP_TIME_MS)
             time.sleep((_THERMAL_PARK_STEP_TIME_MS / 1000.0) + 0.05)
+        power_down_servos()
     except Exception as e:
         logger.warning(
             "Thermal park sequence failed (%s); using HOME pulses fallback",
             e,
         )
         move_to_home(controller, time_ms=2000)
+        power_down_servos()
 
 
 thermal_monitor = ServoThermalMonitor(
@@ -89,4 +114,5 @@ def park_arm():
 
 def resume_arm():
     """Resume thermal monitoring after a manual park."""
+    power_up_servos()
     thermal_monitor.resume()

@@ -1325,6 +1325,8 @@ if __name__ == "__main__":
     brain.thermal_status_provider = servo_integration.get_thermal_status
     brain.thermal_park_callback = servo_integration.park_arm
     brain.thermal_resume_callback = servo_integration.resume_arm
+    brain.servo_power_provider = servo_integration.is_servo_power_on
+    servo_integration.power_up_servos()
     servo_integration.thermal_monitor.start()
     print("--- Servo thermal monitor started ---")
     threading.Thread(target=brain.start_brain_ui, daemon=True).start()

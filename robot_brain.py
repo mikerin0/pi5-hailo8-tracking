@@ -36,6 +36,7 @@ servo_move_callback = None
 thermal_status_provider = None
 thermal_park_callback = None
 thermal_resume_callback = None
+servo_power_provider = None
 TUNER_PARAMS_PATH = os.path.join(os.path.dirname(__file__), "tuner_params.json")
 
 try:
@@ -576,6 +577,16 @@ class RobotTuner:
         else:
             self.tracking_status_var.set("Tracking: Paused")
 
+        power_provider = servo_power_provider
+        if power_provider is None:
+            self.servo_power_var.set("Servo Power: unknown")
+        else:
+            try:
+                power_on = bool(power_provider())
+                self.servo_power_var.set("Servo Power: ON" if power_on else "Servo Power: OFF")
+            except Exception as e:
+                self.servo_power_var.set(f"Servo Power error: {e}")
+
         provider = thermal_status_provider
         if provider is None:
             self.thermal_status_var.set("Thermal monitor: unavailable")
@@ -772,6 +783,8 @@ class RobotTuner:
         tk.Label(status_col, text="--- THERMAL STATUS ---", font=("Arial", 12, "bold")).pack(pady=12)
         self.tracking_status_var = tk.StringVar(value="Tracking: initializing...")
         tk.Label(status_col, textvariable=self.tracking_status_var, justify="left").pack(pady=2)
+        self.servo_power_var = tk.StringVar(value="Servo Power: initializing...")
+        tk.Label(status_col, textvariable=self.servo_power_var, justify="left").pack(pady=2)
         self.thermal_status_var = tk.StringVar(value="Thermal monitor: initializing...")
         tk.Label(status_col, textvariable=self.thermal_status_var, wraplength=260, justify="left").pack(pady=4)
 
