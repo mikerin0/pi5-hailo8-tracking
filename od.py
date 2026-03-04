@@ -164,6 +164,7 @@ _GST_INSPECT_TIMEOUT = 20
 # All remaining imports come after the environment is prepared.
 import time, threading, gi, hailo, numpy as np, cv2, robot_brain as brain
 import config
+import servo_arm_integration as servo_integration
 try:
     import mediapipe as mp
 except Exception:
@@ -1320,8 +1321,15 @@ def camera_loop():
 
 if __name__ == "__main__":
     print(f"--- od.py version {_VERSION} ---")
+    brain.servo_move_callback = servo_integration.thermal_monitor.notify_move
+    brain.thermal_status_provider = servo_integration.get_thermal_status
+    servo_integration.thermal_monitor.start()
+    print("--- Servo thermal monitor started ---")
     threading.Thread(target=brain.start_brain_ui, daemon=True).start()
     try:
         camera_loop()
     except KeyboardInterrupt:
         brain.request_shutdown()
+    finally:
+        servo_integration.thermal_monitor.stop()
+        print("--- Servo thermal monitor stopped ---")

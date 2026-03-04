@@ -32,6 +32,8 @@ _holding_item = False
 _holding_item_lock = threading.Lock()
 _release_block_until = 0.0
 _release_block_lock = threading.Lock()
+servo_move_callback = None
+thermal_status_provider = None
 TUNER_PARAMS_PATH = os.path.join(os.path.dirname(__file__), "tuner_params.json")
 
 try:
@@ -73,6 +75,16 @@ def _gripper_switch_pressed():
 def _send_servo_packet(id, pos, time_ms=800):
     packet = bytearray([0x55, 0x55, 0x08, 0x03, 0x01, time_ms & 0xFF, (time_ms >> 8) & 0xFF, id, pos & 0xFF, (pos >> 8) & 0xFF])
     ser.write(packet)
+
+
+def _notify_servo_move():
+    callback = servo_move_callback
+    if callback is None:
+        return
+    try:
+        callback()
+    except Exception:
+        pass
 
 
 def set_holding_item(value):
@@ -259,6 +271,7 @@ def move_servo(id, pos, time_ms=800):
             if closing and _gripper_switch_pressed():
                 print("Gripper close blocked: microswitch already active")
                 _send_servo_packet(1, _gripper_pos_est, 120)
+                _notify_servo_move()
                 return
 
             if closing and _gripper_switch_ready:
@@ -273,16 +286,19 @@ def move_servo(id, pos, time_ms=800):
                         return
                     current = min(pos, current + step_us)
                     _send_servo_packet(1, current, step_time_ms)
+                    _notify_servo_move()
                     _gripper_pos_est = current
                     time.sleep(step_time_ms / 1000.0)
                 return
 
             _send_servo_packet(id, pos, time_ms)
+            _notify_servo_move()
             _gripper_pos_est = pos
             return
     else:
         pos = max(500, min(2500, pos))
     _send_servo_packet(id, pos, time_ms)
+    _notify_servo_move()
 
 def go_home():
     # Open gripper first to reduce collision/load risk while parking.
@@ -534,12 +550,38 @@ class RobotTuner:
                 raise ValueError("preset must be a JSON object")
             for key, value in data.items():
                 if key in self.shared_params:
-                    self.shared_params[key] = float(value)
+                    current = self.shared_params[key]
+                    if isinstance(current, str):
+                        self.shared_params[key] = str(value)
+                    elif isinstance(current, (int, float)):
+                        self.shared_params[key] = float(value)
+                    else:
+                        self.shared_params[key] = value
             if not silent:
                 print(f"Loaded tuner preset: {TUNER_PARAMS_PATH}")
             self._sync_scale_widgets()
         except Exception as e:
             print(f"Failed to load tuner preset: {e}")
+
+    def _update_thermal_status(self):
+        provider = thermal_status_provider
+        if provider is None:
+            self.thermal_status_var.set("Thermal monitor: unavailable")
+        else:
+            try:
+                status = provider() or {}
+                parked = bool(status.get("parked", False))
+                idle_secs = float(status.get("idle_secs", 0.0))
+                high_counts = status.get("high_load_counts", {}) or {}
+                high_servos = [str(sid) for sid, cnt in high_counts.items() if int(cnt) >= 3]
+                high_text = ",".join(high_servos) if high_servos else "none"
+                self.thermal_status_var.set(
+                    f"Parked: {parked} | Idle: {idle_secs:.1f}s | High load servos: {high_text}"
+                )
+            except Exception as e:
+                self.thermal_status_var.set(f"Thermal monitor error: {e}")
+        if hasattr(self, "root") and self.root is not None:
+            self.root.after(1000, self._update_thermal_status)
 
     def _save_tuner_params(self):
         try:
@@ -682,6 +724,12 @@ class RobotTuner:
         
         tk.Button(btn_frame, text="LIGHTS ON", bg="yellow", width=12, command=lambda: send_to_crestron("LIGHT_ON")).pack(side="left", padx=5)
         tk.Button(btn_frame, text="LIGHTS OFF", bg="black", fg="white", width=12, command=lambda: send_to_crestron("LIGHT_OFF")).pack(side="left", padx=5)
+
+        # --- Thermal Monitor Frame (right column) ---
+        tk.Label(right_col, text="--- THERMAL STATUS ---", font=("Arial", 12, "bold")).pack(pady=12)
+        self.thermal_status_var = tk.StringVar(value="Thermal monitor: initializing...")
+        tk.Label(right_col, textvariable=self.thermal_status_var, wraplength=320, justify="left").pack(pady=4)
+        self._update_thermal_status()
 
     def toggle_manual_mode(self):
         self.manual_mode = self.manual_var.get()
