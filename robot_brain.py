@@ -193,6 +193,8 @@ def tcp_listener():
                             say("Flagpole Mode. Manual lock engaged.")
                         elif data == "RESUME":
                             tuner.shared_params["busy"] = 0
+                            if thermal_resume_callback:
+                                threading.Thread(target=thermal_resume_callback, daemon=True).start()
                             global last_angles
                             last_angles = [0, 0, 0.2, 0.5, 0.1]
                             reach_for_coordinate(0.2, 0.0, 0.25, speed=1000)
@@ -552,6 +554,8 @@ class RobotTuner:
                 raise ValueError("preset must be a JSON object")
             for key, value in data.items():
                 if key in self.shared_params:
+                    if key == "busy":
+                        continue
                     current = self.shared_params[key]
                     if isinstance(current, str):
                         self.shared_params[key] = str(value)
@@ -600,9 +604,14 @@ class RobotTuner:
         threading.Thread(target=_worker, daemon=True).start()
 
     def _park_arm_clicked(self):
+        self.shared_params["busy"] = 1
         self._run_thermal_action("Park", thermal_park_callback)
 
     def _resume_arm_clicked(self):
+        self.shared_params["busy"] = 0
+        self.manual_mode = False
+        if hasattr(self, "manual_var"):
+            self.manual_var.set(False)
         self._run_thermal_action("Resume", thermal_resume_callback)
 
     def _save_tuner_params(self):
@@ -795,6 +804,12 @@ tuner = RobotTuner()
 def start_brain_ui():
     # Start the Server thread immediately
     _init_gripper_switch()
+    tuner.shared_params["busy"] = 0
+    if thermal_resume_callback:
+        try:
+            thermal_resume_callback()
+        except Exception:
+            pass
     threading.Thread(target=tcp_listener, daemon=True).start()
     try:
         tuner.create_gui()
