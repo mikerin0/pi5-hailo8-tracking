@@ -223,7 +223,7 @@ class RobotTuner:
     def create_gui(self):
         self.root = tk.Tk()
         self.root.title("Robot Master v2 - Pi Server Mode")
-        self.root.geometry("420x750")
+        self.root.geometry("420x460+0+0")
         self.root.resizable(True, True)
 
         # Scrollable canvas so the GUI fits on any display height
