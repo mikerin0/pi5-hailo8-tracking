@@ -34,6 +34,8 @@ _release_block_until = 0.0
 _release_block_lock = threading.Lock()
 servo_move_callback = None
 thermal_status_provider = None
+thermal_park_callback = None
+thermal_resume_callback = None
 TUNER_PARAMS_PATH = os.path.join(os.path.dirname(__file__), "tuner_params.json")
 
 try:
@@ -583,6 +585,26 @@ class RobotTuner:
         if hasattr(self, "root") and self.root is not None:
             self.root.after(1000, self._update_thermal_status)
 
+    def _run_thermal_action(self, action_name, callback):
+        if callback is None:
+            print(f"Thermal {action_name.lower()} unavailable")
+            return
+
+        def _worker():
+            try:
+                callback()
+                print(f"Thermal {action_name.lower()} requested")
+            except Exception as e:
+                print(f"Thermal {action_name.lower()} failed: {e}")
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _park_arm_clicked(self):
+        self._run_thermal_action("Park", thermal_park_callback)
+
+    def _resume_arm_clicked(self):
+        self._run_thermal_action("Resume", thermal_resume_callback)
+
     def _save_tuner_params(self):
         try:
             with open(TUNER_PARAMS_PATH, "w", encoding="utf-8") as f:
@@ -723,6 +745,13 @@ class RobotTuner:
         tk.Label(status_col, text="--- THERMAL STATUS ---", font=("Arial", 12, "bold")).pack(pady=12)
         self.thermal_status_var = tk.StringVar(value="Thermal monitor: initializing...")
         tk.Label(status_col, textvariable=self.thermal_status_var, wraplength=260, justify="left").pack(pady=4)
+
+        thermal_btn_frame = tk.Frame(status_col)
+        thermal_btn_frame.pack(pady=6)
+        tk.Button(thermal_btn_frame, text="PARK ARM", width=12,
+              bg="orange", command=self._park_arm_clicked).pack(side="left", padx=5)
+        tk.Button(thermal_btn_frame, text="RESUME", width=12,
+              bg="lightgreen", command=self._resume_arm_clicked).pack(side="left", padx=5)
 
         # --- Crestron Lights Frame (status column) ---
         tk.Label(status_col, text="--- CRESTRON LIGHTS ---", font=("Arial", 12, "bold")).pack(pady=15)

@@ -52,3 +52,13 @@ def relax_arm():
 def get_thermal_status():
     """Return the current thermal monitor status."""
     return thermal_monitor.get_status()
+
+
+def park_arm():
+    """Manually park the arm at the configured thermal rest position."""
+    thermal_monitor.park_now()
+
+
+def resume_arm():
+    """Resume thermal monitoring after a manual park."""
+    thermal_monitor.resume()

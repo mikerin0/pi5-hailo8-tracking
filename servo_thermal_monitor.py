@@ -77,6 +77,27 @@ class ServoThermalMonitor:
                 "high_load_counts": dict(self._high_load_counts),
             }
 
+    def park_now(self):
+        """Immediately move the arm to rest position and mark it parked."""
+        move_to_position(
+            self._ctrl, self._rest_position,
+            time_ms=REST_MOVE_TIME_MS,
+        )
+        with self._lock:
+            self._parked = True
+            self._last_move_time = time.monotonic()
+        logger.info(
+            "ServoThermalMonitor: manual park at '%s'",
+            self._rest_position,
+        )
+
+    def resume(self):
+        """Clear parked state and resume normal thermal monitoring."""
+        with self._lock:
+            self._parked = False
+            self._last_move_time = time.monotonic()
+        logger.info("ServoThermalMonitor: resumed")
+
     def _monitor_loop(self):
         while self._running:
             try:
