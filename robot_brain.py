@@ -23,11 +23,14 @@ def _load_preset(params):
             data = json.load(f)
         for k, v in data.items():
             if k in _PRESET_FLOAT_KEYS:
-                params[k] = float(v)
+                try:
+                    params[k] = float(v)
+                except (TypeError, ValueError):
+                    pass  # skip non-numeric values silently
     except FileNotFoundError:
         pass
-    except Exception as e:
-        print(f"Failed to load tuner preset: {e}")
+    except Exception:
+        pass  # silently ignore corrupt/stale preset files
 
 def _save_preset(params):
     try:
