@@ -7,6 +7,7 @@ Do not run this file directly. Launch with python od.py as before.
 
 import logging
 import threading
+import time
 
 import robot_brain as brain
 from lsc6_controller import LSC6Controller
@@ -22,7 +23,34 @@ controller = LSC6Controller(
     arm_disabled=brain.ARM_MOVEMENT_DISABLED,
 )
 
-thermal_monitor = ServoThermalMonitor(controller)
+
+_THERMAL_PARK_SEQUENCE = (
+    (3, 1636),
+    (4, 1947),
+    (1, 1500),
+    (5, 2180),
+)
+_THERMAL_PARK_STEP_TIME_MS = 900
+
+
+def _safe_park_via_sequence():
+    try:
+        for servo_id, pos in _THERMAL_PARK_SEQUENCE:
+            controller.move_servo(servo_id, pos, time_ms=_THERMAL_PARK_STEP_TIME_MS)
+            time.sleep((_THERMAL_PARK_STEP_TIME_MS / 1000.0) + 0.05)
+    except Exception as e:
+        logger.warning(
+            "Thermal park sequence failed (%s); using HOME pulses fallback",
+            e,
+        )
+        move_to_home(controller, time_ms=2000)
+
+
+thermal_monitor = ServoThermalMonitor(
+    controller,
+    rest_position="home",
+    park_callback=_safe_park_via_sequence,
+)
 
 
 def move_servo(servo_id, pos, time_ms=800):

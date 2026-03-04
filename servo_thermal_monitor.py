@@ -23,12 +23,13 @@ class ServoThermalMonitor:
 
     def __init__(self, controller, rest_position=DEFAULT_REST,
                  poll_interval=POLL_INTERVAL_S, idle_timeout=IDLE_TIMEOUT_S,
-                 enabled=True):
+                 enabled=True, park_callback=None):
         self._ctrl = controller
         self._rest_position = rest_position
         self._poll_interval = poll_interval
         self._idle_timeout = idle_timeout
         self._enabled = enabled
+        self._park_callback = park_callback
         self._running = False
         self._thread = None
         self._lock = threading.Lock()
@@ -79,10 +80,7 @@ class ServoThermalMonitor:
 
     def park_now(self):
         """Immediately move the arm to rest position and mark it parked."""
-        move_to_position(
-            self._ctrl, self._rest_position,
-            time_ms=REST_MOVE_TIME_MS,
-        )
+        self._perform_park_move()
         with self._lock:
             self._parked = True
             self._last_move_time = time.monotonic()
@@ -153,10 +151,7 @@ class ServoThermalMonitor:
                 idle_secs, self._rest_position,
             )
             try:
-                move_to_position(
-                    self._ctrl, self._rest_position,
-                    time_ms=REST_MOVE_TIME_MS,
-                )
+                self._perform_park_move()
                 with self._lock:
                     self._parked = True
                 logger.info(
@@ -167,3 +162,12 @@ class ServoThermalMonitor:
                 logger.error(
                     "ServoThermalMonitor: rest move failed – %s", exc
                 )
+
+    def _perform_park_move(self):
+        if self._park_callback is not None:
+            self._park_callback()
+            return
+        move_to_position(
+            self._ctrl, self._rest_position,
+            time_ms=REST_MOVE_TIME_MS,
+        )

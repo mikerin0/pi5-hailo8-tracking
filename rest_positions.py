@@ -22,7 +22,7 @@ POSITION_REGISTRY = {
 }
 
 # Default rest position used by the thermal monitor
-DEFAULT_REST = "compact_fold"
+DEFAULT_REST = "home"
 
 
 def move_to_position(controller, name, time_ms=2000):
