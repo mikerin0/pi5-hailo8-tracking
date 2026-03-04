@@ -226,7 +226,20 @@ class RobotTuner:
         self.root.geometry("420x460+0+0")
         self.root.resizable(True, True)
 
-        # Scrollable canvas so the GUI fits on any display height
+        # --- Camera Mode Frame (FIXED — always visible, above scroll area) ---
+        top = tk.Frame(self.root, bd=1, relief="groove")
+        top.pack(side="top", fill="x")
+        tk.Label(top, text="--- CAMERA MODE ---", font=("Arial", 12, "bold")).pack(pady=3)
+        cam_frame = tk.Frame(top)
+        cam_frame.pack()
+        tk.Button(cam_frame, text="HIGH CAM\n(Face Tracking)", bg="blue", fg="white",
+                  width=14, command=lambda: switch_camera("HIGH_CAM")).pack(side="left", padx=5)
+        tk.Button(cam_frame, text="TABLE CAM\n(Manipulation)", bg="green", fg="white",
+                  width=14, command=lambda: switch_camera("TABLE_CAM")).pack(side="left", padx=5)
+        self.cam_mode_label = tk.Label(top, text="Mode: HIGH CAM", font=("Arial", 10))
+        self.cam_mode_label.pack(pady=3)
+
+        # Scrollable canvas for the rest of the GUI
         canvas = tk.Canvas(self.root, borderwidth=0)
         vsb = tk.Scrollbar(self.root, orient="vertical", command=canvas.yview)
         canvas.configure(yscrollcommand=vsb.set)
@@ -237,16 +250,17 @@ class RobotTuner:
         f.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
         canvas.bind("<Configure>", lambda e: canvas.itemconfig(win_id, width=e.width))
 
-        # --- Camera Mode Frame ---
-        tk.Label(f, text="--- CAMERA MODE ---", font=("Arial", 12, "bold")).pack(pady=5)
-        cam_frame = tk.Frame(f)
-        cam_frame.pack()
-        tk.Button(cam_frame, text="HIGH CAM\n(Face Tracking)", bg="blue", fg="white",
-                  width=14, command=lambda: switch_camera("HIGH_CAM")).pack(side="left", padx=5)
-        tk.Button(cam_frame, text="TABLE CAM\n(Manipulation)", bg="green", fg="white",
-                  width=14, command=lambda: switch_camera("TABLE_CAM")).pack(side="left", padx=5)
-        self.cam_mode_label = tk.Label(f, text="Mode: HIGH CAM", font=("Arial", 10))
-        self.cam_mode_label.pack(pady=3)
+        # --- Servo Thermal Frame (at top of scroll area so it's easy to reach) ---
+        tk.Label(f, text="--- SERVO THERMAL ---", font=("Arial", 12, "bold")).pack(pady=5)
+        tk.Button(f, text="RELAX ARM (fold to rest)",
+                  bg="orange", fg="white", width=22,
+                  command=self._do_relax_arm).pack(pady=5)
+        self.thermal_label = tk.Label(
+            f, text="Thermal monitor: starting…",
+            font=("Arial", 9), wraplength=380, justify="left"
+        )
+        self.thermal_label.pack(pady=3)
+        self._refresh_thermal_status()
 
         # --- Tracking Tuner Frame ---
         tk.Label(f, text="--- TRACKING TUNER ---", font=("Arial", 12, "bold")).pack(pady=5)
@@ -275,18 +289,6 @@ class RobotTuner:
 
         tk.Button(f, text="HOME ARM", command=go_home, bg="gray", fg="white").pack(pady=10)
 
-        # --- Servo Thermal Frame ---
-        tk.Label(f, text="--- SERVO THERMAL ---", font=("Arial", 12, "bold")).pack(pady=5)
-        tk.Button(f, text="RELAX ARM (fold to rest)",
-                  bg="orange", fg="white", width=22,
-                  command=self._do_relax_arm).pack(pady=5)
-        self.thermal_label = tk.Label(
-            f, text="Thermal monitor: starting…",
-            font=("Arial", 9), wraplength=380, justify="left"
-        )
-        self.thermal_label.pack(pady=3)
-        self._refresh_thermal_status()
-
         # --- Crestron Lights Frame ---
         tk.Label(f, text="--- CRESTRON LIGHTS ---", font=("Arial", 12, "bold")).pack(pady=15)
         btn_frame = tk.Frame(f)
@@ -297,14 +299,6 @@ class RobotTuner:
         # --- Exit ---
         tk.Button(f, text="EXIT", bg="red", fg="white", width=12,
                   command=lambda: os._exit(0)).pack(pady=15)
-
-        # Ensure the canvas always starts at the top (camera section visible first).
-        # Two-step: immediate after layout pass + deferred call after the Pi window
-        # manager finishes placing the window (avoids a scroll-to-middle artifact
-        # seen on Raspberry Pi displays where <Configure> events re-position the view).
-        self.root.update_idletasks()
-        canvas.yview_moveto(0.0)
-        self.root.after(200, lambda: canvas.yview_moveto(0.0))
 
     def toggle_manual_mode(self):
         self.manual_mode = self.manual_var.get()
