@@ -765,6 +765,11 @@ def start_brain_ui():
     # Start the Server thread immediately
     _init_gripper_switch()
     threading.Thread(target=tcp_listener, daemon=True).start()
-    tuner.create_gui()
-    tuner.root.mainloop()
-    request_shutdown()
+    try:
+        tuner.create_gui()
+        tuner.root.mainloop()
+        request_shutdown()
+    except tk.TclError as e:
+        print(f"GUI disabled (no display): {e}")
+        while not shutdown_event.is_set():
+            time.sleep(0.5)
