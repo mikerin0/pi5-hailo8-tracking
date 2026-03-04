@@ -590,19 +590,26 @@ class RobotTuner:
         provider = thermal_status_provider
         if provider is None:
             self.thermal_status_var.set("Thermal monitor: unavailable")
+            self.servo5_load_var.set("Servo 5 Load: n/a")
         else:
             try:
                 status = provider() or {}
                 parked = bool(status.get("parked", False))
                 idle_secs = float(status.get("idle_secs", 0.0))
+                servo5_dev = status.get("servo5_deviation", None)
                 high_counts = status.get("high_load_counts", {}) or {}
                 high_servos = [str(sid) for sid, cnt in high_counts.items() if int(cnt) >= 3]
                 high_text = ",".join(high_servos) if high_servos else "none"
                 self.thermal_status_var.set(
                     f"Parked: {parked} | Idle: {idle_secs:.1f}s | High load servos: {high_text}"
                 )
+                if servo5_dev is None:
+                    self.servo5_load_var.set("Servo 5 Load: n/a")
+                else:
+                    self.servo5_load_var.set(f"Servo 5 Load: {int(servo5_dev)}")
             except Exception as e:
                 self.thermal_status_var.set(f"Thermal monitor error: {e}")
+                self.servo5_load_var.set("Servo 5 Load: error")
         if hasattr(self, "root") and self.root is not None:
             self.root.after(1000, self._update_thermal_status)
 
@@ -785,6 +792,8 @@ class RobotTuner:
         tk.Label(status_col, textvariable=self.tracking_status_var, justify="left").pack(pady=2)
         self.servo_power_var = tk.StringVar(value="Servo Power: initializing...")
         tk.Label(status_col, textvariable=self.servo_power_var, justify="left").pack(pady=2)
+        self.servo5_load_var = tk.StringVar(value="Servo 5 Load: initializing...")
+        tk.Label(status_col, textvariable=self.servo5_load_var, justify="left").pack(pady=2)
         self.thermal_status_var = tk.StringVar(value="Thermal monitor: initializing...")
         tk.Label(status_col, textvariable=self.thermal_status_var, wraplength=260, justify="left").pack(pady=4)
 

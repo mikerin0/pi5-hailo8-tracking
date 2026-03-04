@@ -104,7 +104,9 @@ def relax_arm():
 
 def get_thermal_status():
     """Return the current thermal monitor status."""
-    return thermal_monitor.get_status()
+    status = thermal_monitor.get_status()
+    status["servo5_deviation"] = controller.get_deviation(5)
+    return status
 
 
 def park_arm():
