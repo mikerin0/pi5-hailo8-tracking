@@ -1321,7 +1321,7 @@ def camera_loop():
 
 if __name__ == "__main__":
     print(f"--- od.py version {_VERSION} ---")
-    brain.servo_move_callback = servo_integration.thermal_monitor.notify_move
+    brain.servo_move_callback = servo_integration.note_servo_move
     brain.thermal_status_provider = servo_integration.get_thermal_status
     brain.thermal_park_callback = servo_integration.park_arm
     brain.thermal_resume_callback = servo_integration.resume_arm

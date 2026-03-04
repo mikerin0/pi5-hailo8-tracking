@@ -84,6 +84,16 @@ def move_servo(servo_id, pos, time_ms=800):
     thermal_monitor.notify_move()
 
 
+def note_servo_move(servo_id=None, pos=None):
+    """Track externally-issued servo commands for thermal/load estimation."""
+    if servo_id is not None and pos is not None:
+        try:
+            controller.note_commanded_position(int(servo_id), int(pos))
+        except Exception:
+            pass
+    thermal_monitor.notify_move()
+
+
 def move_servos(positions, time_ms=800):
     """Move multiple servos simultaneously and notify the thermal monitor."""
     controller.move_servos(positions, time_ms=time_ms)

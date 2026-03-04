@@ -80,12 +80,17 @@ def _send_servo_packet(id, pos, time_ms=800):
     ser.write(packet)
 
 
-def _notify_servo_move():
+def _notify_servo_move(servo_id=None, pos=None):
     callback = servo_move_callback
     if callback is None:
         return
     try:
-        callback()
+        callback(servo_id, pos)
+    except TypeError:
+        try:
+            callback()
+        except Exception:
+            pass
     except Exception:
         pass
 
@@ -276,7 +281,7 @@ def move_servo(id, pos, time_ms=800):
             if closing and _gripper_switch_pressed():
                 print("Gripper close blocked: microswitch already active")
                 _send_servo_packet(1, _gripper_pos_est, 120)
-                _notify_servo_move()
+                _notify_servo_move(1, _gripper_pos_est)
                 return
 
             if closing and _gripper_switch_ready:
@@ -291,19 +296,19 @@ def move_servo(id, pos, time_ms=800):
                         return
                     current = min(pos, current + step_us)
                     _send_servo_packet(1, current, step_time_ms)
-                    _notify_servo_move()
+                    _notify_servo_move(1, current)
                     _gripper_pos_est = current
                     time.sleep(step_time_ms / 1000.0)
                 return
 
             _send_servo_packet(id, pos, time_ms)
-            _notify_servo_move()
+            _notify_servo_move(id, pos)
             _gripper_pos_est = pos
             return
     else:
         pos = max(500, min(2500, pos))
     _send_servo_packet(id, pos, time_ms)
-    _notify_servo_move()
+    _notify_servo_move(id, pos)
 
 def go_home():
     # Open gripper first to reduce collision/load risk while parking.

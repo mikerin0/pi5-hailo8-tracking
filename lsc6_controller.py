@@ -141,6 +141,12 @@ class LSC6Controller:
         ]
         self._write(self._build_packet(CMD_SERVO_MOVE, data))
 
+    def note_commanded_position(self, servo_id, pos):
+        """Record a commanded position without transmitting a move packet."""
+        pos = self.clamp(servo_id, pos)
+        with self._cmd_lock:
+            self._commanded[servo_id] = pos
+
     def move_servos(self, positions, time_ms=800):
         """Move multiple servos simultaneously."""
         if self.arm_disabled:
