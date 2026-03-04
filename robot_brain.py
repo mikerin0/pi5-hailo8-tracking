@@ -633,10 +633,12 @@ class RobotTuner:
             print(f"Thermal {action_name.lower()} unavailable")
             return
 
+        print(f"Thermal {action_name.lower()} requested")
+
         def _worker():
             try:
                 callback()
-                print(f"Thermal {action_name.lower()} requested")
+                print(f"Thermal {action_name.lower()} completed")
             except Exception as e:
                 print(f"Thermal {action_name.lower()} failed: {e}")
 

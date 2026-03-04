@@ -97,11 +97,17 @@ class LSC6Controller:
         with self._lock:
             self._ser.write(packet)
 
-    def _query(self, packet, expected_len, retries=3):
+    def _query(self, packet, expected_len, retries=3, timeout_s=None):
         """Send *packet* and return the raw response bytes, or None."""
         if self._ser is None:
             return None
         with self._lock:
+            original_timeout = getattr(self._ser, "timeout", None)
+            if timeout_s is not None:
+                try:
+                    self._ser.timeout = timeout_s
+                except Exception:
+                    pass
             for attempt in range(retries):
                 self._ser.reset_input_buffer()
                 self._ser.write(packet)
@@ -109,11 +115,21 @@ class LSC6Controller:
                 response = self._ser.read(expected_len)
                 if (len(response) == expected_len
                         and response[:2] == b'\x55\x55'):
+                    if timeout_s is not None:
+                        try:
+                            self._ser.timeout = original_timeout
+                        except Exception:
+                            pass
                     return response
                 logger.debug(
                     "Query attempt %d/%d: %d/%d bytes received",
                     attempt + 1, retries, len(response), expected_len,
                 )
+            if timeout_s is not None:
+                try:
+                    self._ser.timeout = original_timeout
+                except Exception:
+                    pass
         return None
 
     @staticmethod
@@ -172,10 +188,12 @@ class LSC6Controller:
                                [servo_id, 1 if enabled else 0])
         )
 
-    def read_position(self, servo_id):
+    def read_position(self, servo_id, fast=False):
         """Query the current physical position of *servo_id*."""
         packet = self._build_packet(CMD_GET_SERVO_POS, [0x01, servo_id])
-        response = self._query(packet, expected_len=8)
+        retries = 1 if fast else 3
+        timeout_s = 0.05 if fast else None
+        response = self._query(packet, expected_len=8, retries=retries, timeout_s=timeout_s)
         if response is None:
             return None
         pos = response[6] | (response[7] << 8)
@@ -189,7 +207,7 @@ class LSC6Controller:
 
     def get_deviation(self, servo_id):
         """Return |commanded_pos – actual_pos| for *servo_id*."""
-        actual = self.read_position(servo_id)
+        actual = self.read_position(servo_id, fast=True)
         with self._cmd_lock:
             commanded = self._commanded.get(servo_id)
         if actual is None or commanded is None:
