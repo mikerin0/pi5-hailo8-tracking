@@ -78,6 +78,27 @@ def _shelly_set_output(enabled):
         return None
 
 
+def _shelly_get_status():
+    if not _shelly_enabled():
+        return None
+
+    base = _shelly_base_url()
+    if not base:
+        return None
+
+    switch_id = _shelly_switch_id()
+    url = f"{base}/rpc/Switch.GetStatus?id={switch_id}"
+    try:
+        with urllib.request.urlopen(url, timeout=_shelly_timeout()) as resp:
+            payload = resp.read().decode("utf-8")
+        data = json.loads(payload)
+        if isinstance(data, dict):
+            return data
+        return None
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+        return None
+
+
 def _set_servo_power(enabled):
     global _servo_power_on
     with _SERVO_POWER_LOCK:
@@ -167,6 +188,12 @@ def get_thermal_status():
     """Return the current thermal monitor status."""
     status = thermal_monitor.get_status()
     status["servo5_deviation"] = controller.get_deviation(5)
+    shelly_status = _shelly_get_status()
+    if shelly_status is None:
+        status["shelly_apower_w"] = None
+    else:
+        apower = shelly_status.get("apower", None)
+        status["shelly_apower_w"] = float(apower) if apower is not None else None
     return status
 
 

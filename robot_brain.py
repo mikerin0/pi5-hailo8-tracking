@@ -599,12 +599,14 @@ class RobotTuner:
         if provider is None:
             self.thermal_status_var.set("Thermal monitor: unavailable")
             self.servo5_load_var.set("Servo 5 Load: n/a")
+            self.shelly_power_var.set("Shelly Power: n/a")
         else:
             try:
                 status = provider() or {}
                 parked = bool(status.get("parked", False))
                 idle_secs = float(status.get("idle_secs", 0.0))
                 servo5_dev = status.get("servo5_deviation", None)
+                shelly_apower = status.get("shelly_apower_w", None)
                 high_counts = status.get("high_load_counts", {}) or {}
                 high_servos = [str(sid) for sid, cnt in high_counts.items() if int(cnt) >= 3]
                 high_text = ",".join(high_servos) if high_servos else "none"
@@ -615,9 +617,14 @@ class RobotTuner:
                     self.servo5_load_var.set("Servo 5 Load: n/a")
                 else:
                     self.servo5_load_var.set(f"Servo 5 Load: {int(servo5_dev)}")
+                if shelly_apower is None:
+                    self.shelly_power_var.set("Shelly Power: n/a")
+                else:
+                    self.shelly_power_var.set(f"Shelly Power: {float(shelly_apower):.1f} W")
             except Exception as e:
                 self.thermal_status_var.set(f"Thermal monitor error: {e}")
                 self.servo5_load_var.set("Servo 5 Load: error")
+                self.shelly_power_var.set("Shelly Power: error")
         if hasattr(self, "root") and self.root is not None:
             self.root.after(1000, self._update_thermal_status)
 
@@ -802,6 +809,8 @@ class RobotTuner:
         tk.Label(status_col, textvariable=self.servo_power_var, justify="left").pack(pady=2)
         self.servo5_load_var = tk.StringVar(value="Servo 5 Load: initializing...")
         tk.Label(status_col, textvariable=self.servo5_load_var, justify="left").pack(pady=2)
+        self.shelly_power_var = tk.StringVar(value="Shelly Power: initializing...")
+        tk.Label(status_col, textvariable=self.shelly_power_var, justify="left").pack(pady=2)
         self.thermal_status_var = tk.StringVar(value="Thermal monitor: initializing...")
         tk.Label(status_col, textvariable=self.thermal_status_var, wraplength=260, justify="left").pack(pady=4)
 
