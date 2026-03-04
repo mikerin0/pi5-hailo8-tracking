@@ -35,9 +35,9 @@ from lsc6_controller import LSC6Controller
 HOME = {6: 1883, 5: 700, 4: 655, 3: 720, 2: 1500, 1: 1500}
 
 # Compact fold – arm pulled close to the mounting bracket, base centred.
-# Shoulder and elbow folded so the forearm is nearly vertical.
-# Very low torque on shoulder / elbow joints.
-COMPACT_FOLD = {6: 1500, 5: 800, 4: 1000, 3: 1200, 2: 1500, 1: 1500}
+# Uses the same field-calibrated joint angles as HOME so the arm never
+# crashes into the table or mounting surface.
+COMPACT_FOLD = {6: 1500, 5: 700, 4: 655, 3: 720, 2: 1500, 1: 1500}
 
 # Upright stow – all joints at neutral (1500).  Arm points straight up,
 # gravity acts along the joint axes so holding torque is minimal.

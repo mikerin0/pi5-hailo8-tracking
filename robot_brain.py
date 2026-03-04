@@ -233,8 +233,9 @@ class RobotTuner:
         vsb.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
         f = tk.Frame(canvas)
-        canvas.create_window((0, 0), window=f, anchor="nw")
+        win_id = canvas.create_window((0, 0), window=f, anchor="nw")
         f.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(win_id, width=e.width))
 
         # --- Camera Mode Frame ---
         tk.Label(f, text="--- CAMERA MODE ---", font=("Arial", 12, "bold")).pack(pady=5)
@@ -280,7 +281,7 @@ class RobotTuner:
 
         # --- Exit ---
         tk.Button(f, text="EXIT", bg="red", fg="white", width=12,
-                  command=self.root.destroy).pack(pady=15)
+                  command=lambda: os._exit(0)).pack(pady=15)
 
     def toggle_manual_mode(self):
         self.manual_mode = self.manual_var.get()
