@@ -160,3 +160,10 @@ FINGER_GESTURE_FRAMES_REQUIRED = 2
 # Vertical margin for counting a finger as raised (tip.y < pip.y - margin)
 FINGER_GESTURE_Y_MARGIN = 0.02
 FINGER_GESTURE_DEBUG = False
+
+# --- Shelly smart plug power control for servo/controller supply ---
+# Uses Shelly Gen2 RPC API, e.g. /rpc/Switch.Set?id=0&on=true
+SHELLY_ARM_POWER_ENABLED = True
+SHELLY_ARM_POWER_HOST = "172.31.31.166"
+SHELLY_ARM_POWER_SWITCH_ID = 0
+SHELLY_ARM_POWER_TIMEOUT_S = 2.0

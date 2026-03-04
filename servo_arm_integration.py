@@ -8,8 +8,12 @@ Do not run this file directly. Launch with python od.py as before.
 import logging
 import threading
 import time
+import json
+import urllib.request
+import urllib.error
 
 import robot_brain as brain
+import config
 from lsc6_controller import ALL_SERVO_IDS, LSC6Controller
 from rest_positions import move_to_home, move_to_position
 from servo_thermal_monitor import ServoThermalMonitor
@@ -32,15 +36,62 @@ _THERMAL_PARK_SEQUENCE = (
 )
 _THERMAL_PARK_STEP_TIME_MS = 900
 _SERVO_POWER_LOCK = threading.Lock()
-_servo_power_on = True
+_servo_power_on = None
+
+
+def _shelly_enabled():
+    return bool(getattr(config, "SHELLY_ARM_POWER_ENABLED", False))
+
+
+def _shelly_base_url():
+    host = str(getattr(config, "SHELLY_ARM_POWER_HOST", "")).strip()
+    return f"http://{host}" if host else ""
+
+
+def _shelly_switch_id():
+    return int(getattr(config, "SHELLY_ARM_POWER_SWITCH_ID", 0))
+
+
+def _shelly_timeout():
+    return float(getattr(config, "SHELLY_ARM_POWER_TIMEOUT_S", 2.0))
+
+
+def _shelly_set_output(enabled):
+    if not _shelly_enabled():
+        return bool(enabled)
+
+    base = _shelly_base_url()
+    if not base:
+        logger.warning("Shelly power enabled but host is empty")
+        return None
+
+    switch_id = _shelly_switch_id()
+    on_str = "true" if enabled else "false"
+    url = f"{base}/rpc/Switch.Set?id={switch_id}&on={on_str}"
+    try:
+        with urllib.request.urlopen(url, timeout=_shelly_timeout()) as resp:
+            payload = resp.read().decode("utf-8")
+        data = json.loads(payload)
+        return bool(data.get("output"))
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError) as e:
+        logger.warning("Shelly set output failed (%s): %s", url, e)
+        return None
 
 
 def _set_servo_power(enabled):
     global _servo_power_on
     with _SERVO_POWER_LOCK:
         for servo_id in ALL_SERVO_IDS:
-            controller.set_torque(servo_id, bool(enabled))
-        _servo_power_on = bool(enabled)
+            try:
+                controller.set_torque(servo_id, bool(enabled))
+            except Exception as e:
+                logger.warning("Set torque failed for servo %s: %s", servo_id, e)
+
+        shelly_state = _shelly_set_output(enabled)
+        if shelly_state is None:
+            _servo_power_on = bool(enabled) if not _shelly_enabled() else None
+        else:
+            _servo_power_on = bool(shelly_state)
 
 
 def power_down_servos():

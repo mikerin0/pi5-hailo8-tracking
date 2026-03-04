@@ -1336,6 +1336,10 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         brain.request_shutdown()
     finally:
+        try:
+            servo_integration.power_down_servos()
+        except Exception as e:
+            print(f"WARNING: power_down_servos failed during shutdown: {e}")
         brain.request_shutdown()
         camera_thread.join(timeout=3.0)
         servo_integration.thermal_monitor.stop()

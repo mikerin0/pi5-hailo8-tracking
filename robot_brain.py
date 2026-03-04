@@ -587,8 +587,11 @@ class RobotTuner:
             self.servo_power_var.set("Servo Power: unknown")
         else:
             try:
-                power_on = bool(power_provider())
-                self.servo_power_var.set("Servo Power: ON" if power_on else "Servo Power: OFF")
+                power_state = power_provider()
+                if power_state is None:
+                    self.servo_power_var.set("Servo Power: UNKNOWN")
+                else:
+                    self.servo_power_var.set("Servo Power: ON" if bool(power_state) else "Servo Power: OFF")
             except Exception as e:
                 self.servo_power_var.set(f"Servo Power error: {e}")
 
