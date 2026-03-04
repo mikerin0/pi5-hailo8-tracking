@@ -1328,6 +1328,7 @@ if __name__ == "__main__":
     brain.servo_power_provider = servo_integration.is_servo_power_on
     servo_integration.power_up_servos()
     servo_integration.thermal_monitor.start()
+    servo_integration.start_status_poller()
     print("--- Servo thermal monitor started ---")
     camera_thread = threading.Thread(target=camera_loop, daemon=True, name="CameraLoop")
     camera_thread.start()
@@ -1342,5 +1343,6 @@ if __name__ == "__main__":
             print(f"WARNING: power_down_servos failed during shutdown: {e}")
         brain.request_shutdown()
         camera_thread.join(timeout=3.0)
+        servo_integration.stop_status_poller()
         servo_integration.thermal_monitor.stop()
         print("--- Servo thermal monitor stopped ---")

@@ -37,6 +37,17 @@ _THERMAL_PARK_SEQUENCE = (
 _THERMAL_PARK_STEP_TIME_MS = 900
 _SERVO_POWER_LOCK = threading.Lock()
 _servo_power_on = None
+_STATUS_CACHE_LOCK = threading.Lock()
+_status_cache = {
+    "parked": False,
+    "idle_secs": 0.0,
+    "high_load_counts": {},
+    "servo5_deviation": None,
+    "shelly_apower_w": None,
+}
+_STATUS_POLL_INTERVAL_S = 1.0
+_status_poll_running = False
+_status_poll_thread = None
 
 
 def _shelly_enabled():
@@ -97,6 +108,47 @@ def _shelly_get_status():
         return None
     except (urllib.error.URLError, TimeoutError, ValueError, OSError):
         return None
+
+
+def _update_status_cache_once():
+    status = thermal_monitor.get_status()
+    status["servo5_deviation"] = controller.get_deviation(5)
+    shelly_status = _shelly_get_status()
+    if shelly_status is None:
+        status["shelly_apower_w"] = None
+    else:
+        apower = shelly_status.get("apower", None)
+        status["shelly_apower_w"] = float(apower) if apower is not None else None
+
+    with _STATUS_CACHE_LOCK:
+        _status_cache.update(status)
+
+
+def _status_poll_loop():
+    while _status_poll_running:
+        try:
+            _update_status_cache_once()
+        except Exception as e:
+            logger.debug("Status poller update failed: %s", e)
+        time.sleep(_STATUS_POLL_INTERVAL_S)
+
+
+def start_status_poller():
+    global _status_poll_running, _status_poll_thread
+    if _status_poll_running:
+        return
+    _status_poll_running = True
+    _status_poll_thread = threading.Thread(
+        target=_status_poll_loop,
+        name="ArmStatusPoller",
+        daemon=True,
+    )
+    _status_poll_thread.start()
+
+
+def stop_status_poller():
+    global _status_poll_running
+    _status_poll_running = False
 
 
 def _set_servo_power(enabled):
@@ -186,15 +238,8 @@ def relax_arm():
 
 def get_thermal_status():
     """Return the current thermal monitor status."""
-    status = thermal_monitor.get_status()
-    status["servo5_deviation"] = controller.get_deviation(5)
-    shelly_status = _shelly_get_status()
-    if shelly_status is None:
-        status["shelly_apower_w"] = None
-    else:
-        apower = shelly_status.get("apower", None)
-        status["shelly_apower_w"] = float(apower) if apower is not None else None
-    return status
+    with _STATUS_CACHE_LOCK:
+        return dict(_status_cache)
 
 
 def park_arm():
