@@ -570,6 +570,12 @@ class RobotTuner:
             print(f"Failed to load tuner preset: {e}")
 
     def _update_thermal_status(self):
+        busy = int(self.shared_params.get("busy", 0))
+        if busy == 0 and not self.manual_mode:
+            self.tracking_status_var.set("Tracking: Active")
+        else:
+            self.tracking_status_var.set("Tracking: Paused")
+
         provider = thermal_status_provider
         if provider is None:
             self.thermal_status_var.set("Thermal monitor: unavailable")
@@ -613,6 +619,18 @@ class RobotTuner:
         if hasattr(self, "manual_var"):
             self.manual_var.set(False)
         self._run_thermal_action("Resume", thermal_resume_callback)
+
+    def _park_and_shutdown_clicked(self):
+        try:
+            if thermal_park_callback:
+                self.shared_params["busy"] = 1
+                thermal_park_callback()
+                print("Thermal park requested before shutdown")
+            else:
+                print("Thermal park unavailable before shutdown")
+        except Exception as e:
+            print(f"Thermal park before shutdown failed: {e}")
+        shutdown_program()
 
     def _save_tuner_params(self):
         try:
@@ -698,7 +716,7 @@ class RobotTuner:
                          length=320, command=lambda v, k=k: self.update_tune(k, v))
             s.set(self.shared_params[k]); s.pack()
 
-        tk.Button(left_col, text="EXIT PROGRAM", command=shutdown_program,
+        tk.Button(left_col, text="EXIT PROGRAM", command=self._park_and_shutdown_clicked,
                   bg="red", fg="white").pack(pady=10)
 
         # --- Tracking Math (right column) ---
@@ -752,6 +770,8 @@ class RobotTuner:
 
         # --- Thermal Monitor Frame (status column) ---
         tk.Label(status_col, text="--- THERMAL STATUS ---", font=("Arial", 12, "bold")).pack(pady=12)
+        self.tracking_status_var = tk.StringVar(value="Tracking: initializing...")
+        tk.Label(status_col, textvariable=self.tracking_status_var, justify="left").pack(pady=2)
         self.thermal_status_var = tk.StringVar(value="Thermal monitor: initializing...")
         tk.Label(status_col, textvariable=self.thermal_status_var, wraplength=260, justify="left").pack(pady=4)
 
