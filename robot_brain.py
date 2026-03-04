@@ -604,15 +604,17 @@ class RobotTuner:
     def create_gui(self):
         self.root = tk.Tk()
         self.root.title("Robot Master - Pi Server Mode")
-        self.root.geometry("820x860")
+        self.root.geometry("1180x860")
         self.root.protocol("WM_DELETE_WINDOW", shutdown_program)
 
         columns = tk.Frame(self.root)
         columns.pack(fill="both", expand=True, padx=10, pady=8)
         left_col = tk.Frame(columns)
         right_col = tk.Frame(columns)
+        status_col = tk.Frame(columns)
         left_col.grid(row=0, column=0, sticky="nw", padx=(0, 10))
         right_col.grid(row=0, column=1, sticky="nw")
+        status_col.grid(row=0, column=2, sticky="nw", padx=(10, 0))
 
         # --- Camera Mode Frame (left column) ---
         tk.Label(left_col, text="--- CAMERA MODE ---", font=("Arial", 12, "bold")).pack(pady=5)
@@ -717,18 +719,18 @@ class RobotTuner:
             s.set(self.shared_params[k]); s.pack()
             self.scale_widgets[k] = s
 
-        # --- Crestron Lights Frame (right column) ---
-        tk.Label(right_col, text="--- CRESTRON LIGHTS ---", font=("Arial", 12, "bold")).pack(pady=15)
-        btn_frame = tk.Frame(right_col)
+        # --- Thermal Monitor Frame (status column) ---
+        tk.Label(status_col, text="--- THERMAL STATUS ---", font=("Arial", 12, "bold")).pack(pady=12)
+        self.thermal_status_var = tk.StringVar(value="Thermal monitor: initializing...")
+        tk.Label(status_col, textvariable=self.thermal_status_var, wraplength=260, justify="left").pack(pady=4)
+
+        # --- Crestron Lights Frame (status column) ---
+        tk.Label(status_col, text="--- CRESTRON LIGHTS ---", font=("Arial", 12, "bold")).pack(pady=15)
+        btn_frame = tk.Frame(status_col)
         btn_frame.pack()
-        
+
         tk.Button(btn_frame, text="LIGHTS ON", bg="yellow", width=12, command=lambda: send_to_crestron("LIGHT_ON")).pack(side="left", padx=5)
         tk.Button(btn_frame, text="LIGHTS OFF", bg="black", fg="white", width=12, command=lambda: send_to_crestron("LIGHT_OFF")).pack(side="left", padx=5)
-
-        # --- Thermal Monitor Frame (right column) ---
-        tk.Label(right_col, text="--- THERMAL STATUS ---", font=("Arial", 12, "bold")).pack(pady=12)
-        self.thermal_status_var = tk.StringVar(value="Thermal monitor: initializing...")
-        tk.Label(right_col, textvariable=self.thermal_status_var, wraplength=320, justify="left").pack(pady=4)
         self._update_thermal_status()
 
     def toggle_manual_mode(self):
