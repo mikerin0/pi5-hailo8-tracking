@@ -222,7 +222,7 @@ class RobotTuner:
 
     def create_gui(self):
         self.root = tk.Tk()
-        self.root.title("Robot Master - Pi Server Mode")
+        self.root.title("Robot Master v2 - Pi Server Mode")
         self.root.geometry("420x750")
         self.root.resizable(True, True)
 
@@ -255,8 +255,8 @@ class RobotTuner:
 
         for lbl, k, mn, mx in [("Reach X", "tune_x", 0.1, 0.35), ("Swing Y", "tune_y", -0.2, 0.2), ("Height Z", "tune_z", 0.02, 0.4)]:
             tk.Label(f, text=lbl).pack()
-            s = tk.Scale(f, from_=mn, to=mx, resolution=0.005, orient='horizontal', length=300, command=lambda v, k=k: self.update_tune(k, v))
-            s.set(self.shared_params[k]); s.pack()
+            s = tk.Scale(f, from_=mn, to=mx, resolution=0.005, orient='horizontal', command=lambda v, k=k: self.update_tune(k, v))
+            s.set(self.shared_params[k]); s.pack(fill="x", padx=10)
 
         tk.Button(f, text="HOME ARM", command=go_home, bg="gray", fg="white").pack(pady=10)
 
