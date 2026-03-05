@@ -35,6 +35,12 @@ _THERMAL_PARK_SEQUENCE = (
     (5, 2180),
 )
 _THERMAL_PARK_STEP_TIME_MS = 900
+_TRACKING_READY_POSE = {
+    5: 2005,
+    4: 1597,
+    3: 1694,
+}
+_TRACKING_READY_TIME_MS = 2200
 _SERVO_POWER_LOCK = threading.Lock()
 _servo_power_on = None
 _STATUS_CACHE_LOCK = threading.Lock()
@@ -250,4 +256,6 @@ def park_arm():
 def resume_arm():
     """Resume thermal monitoring after a manual park."""
     power_up_servos()
+    controller.move_servos(_TRACKING_READY_POSE, time_ms=_TRACKING_READY_TIME_MS)
+    time.sleep((_TRACKING_READY_TIME_MS / 1000.0) + 0.1)
     thermal_monitor.resume()

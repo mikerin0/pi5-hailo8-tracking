@@ -198,12 +198,10 @@ def tcp_listener():
                             reach_for_coordinate(0.05, 0.0, 0.46, speed=500)
                             say("Flagpole Mode. Manual lock engaged.")
                         elif data == "RESUME":
-                            tuner.shared_params["busy"] = 0
+                            tuner.shared_params["busy"] = 1
                             if thermal_resume_callback:
-                                threading.Thread(target=thermal_resume_callback, daemon=True).start()
-                            global last_angles
-                            last_angles = [0, 0, 0.2, 0.5, 0.1]
-                            reach_for_coordinate(0.2, 0.0, 0.25, speed=1000)
+                                thermal_resume_callback()
+                            tuner.shared_params["busy"] = 0
                             say("Resuming tracking")
             except socket.timeout:
                 continue
@@ -649,11 +647,25 @@ class RobotTuner:
         self._run_thermal_action("Park", thermal_park_callback)
 
     def _resume_arm_clicked(self):
-        self.shared_params["busy"] = 0
+        self.shared_params["busy"] = 1
         self.manual_mode = False
         if hasattr(self, "manual_var"):
             self.manual_var.set(False)
-        self._run_thermal_action("Resume", thermal_resume_callback)
+        if thermal_resume_callback is None:
+            print("Thermal resume unavailable")
+            return
+
+        print("Thermal resume requested")
+
+        def _worker():
+            try:
+                thermal_resume_callback()
+                self.shared_params["busy"] = 0
+                print("Thermal resume completed")
+            except Exception as e:
+                print(f"Thermal resume failed: {e}")
+
+        threading.Thread(target=_worker, daemon=True).start()
 
     def _park_and_shutdown_clicked(self):
         try:
@@ -865,12 +877,13 @@ tuner = RobotTuner()
 def start_brain_ui():
     # Start the Server thread immediately
     _init_gripper_switch()
-    tuner.shared_params["busy"] = 0
+    tuner.shared_params["busy"] = 1
     if thermal_resume_callback:
         try:
             thermal_resume_callback()
         except Exception:
             pass
+    tuner.shared_params["busy"] = 0
     threading.Thread(target=tcp_listener, daemon=True).start()
     try:
         tuner.create_gui()
