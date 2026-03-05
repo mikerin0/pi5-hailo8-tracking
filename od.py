@@ -547,6 +547,8 @@ _last_pose_debug_state = None
 _mp_hands = None
 _last_finger_event_times = {}
 _finger_state_streak = {"ONE": 0, "TWO": 0}
+_table_obj_hits = 0
+_last_table_obj_trigger_time = 0.0
 
 
 def _point_confidence(point):
@@ -863,6 +865,94 @@ def _maybe_release_to_user_from_table(points, now):
     _table_release_hits = 0
 
 
+def _maybe_pick_table_object_from_sample(sample, now):
+    """Detect a table object in TABLE_CAM and trigger take-item sequence."""
+    global _table_obj_hits, _last_table_obj_trigger_time
+
+    if not bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False)):
+        _table_obj_hits = 0
+        return
+    if brain.tuner.shared_params.get("camera_mode", "HIGH_CAM") != "TABLE_CAM":
+        _table_obj_hits = 0
+        return
+    if brain.tuner.shared_params.get("busy", 0) != 0:
+        _table_obj_hits = 0
+        return
+    if brain.is_holding_item():
+        _table_obj_hits = 0
+        return
+
+    cooldown = max(2.0, float(getattr(config, "TABLE_OBJECT_COOLDOWN_SEC", 20.0)))
+    if now - _last_table_obj_trigger_time < cooldown:
+        _table_obj_hits = 0
+        return
+
+    buf = sample.get_buffer()
+    caps = sample.get_caps()
+    struct = caps.get_structure(0)
+    w = int(struct.get_value("width"))
+    h = int(struct.get_value("height"))
+    ok, mapinfo = buf.map(Gst.MapFlags.READ)
+    if not ok:
+        return
+    try:
+        frame_rgb = np.frombuffer(mapinfo.data, dtype=np.uint8).reshape((h, w, 3))
+        gray = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2GRAY)
+        gray = cv2.GaussianBlur(gray, (5, 5), 0)
+        _, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        contours, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    except Exception:
+        _table_obj_hits = 0
+        return
+    finally:
+        buf.unmap(mapinfo)
+
+    if not contours:
+        _table_obj_hits = 0
+        return
+
+    c = max(contours, key=cv2.contourArea)
+    area = float(cv2.contourArea(c))
+    min_area = float(getattr(config, "TABLE_OBJECT_MIN_AREA_PX", 1200))
+    if area < min_area:
+        _table_obj_hits = 0
+        return
+
+    m = cv2.moments(c)
+    if m.get("m00", 0.0) == 0.0:
+        _table_obj_hits = 0
+        return
+
+    cx = float(m["m10"] / m["m00"])
+    cy = float(m["m01"] / m["m00"])
+    x_norm = max(0.0, min(1.0, cx / max(1.0, float(w))))
+    y_norm = max(0.0, min(1.0, cy / max(1.0, float(h))))
+
+    _table_obj_hits += 1
+    frames_required = max(1, int(getattr(config, "TABLE_OBJECT_FRAMES_REQUIRED", 5)))
+    if _table_obj_hits < frames_required:
+        return
+
+    p = brain.tuner.get_params()
+    y_gain = float(getattr(config, "TABLE_OBJECT_Y_GAIN", 0.24))
+    x_bias_gain = float(getattr(config, "TABLE_OBJECT_X_BIAS_GAIN", 0.03))
+
+    take_y = max(-0.12, min(0.12, (0.5 - x_norm) * y_gain))
+    take_x = float(p.get("take_x", 0.16)) + ((0.75 - y_norm) * x_bias_gain)
+    take_x = max(0.12, min(0.28, take_x))
+
+    brain.tuner.shared_params["take_x"] = take_x
+    brain.tuner.shared_params["take_y"] = take_y
+    print(
+        "TABLE_CAM object detected: "
+        f"x_norm={x_norm:.2f} y_norm={y_norm:.2f} area={int(area)} "
+        f"-> take_x={take_x:.3f} take_y={take_y:.3f}; starting pickup"
+    )
+    brain.start_take_item_sequence()
+    _last_table_obj_trigger_time = now
+    _table_obj_hits = 0
+
+
 def _release_overlay_caps_changed(_overlay, caps):
     global _overlay_frame_w, _overlay_frame_h
     try:
@@ -981,6 +1071,8 @@ def app_callback(pad, info, user_data):
 
         else:
             _maybe_send_pose_gesture_events(None, now)
+            if brain.tuner.shared_params.get("camera_mode", "HIGH_CAM") == "TABLE_CAM":
+                return Gst.PadProbeReturn.OK
             # No person in frame – enter standby after timeout
             now = time.time()
             if now - _last_seen_time > config.FLAGPOLE_TIMEOUT:
@@ -1237,6 +1329,10 @@ def camera_loop():
                 and bool(getattr(config, "FINGER_GESTURE_EVENTS_ENABLED", True))
                 and mp is not None
             )
+            table_object_branch_enabled = (
+                mode == "TABLE_CAM"
+                and bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False))
+            )
 
             if finger_branch_enabled:
                 launch_str = (
@@ -1253,6 +1349,25 @@ def camera_loop():
                     f"t. ! queue leaky=downstream max-size-buffers=1 ! "
                     f"video/x-raw,format=RGB,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
                     f"appsink name=finger_sink emit-signals=false sync=false drop=true max-buffers=1"
+                )
+            elif table_object_branch_enabled:
+                launch_str = (
+                    f"libcamerasrc camera-name={cam_path} ! "
+                    f"video/x-raw,format=NV12,"
+                    f"width={config.CAM_SENSOR_W},height={config.CAM_SENSOR_H} ! "
+                    f"videoconvert ! videoscale ! "
+                    f"video/x-raw,format=RGB,"
+                    f"width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
+                    f"queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
+                    f"hailonet hef-path={HEF_PATH} force-writable=true ! "
+                    f"hailofilter name=hailofilter so-path={SO_PATH} ! "
+                    f"hailotracker ! hailooverlay ! "
+                    f"videoconvert ! tee name=t "
+                    f"t. ! queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
+                    f"autovideosink sync=false "
+                    f"t. ! queue leaky=downstream max-size-buffers=1 ! "
+                    f"video/x-raw,format=RGB,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
+                    f"appsink name=table_obj_sink emit-signals=false sync=false drop=true max-buffers=1"
                 )
             else:
                 launch_str = (
@@ -1299,6 +1414,7 @@ def camera_loop():
                     release_overlay.connect("draw", _release_overlay_draw)
 
             finger_sink = pipe.get_by_name("finger_sink") if finger_branch_enabled else None
+            table_obj_sink = pipe.get_by_name("table_obj_sink") if table_object_branch_enabled else None
 
             pipe.set_state(Gst.State.PLAYING)
             print("--- Hailo AI Hat Active: yolov8m_pose running ---")
@@ -1308,6 +1424,10 @@ def camera_loop():
                     sample = finger_sink.emit("try-pull-sample", int(0.02 * Gst.SECOND))
                     if sample is not None:
                         _maybe_send_finger_gesture_events_from_sample(sample, time.time())
+                if table_obj_sink is not None:
+                    sample = table_obj_sink.emit("try-pull-sample", int(0.02 * Gst.SECOND))
+                    if sample is not None:
+                        _maybe_pick_table_object_from_sample(sample, time.time())
                 time.sleep(0.1)
 
         except Exception as e:

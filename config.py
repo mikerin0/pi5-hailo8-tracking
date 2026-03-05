@@ -129,6 +129,16 @@ TABLE_HANDOFF_MIN_CONFIDENCE = 0.45
 # unstable with some camera/display combinations.
 TABLE_HANDOFF_OVERLAY_ENABLED = False
 
+# --- TABLE_CAM object pickup (MVP) ---
+# Detects the largest blob on the lower camera feed and triggers the
+# existing take-item sequence using tuned take_* values.
+TABLE_OBJECT_PICKUP_ENABLED = True
+TABLE_OBJECT_MIN_AREA_PX = 1200
+TABLE_OBJECT_FRAMES_REQUIRED = 5
+TABLE_OBJECT_COOLDOWN_SEC = 20.0
+TABLE_OBJECT_Y_GAIN = 0.24
+TABLE_OBJECT_X_BIAS_GAIN = 0.03
+
 # --- Pose gesture events to Crestron (outbound) ---
 # Uses yolov8 pose keypoints (wrists + shoulders). These are coarse gestures,
 # not finger-level hand-pose classification.
