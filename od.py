@@ -1284,7 +1284,7 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
         f"x_norm={x_norm:.2f} y_norm={y_norm:.2f} area={int(area)} "
         f"-> take_x={take_x:.3f} take_y={take_y:.3f} take_z={take_z:.3f}; starting pickup"
     )
-    brain.start_take_item_sequence()
+    brain.start_take_item_sequence(auto_pick=True)
     _last_table_obj_trigger_time = now
     _table_obj_hits = 0
     _table_obj_center_hits = 0

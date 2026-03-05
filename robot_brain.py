@@ -346,7 +346,7 @@ def go_home():
     set_holding_item(False)
 
 
-def _take_item_sequence():
+def _take_item_sequence(auto_pick=False):
     if not _take_item_lock.acquire(blocking=False):
         print("Take-item request ignored: sequence already running")
         return
@@ -363,14 +363,19 @@ def _take_item_sequence():
         take_z = max(0.24, min(0.40, float(p.get("take_z", 0.30))))
         take_lift_z = max(take_z + 0.05, min(0.45, float(p.get("take_lift_z", 0.36))))
         take_wait_s = max(1.0, min(8.0, float(p.get("take_wait_s", 3.0))))
+        auto_take_wait_s = max(0.1, min(1.5, float(p.get("auto_take_wait_s", 0.3))))
 
         move_servo(1, 1500, 900)
         # Approach from above first to avoid tipping the base by dipping too low.
         reach_for_coordinate(take_x, take_y, take_lift_z, speed=900)
         time.sleep(0.6)
         reach_for_coordinate(take_x, take_y, take_z, speed=800)
-        say("Please place the item in my gripper")
-        time.sleep(take_wait_s)
+        if auto_pick:
+            print("Auto-pick: object aligned, closing gripper")
+            time.sleep(auto_take_wait_s)
+        else:
+            say("Please place the item in my gripper")
+            time.sleep(take_wait_s)
 
         move_servo(1, 2300, 900)
         set_holding_item(True)
@@ -389,8 +394,8 @@ def _take_item_sequence():
         _take_item_lock.release()
 
 
-def start_take_item_sequence():
-    threading.Thread(target=_take_item_sequence, daemon=True).start()
+def start_take_item_sequence(auto_pick=False):
+    threading.Thread(target=lambda: _take_item_sequence(auto_pick=auto_pick), daemon=True).start()
 
 def reach_for_coordinate(x, y, z, speed=800):
     global last_angles
