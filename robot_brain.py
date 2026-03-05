@@ -610,23 +610,22 @@ class RobotTuner:
                 print(f"Failed to save window state: {e}")
 
     def _apply_window_state(self):
+        try:
+            self.root.attributes("-fullscreen", False)
+        except Exception:
+            pass
+        try:
+            self.root.state("normal")
+        except Exception:
+            pass
+
         if self._window_geometry:
             try:
                 self.root.geometry(str(self._window_geometry))
-            except Exception:
-                pass
-        if self._window_state:
-            try:
-                self.root.state(str(self._window_state))
                 return
             except Exception:
                 pass
-        try:
-            self.root.state("zoomed")
-        except Exception:
-            sw = max(1024, int(self.root.winfo_screenwidth()))
-            sh = max(700, int(self.root.winfo_screenheight()))
-            self.root.geometry(f"{sw}x{sh}+0+0")
+        self.root.geometry("1180x860")
 
     def _on_window_close(self):
         self._save_window_state(silent=True)
