@@ -252,6 +252,10 @@ def send_to_crestron(command):
 
 def switch_camera(mode):
     """Switch the active camera pipeline and update the GUI indicator."""
+    current = tuner.shared_params.get("camera_mode", "HIGH_CAM")
+    if current == mode:
+        print(f"Camera already in mode: {mode}")
+        return
     tuner.shared_params["camera_mode"] = mode
     handler = camera_switch_handlers.get(mode)
     if handler:

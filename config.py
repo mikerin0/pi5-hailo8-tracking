@@ -138,6 +138,11 @@ TABLE_OBJECT_FRAMES_REQUIRED = 5
 TABLE_OBJECT_COOLDOWN_SEC = 20.0
 TABLE_OBJECT_Y_GAIN = 0.24
 TABLE_OBJECT_X_BIAS_GAIN = 0.03
+TABLE_OBJECT_MAX_AREA_FRAC = 0.35
+TABLE_OBJECT_X_MIN_NORM = 0.25
+TABLE_OBJECT_X_MAX_NORM = 0.75
+TABLE_OBJECT_Y_MIN_NORM = 0.45
+TABLE_OBJECT_TAKE_Z = 0.27
 
 # --- Pose gesture events to Crestron (outbound) ---
 # Uses yolov8 pose keypoints (wrists + shoulders). These are coarse gestures,

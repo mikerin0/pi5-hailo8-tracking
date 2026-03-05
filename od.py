@@ -1215,6 +1215,12 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
         _table_obj_hits = 0
         return
 
+    frame_area = float(max(1, w * h))
+    max_area_frac = float(getattr(config, "TABLE_OBJECT_MAX_AREA_FRAC", 0.35))
+    if (area / frame_area) > max(0.05, max_area_frac):
+        _table_obj_hits = 0
+        return
+
     m = cv2.moments(c)
     if m.get("m00", 0.0) == 0.0:
         _table_obj_hits = 0
@@ -1224,6 +1230,13 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
     cy = float(m["m01"] / m["m00"])
     x_norm = max(0.0, min(1.0, cx / max(1.0, float(w))))
     y_norm = max(0.0, min(1.0, cy / max(1.0, float(h))))
+
+    x_min = float(getattr(config, "TABLE_OBJECT_X_MIN_NORM", 0.25))
+    x_max = float(getattr(config, "TABLE_OBJECT_X_MAX_NORM", 0.75))
+    y_min = float(getattr(config, "TABLE_OBJECT_Y_MIN_NORM", 0.45))
+    if not (x_min <= x_norm <= x_max and y_norm >= y_min):
+        _table_obj_hits = 0
+        return
 
     _table_obj_hits += 1
     frames_required = max(1, int(getattr(config, "TABLE_OBJECT_FRAMES_REQUIRED", 5)))
@@ -1237,13 +1250,18 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
     take_y = max(-0.12, min(0.12, (0.5 - x_norm) * y_gain))
     take_x = float(p.get("take_x", 0.16)) + ((0.75 - y_norm) * x_bias_gain)
     take_x = max(0.12, min(0.28, take_x))
+    take_z = float(getattr(config, "TABLE_OBJECT_TAKE_Z", 0.27))
+    take_z = max(0.24, min(0.40, take_z))
+    take_lift_z = max(take_z + 0.05, min(0.45, float(p.get("take_lift_z", 0.36))))
 
     brain.tuner.shared_params["take_x"] = take_x
     brain.tuner.shared_params["take_y"] = take_y
+    brain.tuner.shared_params["take_z"] = take_z
+    brain.tuner.shared_params["take_lift_z"] = take_lift_z
     print(
         "DUAL_CAM object detected: "
         f"x_norm={x_norm:.2f} y_norm={y_norm:.2f} area={int(area)} "
-        f"-> take_x={take_x:.3f} take_y={take_y:.3f}; starting pickup"
+        f"-> take_x={take_x:.3f} take_y={take_y:.3f} take_z={take_z:.3f}; starting pickup"
     )
     brain.start_take_item_sequence()
     _last_table_obj_trigger_time = now
