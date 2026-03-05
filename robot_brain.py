@@ -365,6 +365,11 @@ def _take_item_sequence(auto_pick=False):
         take_wait_s = max(1.0, min(8.0, float(p.get("take_wait_s", 3.0))))
         auto_take_wait_s = max(0.1, min(1.5, float(p.get("auto_take_wait_s", 0.3))))
 
+        if auto_pick:
+            z_offset = float(getattr(config, "TABLE_PICK_Z_OFFSET_M", -0.06))
+            take_z = max(0.12, min(0.40, take_z + z_offset))
+            take_lift_z = max(take_z + 0.05, min(0.45, take_lift_z + z_offset))
+
         move_servo(1, 1500, 900)
         # Approach from above first to avoid tipping the base by dipping too low.
         if auto_pick:

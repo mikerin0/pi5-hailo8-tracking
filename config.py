@@ -153,6 +153,8 @@ TABLE_OBJECT_ALIGN_ALPHA = 0.35
 TABLE_OBJECT_TARGET_TYPE = "any"
 # Safety delay after entering TABLE_CAM before auto-pick is allowed.
 TABLE_OBJECT_ARM_DELAY_SEC = 4.0
+# Extra Z offset applied only to autonomous TABLE PICK (meters).
+TABLE_PICK_Z_OFFSET_M = -0.06
 
 # --- Pose gesture events to Crestron (outbound) ---
 # Uses yolov8 pose keypoints (wrists + shoulders). These are coarse gestures,
