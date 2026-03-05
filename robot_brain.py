@@ -99,6 +99,11 @@ def _notify_servo_move(servo_id=None, pos=None):
         pass
 
 
+def _is_gripper_open_enough(target_open=1500, tolerance=20):
+    with _gripper_motion_lock:
+        return _gripper_pos_est <= (int(target_open) + int(tolerance))
+
+
 def set_holding_item(value):
     global _holding_item
     with _holding_item_lock:
@@ -376,7 +381,8 @@ def _take_item_sequence(auto_pick=False):
             take_z = max(0.12, min(0.40, take_z + z_offset))
             take_lift_z = max(take_z + 0.05, min(0.45, take_lift_z + z_offset))
 
-        move_servo(1, 1500, 900)
+        if not _is_gripper_open_enough(1500, tolerance=20):
+            move_servo(1, 1500, 900)
         # Approach from above first to avoid tipping the base by dipping too low.
         if auto_pick:
             reach_for_manual_coordinate(take_x, take_y, take_lift_z, speed=700)
@@ -439,7 +445,7 @@ def reach_for_coordinate(x, y, z, speed=800):
         speed = int(speed)
         cap = int(getattr(config, "SAFE_STARTUP_FIRST_MOVE_SPEED_CAP", 0))
         if cap > 0 and not _first_move_capped:
-            speed = min(speed, cap)
+            speed = max(speed, cap)
             _first_move_capped = True
         angles = my_arm.inverse_kinematics([x, y, z], initial_position=last_angles)
         if not np.all(np.isfinite(angles)):
@@ -469,7 +475,7 @@ def reach_for_manual_coordinate(x, y, z, speed=900):
     speed = int(getattr(config, "MANUAL_JOG_SPEED", speed))
     cap = int(getattr(config, "SAFE_STARTUP_FIRST_MOVE_SPEED_CAP", 0))
     if cap > 0 and not _first_move_capped:
-        speed = min(speed, cap)
+        speed = max(speed, cap)
         _first_move_capped = True
     step_m = max(0.002, float(getattr(config, "MANUAL_JOG_STEP_M", 0.01)))
     travel_z = max(z, float(getattr(config, "MANUAL_TRAVEL_Z", 0.32)))
