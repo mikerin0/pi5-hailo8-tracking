@@ -19,6 +19,8 @@ last_angles = [0, 0, 0.2, 0.5, 0.1]
 # --- Camera switch callbacks (populated by external modules at runtime) ---
 # Keys: "HIGH_CAM", "TABLE_CAM", "DUAL_CAM"  →  callable with no arguments
 camera_switch_handlers = {}
+_camera_switch_lock = threading.Lock()
+_last_camera_switch_time = 0.0
 
 # Global for the persistent Crestron connection
 crestron_conn = None
@@ -252,22 +254,37 @@ def send_to_crestron(command):
 
 def switch_camera(mode):
     """Switch the active camera pipeline and update the GUI indicator."""
+    global _last_camera_switch_time
+    now = time.time()
+    if now - _last_camera_switch_time < 1.0:
+        print(f"Camera switch ignored (debounce): {mode}")
+        return
+
+    if not _camera_switch_lock.acquire(blocking=False):
+        print(f"Camera switch ignored (busy): {mode}")
+        return
+
     current = tuner.shared_params.get("camera_mode", "HIGH_CAM")
     if current == mode:
         print(f"Camera already in mode: {mode}")
+        _camera_switch_lock.release()
         return
-    tuner.shared_params["camera_mode"] = mode
-    handler = camera_switch_handlers.get(mode)
-    if handler:
-        threading.Thread(target=handler, daemon=True).start()
-    # Update GUI label from the main thread if the root window exists
     try:
-        tuner.root.after(0, lambda: tuner.cam_mode_label.config(
-            text=f"Mode: {mode.replace('_', ' ')}"
-        ))
-    except AttributeError:
-        pass
-    print(f"Camera switched to: {mode}")
+        tuner.shared_params["camera_mode"] = mode
+        handler = camera_switch_handlers.get(mode)
+        if handler:
+            handler()
+        # Update GUI label from the main thread if the root window exists
+        try:
+            tuner.root.after(0, lambda: tuner.cam_mode_label.config(
+                text=f"Mode: {mode.replace('_', ' ')}"
+            ))
+        except AttributeError:
+            pass
+        _last_camera_switch_time = now
+        print(f"Camera switched to: {mode}")
+    finally:
+        _camera_switch_lock.release()
 
 # --- 4. MOVEMENT LOGIC ---
 

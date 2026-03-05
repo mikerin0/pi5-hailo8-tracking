@@ -549,6 +549,7 @@ _last_finger_event_times = {}
 _finger_state_streak = {"ONE": 0, "TWO": 0}
 _table_obj_hits = 0
 _last_table_obj_trigger_time = 0.0
+_last_table_obj_block_log_time = 0.0
 
 
 def _point_confidence(point):
@@ -1179,7 +1180,7 @@ _table_obj_thread = None
 
 def _maybe_pick_table_object_from_frame(frame_bgr, now):
     """Detect a table object in DUAL_CAM worker and trigger take-item sequence."""
-    global _table_obj_hits, _last_table_obj_trigger_time
+    global _table_obj_hits, _last_table_obj_trigger_time, _last_table_obj_block_log_time
 
     if not bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False)):
         _table_obj_hits = 0
@@ -1188,14 +1189,23 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
         _table_obj_hits = 0
         return
     if brain.tuner.shared_params.get("busy", 0) != 0:
+        if now - _last_table_obj_block_log_time > 2.0:
+            print("DUAL_CAM auto-pick blocked: robot busy")
+            _last_table_obj_block_log_time = now
         _table_obj_hits = 0
         return
     if brain.is_holding_item():
+        if now - _last_table_obj_block_log_time > 2.0:
+            print("DUAL_CAM auto-pick blocked: already holding item")
+            _last_table_obj_block_log_time = now
         _table_obj_hits = 0
         return
 
     cooldown = max(2.0, float(getattr(config, "TABLE_OBJECT_COOLDOWN_SEC", 20.0)))
     if now - _last_table_obj_trigger_time < cooldown:
+        if now - _last_table_obj_block_log_time > 2.0:
+            print("DUAL_CAM auto-pick blocked: cooldown active")
+            _last_table_obj_block_log_time = now
         _table_obj_hits = 0
         return
 
