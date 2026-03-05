@@ -552,6 +552,7 @@ _last_table_obj_trigger_time = 0.0
 _last_table_obj_block_log_time = 0.0
 _table_obj_center_hits = 0
 _last_table_obj_align_log_time = 0.0
+_table_cam_enter_time = 0.0
 
 
 def _point_confidence(point):
@@ -1125,6 +1126,15 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
         _table_obj_hits = 0
         _table_obj_center_hits = 0
         return
+
+    arm_delay = max(0.0, float(getattr(config, "TABLE_OBJECT_ARM_DELAY_SEC", 4.0)))
+    if now - _table_cam_enter_time < arm_delay:
+        if now - _last_table_obj_block_log_time > 1.5:
+            print("TABLE_CAM auto-pick blocked: arm delay active")
+            _last_table_obj_block_log_time = now
+        _table_obj_hits = 0
+        _table_obj_center_hits = 0
+        return
     if brain.is_holding_item():
         if now - _last_table_obj_block_log_time > 2.0:
             print("DUAL_CAM auto-pick blocked: already holding item")
@@ -1511,12 +1521,17 @@ def camera_loop():
     brain.camera_switch_handlers["TABLE_CAM"] = lambda: _restart_event.set()
     brain.camera_switch_handlers["DUAL_CAM"] = lambda: None
 
-    global _last_seen_time
+    global _last_seen_time, _table_cam_enter_time
     _last_seen_time = time.time() + 5.0  # give Hailo 5 s to find a person at startup
+    prev_mode = None
 
     global _table_obj_dualcam_disabled_warned
     while not brain.shutdown_event.is_set():
         mode = brain.tuner.shared_params.get("camera_mode", "HIGH_CAM")
+        if mode != prev_mode:
+            if mode == "TABLE_CAM":
+                _table_cam_enter_time = time.time()
+            prev_mode = mode
         if mode == "TABLE_CAM":
             cam_path = config.ARDUCAM_DEVICE
             _stop_table_preview()

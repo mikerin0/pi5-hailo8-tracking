@@ -151,6 +151,8 @@ TABLE_OBJECT_ALIGN_ALPHA = 0.35
 # Target type filter for pickup worker:
 #   any | red | green | blue | yellow | orange | white | black
 TABLE_OBJECT_TARGET_TYPE = "any"
+# Safety delay after entering TABLE_CAM before auto-pick is allowed.
+TABLE_OBJECT_ARM_DELAY_SEC = 4.0
 
 # --- Pose gesture events to Crestron (outbound) ---
 # Uses yolov8 pose keypoints (wrists + shoulders). These are coarse gestures,

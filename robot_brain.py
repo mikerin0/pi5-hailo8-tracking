@@ -367,9 +367,14 @@ def _take_item_sequence(auto_pick=False):
 
         move_servo(1, 1500, 900)
         # Approach from above first to avoid tipping the base by dipping too low.
-        reach_for_coordinate(take_x, take_y, take_lift_z, speed=900)
-        time.sleep(0.6)
-        reach_for_coordinate(take_x, take_y, take_z, speed=800)
+        if auto_pick:
+            reach_for_manual_coordinate(take_x, take_y, take_lift_z, speed=700)
+            time.sleep(0.4)
+            reach_for_manual_coordinate(take_x, take_y, take_z, speed=550)
+        else:
+            reach_for_coordinate(take_x, take_y, take_lift_z, speed=900)
+            time.sleep(0.6)
+            reach_for_coordinate(take_x, take_y, take_z, speed=800)
         if auto_pick:
             print("Auto-pick: object aligned, closing gripper")
             time.sleep(auto_take_wait_s)
