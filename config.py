@@ -148,6 +148,9 @@ TABLE_OBJECT_CENTER_Y_NORM = 0.62
 TABLE_OBJECT_CENTER_TOL_NORM = 0.10
 TABLE_OBJECT_CENTER_FRAMES_REQUIRED = 4
 TABLE_OBJECT_ALIGN_ALPHA = 0.35
+# Target type filter for pickup worker:
+#   any | red | green | blue | yellow | orange | white | black
+TABLE_OBJECT_TARGET_TYPE = "any"
 
 # --- Pose gesture events to Crestron (outbound) ---
 # Uses yolov8 pose keypoints (wrists + shoulders). These are coarse gestures,

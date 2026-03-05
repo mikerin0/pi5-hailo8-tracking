@@ -1210,10 +1210,50 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
         return
 
     h, w = frame_bgr.shape[:2]
-    gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
-    gray = cv2.GaussianBlur(gray, (5, 5), 0)
-    _, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    contours, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    target_type = str(getattr(config, "TABLE_OBJECT_TARGET_TYPE", "any")).strip().lower()
+
+    def _contours_from_mask(mask_img):
+        kernel = np.ones((5, 5), np.uint8)
+        mask_img = cv2.morphologyEx(mask_img, cv2.MORPH_OPEN, kernel)
+        mask_img = cv2.morphologyEx(mask_img, cv2.MORPH_CLOSE, kernel)
+        cts, _ = cv2.findContours(mask_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        return cts
+
+    if target_type == "any":
+        gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
+        gray = cv2.GaussianBlur(gray, (5, 5), 0)
+        _, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        contours = _contours_from_mask(th)
+    else:
+        hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
+        mask = None
+        if target_type == "red":
+            m1 = cv2.inRange(hsv, np.array([0, 80, 40]), np.array([10, 255, 255]))
+            m2 = cv2.inRange(hsv, np.array([170, 80, 40]), np.array([179, 255, 255]))
+            mask = cv2.bitwise_or(m1, m2)
+        elif target_type == "green":
+            mask = cv2.inRange(hsv, np.array([35, 60, 40]), np.array([90, 255, 255]))
+        elif target_type == "blue":
+            mask = cv2.inRange(hsv, np.array([90, 70, 40]), np.array([130, 255, 255]))
+        elif target_type == "yellow":
+            mask = cv2.inRange(hsv, np.array([18, 80, 60]), np.array([35, 255, 255]))
+        elif target_type == "orange":
+            mask = cv2.inRange(hsv, np.array([8, 100, 60]), np.array([20, 255, 255]))
+        elif target_type == "white":
+            mask = cv2.inRange(hsv, np.array([0, 0, 180]), np.array([179, 50, 255]))
+        elif target_type == "black":
+            mask = cv2.inRange(hsv, np.array([0, 0, 0]), np.array([179, 255, 60]))
+        else:
+            gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
+            gray = cv2.GaussianBlur(gray, (5, 5), 0)
+            _, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+            contours = _contours_from_mask(th)
+            target_type = "any"
+            mask = None
+
+        if mask is not None:
+            contours = _contours_from_mask(mask)
+
     if not contours:
         _table_obj_hits = 0
         _table_obj_center_hits = 0
@@ -1302,7 +1342,7 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
         return
 
     print(
-        "DUAL_CAM object detected: "
+        f"DUAL_CAM object detected ({target_type}): "
         f"x_norm={x_norm:.2f} y_norm={y_norm:.2f} area={int(area)} "
         f"-> take_x={take_x:.3f} take_y={take_y:.3f} take_z={take_z:.3f}; starting pickup"
     )
