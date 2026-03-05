@@ -856,9 +856,9 @@ class RobotTuner:
         tk.Button(left_col, text="HOME ARM", command=go_home, bg="gray", fg="white").pack(pady=10)
         tk.Button(left_col, text="TAKE ITEM", command=start_take_item_sequence,
               bg="purple", fg="white").pack(pady=6)
-          tk.Button(left_col, text="TABLE PICK", command=start_table_pick_sequence,
+        tk.Button(left_col, text="TABLE PICK", command=start_table_pick_sequence,
               bg="darkgreen", fg="white").pack(pady=6)
-          tk.Button(left_col, text="RELEASE ITEM", command=release_item_manual,
+        tk.Button(left_col, text="RELEASE ITEM", command=release_item_manual,
               bg="orange", fg="black").pack(pady=6)
 
         # --- Handoff Tune Frame (left column) ---
