@@ -986,7 +986,8 @@ def app_callback(pad, info, user_data):
             if now - _last_seen_time > config.FLAGPOLE_TIMEOUT:
                 p = brain.tuner.get_params()
                 if p.get("busy", 0) == 0 and _search_mode is False:
-                    print("Pose tracking: person lost – entering standby")
+                    print("Pose tracking: person lost – entering standby (latched, RESUME required)")
+                    brain.tuner.shared_params["busy"] = 1
                     _search_mode = True
                     brain.reach_for_coordinate(0.06, 0.0, 0.40, speed=500)
 
