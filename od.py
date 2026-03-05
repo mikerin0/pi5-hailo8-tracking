@@ -1278,7 +1278,7 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
         )
         _last_table_obj_align_log_time = now
     take_z = float(getattr(config, "TABLE_OBJECT_TAKE_Z", 0.27))
-    take_z = max(0.24, min(0.40, take_z))
+    take_z = max(0.18, min(0.40, take_z))
     take_lift_z = max(take_z + 0.05, min(0.45, float(p.get("take_lift_z", 0.36))))
 
     brain.tuner.shared_params["take_x"] = take_x
