@@ -1178,6 +1178,7 @@ _table_preview_stop = threading.Event()
 _table_preview_thread = None
 _table_obj_stop = threading.Event()
 _table_obj_thread = None
+_table_obj_dualcam_disabled_warned = False
 
 
 def _maybe_pick_table_object_from_frame(frame_bgr, now):
@@ -1581,6 +1582,7 @@ def camera_loop():
     global _last_seen_time
     _last_seen_time = time.time() + 5.0  # give Hailo 5 s to find a person at startup
 
+    global _table_obj_dualcam_disabled_warned
     while not brain.shutdown_event.is_set():
         mode = brain.tuner.shared_params.get("camera_mode", "HIGH_CAM")
         if mode == "TABLE_CAM":
@@ -1591,12 +1593,11 @@ def camera_loop():
             # Keep main Hailo feed in this process; table preview runs in a
             # separate rpicam/libcamera preview process.
             cam_path = config.PI_CAMERA_DEVICE
-            if bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False)):
-                _stop_table_preview()
-                _start_table_object_worker()
-            else:
-                _stop_table_object_worker()
-                _start_table_preview()
+            _stop_table_object_worker()
+            _start_table_preview()
+            if bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False)) and not _table_obj_dualcam_disabled_warned:
+                print("WARNING: DUAL_CAM object worker disabled for stability (gst-libcamera crash guard)")
+                _table_obj_dualcam_disabled_warned = True
         else:
             cam_path = config.PI_CAMERA_DEVICE
             _stop_table_preview()
