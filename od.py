@@ -1210,7 +1210,12 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
         return
 
     h, w = frame_bgr.shape[:2]
-    target_type = str(getattr(config, "TABLE_OBJECT_TARGET_TYPE", "any")).strip().lower()
+    target_type = str(
+        brain.tuner.shared_params.get(
+            "table_object_target_type",
+            getattr(config, "TABLE_OBJECT_TARGET_TYPE", "any"),
+        )
+    ).strip().lower()
 
     def _contours_from_mask(mask_img):
         kernel = np.ones((5, 5), np.uint8)
@@ -1678,6 +1683,24 @@ def camera_loop():
             print("--- Hailo AI Hat Active: yolov8m_pose running ---")
 
             while not _restart_event.is_set() and not brain.shutdown_event.is_set():
+                live_mode = brain.tuner.shared_params.get("camera_mode", "HIGH_CAM")
+                if live_mode != mode:
+                    if {live_mode, mode} <= {"HIGH_CAM", "DUAL_CAM"}:
+                        mode = live_mode
+                        if mode == "DUAL_CAM":
+                            if bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False)):
+                                _stop_table_preview()
+                                _start_table_object_worker()
+                            else:
+                                _stop_table_object_worker()
+                                _start_table_preview()
+                        else:
+                            _stop_table_preview()
+                            _stop_table_object_worker()
+                        continue
+                    _restart_event.set()
+                    continue
+
                 if finger_sink is not None:
                     sample = finger_sink.emit("try-pull-sample", int(0.02 * Gst.SECOND))
                     if sample is not None:

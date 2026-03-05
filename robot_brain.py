@@ -545,6 +545,7 @@ class RobotTuner:
             "table_claw_y": float(getattr(config, "TABLE_HANDOFF_CLAW_Y_NORM", 0.82)),
             "table_release_radius": float(getattr(config, "TABLE_HANDOFF_RADIUS_NORM", 0.14)),
             "table_release_cooldown": float(getattr(config, "TABLE_HANDOFF_RELEASE_COOLDOWN", 2.5)),
+            "table_object_target_type": str(getattr(config, "TABLE_OBJECT_TARGET_TYPE", "any")),
         }
         self.scale_widgets = {}
         self._syncing_scales = False
@@ -909,6 +910,12 @@ class RobotTuner:
         self.thermal_status_var = tk.StringVar(value="Thermal monitor: initializing...")
         tk.Label(status_col, textvariable=self.thermal_status_var, wraplength=260, justify="left").pack(pady=4)
 
+        tk.Label(status_col, text="Pickup Target", font=("Arial", 10, "bold")).pack(pady=(8, 2))
+        self.object_target_var = tk.StringVar(value=self.shared_params.get("table_object_target_type", "any"))
+        target_opts = ["any", "red", "green", "blue", "yellow", "orange", "white", "black"]
+        tk.OptionMenu(status_col, self.object_target_var, *target_opts,
+                  command=self.update_object_target_type).pack(pady=(0, 6), fill="x")
+
         thermal_btn_frame = tk.Frame(status_col)
         thermal_btn_frame.pack(pady=6)
         tk.Button(thermal_btn_frame, text="PARK ARM", width=12,
@@ -952,6 +959,9 @@ class RobotTuner:
                 self.shared_params["tune_z"],
                 1200,
             )
+
+    def update_object_target_type(self, value):
+        self.shared_params["table_object_target_type"] = str(value).strip().lower()
 
 tuner = RobotTuner()
 
