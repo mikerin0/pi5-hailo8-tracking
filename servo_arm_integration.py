@@ -89,7 +89,15 @@ def _shelly_set_output(enabled):
         with urllib.request.urlopen(url, timeout=_shelly_timeout()) as resp:
             payload = resp.read().decode("utf-8")
         data = json.loads(payload)
-        return bool(data.get("output"))
+        if isinstance(data, dict) and "output" in data:
+            return bool(data.get("output"))
+
+        # Some firmware replies to Switch.Set without the current output state.
+        # Query status once; if that also fails, trust the requested state.
+        status = _shelly_get_status()
+        if isinstance(status, dict) and "output" in status:
+            return bool(status.get("output"))
+        return bool(enabled)
     except (urllib.error.URLError, TimeoutError, ValueError, OSError) as e:
         logger.warning("Shelly set output failed (%s): %s", url, e)
         return None

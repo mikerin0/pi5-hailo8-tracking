@@ -1572,9 +1572,11 @@ def camera_loop():
 
     # Register handlers so robot_brain.switch_camera() can restart this pipeline
     # when the operator switches camera mode from the GUI or via Crestron.
-    brain.camera_switch_handlers["HIGH_CAM"] = lambda: _restart_event.set()
+    # HIGH_CAM and DUAL_CAM share the same main pipeline/camera path, so avoid
+    # tearing down/rebuilding libcamerasrc between those two modes.
+    brain.camera_switch_handlers["HIGH_CAM"] = lambda: None
     brain.camera_switch_handlers["TABLE_CAM"] = lambda: _restart_event.set()
-    brain.camera_switch_handlers["DUAL_CAM"] = lambda: _restart_event.set()
+    brain.camera_switch_handlers["DUAL_CAM"] = lambda: None
 
     global _last_seen_time
     _last_seen_time = time.time() + 5.0  # give Hailo 5 s to find a person at startup
