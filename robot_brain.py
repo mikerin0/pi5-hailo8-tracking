@@ -38,6 +38,7 @@ thermal_park_callback = None
 thermal_resume_callback = None
 servo_power_provider = None
 TUNER_PARAMS_PATH = os.path.join(os.path.dirname(__file__), "tuner_params.json")
+WINDOW_STATE_PATH = os.path.join(os.path.dirname(__file__), "window_state.json")
 
 try:
     ser = serial.Serial(PORT, BAUD, timeout=1)
@@ -528,7 +529,10 @@ class RobotTuner:
         self._syncing_scales = False
         self.manual_mode = False 
         self.needs_camera_restart = False
+        self._window_geometry = None
+        self._window_state = None
         self._load_tuner_params(silent=True)
+        self._load_window_state(silent=True)
 
     def get_params(self): return self.shared_params
 
@@ -572,6 +576,61 @@ class RobotTuner:
             self._sync_scale_widgets()
         except Exception as e:
             print(f"Failed to load tuner preset: {e}")
+
+    def _load_window_state(self, silent=False):
+        if not os.path.isfile(WINDOW_STATE_PATH):
+            return
+        try:
+            with open(WINDOW_STATE_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if not isinstance(data, dict):
+                return
+            self._window_geometry = data.get("geometry")
+            self._window_state = data.get("state")
+            if not silent:
+                print(f"Loaded window state: {WINDOW_STATE_PATH}")
+        except Exception as e:
+            if not silent:
+                print(f"Failed to load window state: {e}")
+
+    def _save_window_state(self, silent=True):
+        if not hasattr(self, "root") or self.root is None:
+            return
+        try:
+            data = {
+                "geometry": self.root.geometry(),
+                "state": self.root.state(),
+            }
+            with open(WINDOW_STATE_PATH, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, sort_keys=True)
+            if not silent:
+                print(f"Saved window state: {WINDOW_STATE_PATH}")
+        except Exception as e:
+            if not silent:
+                print(f"Failed to save window state: {e}")
+
+    def _apply_window_state(self):
+        if self._window_geometry:
+            try:
+                self.root.geometry(str(self._window_geometry))
+            except Exception:
+                pass
+        if self._window_state:
+            try:
+                self.root.state(str(self._window_state))
+                return
+            except Exception:
+                pass
+        try:
+            self.root.state("zoomed")
+        except Exception:
+            sw = max(1024, int(self.root.winfo_screenwidth()))
+            sh = max(700, int(self.root.winfo_screenheight()))
+            self.root.geometry(f"{sw}x{sh}+0+0")
+
+    def _on_window_close(self):
+        self._save_window_state(silent=True)
+        shutdown_program()
 
     def _update_thermal_status(self):
         busy = int(self.shared_params.get("busy", 0))
@@ -677,6 +736,7 @@ class RobotTuner:
                 print("Thermal park unavailable before shutdown")
         except Exception as e:
             print(f"Thermal park before shutdown failed: {e}")
+        self._save_window_state(silent=True)
         shutdown_program()
 
     def _save_tuner_params(self):
@@ -701,13 +761,8 @@ class RobotTuner:
         self.root = tk.Tk()
         self.root.title("Robot Master - Pi Server Mode")
         self.root.geometry("1180x860")
-        try:
-            self.root.state("zoomed")
-        except Exception:
-            sw = max(1024, int(self.root.winfo_screenwidth()))
-            sh = max(700, int(self.root.winfo_screenheight()))
-            self.root.geometry(f"{sw}x{sh}+0+0")
-        self.root.protocol("WM_DELETE_WINDOW", shutdown_program)
+        self._apply_window_state()
+        self.root.protocol("WM_DELETE_WINDOW", self._on_window_close)
 
         columns = tk.Frame(self.root)
         columns.pack(fill="both", expand=True, padx=10, pady=8)
