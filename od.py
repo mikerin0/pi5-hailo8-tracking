@@ -1252,17 +1252,29 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
 
 def _table_object_worker():
     """Separate lower-camera worker for safe object pickup detection in DUAL_CAM."""
-    gst = (
+    launch_str = (
         f"libcamerasrc camera-name={config.ARDUCAM_DEVICE} ! "
         f"video/x-raw,format=NV12,width={config.CAM_SENSOR_W},height={config.CAM_SENSOR_H} ! "
         f"videoconvert ! videoscale ! "
-        f"video/x-raw,format=BGR,width={config.FRAME_W},height={config.FRAME_H} ! "
-        "appsink drop=true max-buffers=1 sync=false"
+        f"video/x-raw,format=RGB,width={config.FRAME_W},height={config.FRAME_H} ! "
+        "appsink name=table_obj_sink emit-signals=false sync=false drop=true max-buffers=1"
     )
-    cap = cv2.VideoCapture(gst, cv2.CAP_GSTREAMER)
-    if not cap.isOpened():
-        print("Table object worker unavailable: could not open lower camera stream")
+    try:
+        pipe = Gst.parse_launch(launch_str)
+    except Exception as e:
+        print(f"Table object worker unavailable: pipeline build failed: {e}")
         return
+    sink = pipe.get_by_name("table_obj_sink")
+    if sink is None:
+        print("Table object worker unavailable: appsink missing")
+        return
+
+    try:
+        pipe.set_state(Gst.State.PLAYING)
+    except Exception as e:
+        print(f"Table object worker unavailable: failed to start: {e}")
+        return
+
     print("--- Table object worker active (DUAL_CAM) ---")
     window_name = "Table Object View"
     window_ready = False
@@ -1274,10 +1286,30 @@ def _table_object_worker():
         window_ready = False
     try:
         while not _table_obj_stop.is_set() and not brain.shutdown_event.is_set():
-            ok, frame = cap.read()
-            if not ok or frame is None:
-                time.sleep(0.05)
+            sample = sink.emit("try-pull-sample", int(0.08 * Gst.SECOND))
+            if sample is None:
+                time.sleep(0.02)
                 continue
+
+            buf = sample.get_buffer()
+            caps = sample.get_caps()
+            struct = caps.get_structure(0)
+            w = int(struct.get_value("width"))
+            h = int(struct.get_value("height"))
+            ok, mapinfo = buf.map(Gst.MapFlags.READ)
+            if not ok:
+                continue
+            try:
+                frame_rgb = np.frombuffer(mapinfo.data, dtype=np.uint8).reshape((h, w, 3))
+                frame = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+            except Exception:
+                continue
+            finally:
+                try:
+                    buf.unmap(mapinfo)
+                except Exception:
+                    pass
+
             try:
                 _maybe_pick_table_object_from_frame(frame, time.time())
             except Exception:
@@ -1290,7 +1322,7 @@ def _table_object_worker():
                     window_ready = False
             time.sleep(0.05)
     finally:
-        cap.release()
+        _graceful_stop_pipeline(pipe)
         if window_ready:
             try:
                 cv2.destroyWindow(window_name)
