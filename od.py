@@ -1264,6 +1264,14 @@ def _table_object_worker():
         print("Table object worker unavailable: could not open lower camera stream")
         return
     print("--- Table object worker active (DUAL_CAM) ---")
+    window_name = "Table Object View"
+    window_ready = False
+    try:
+        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(window_name, config.FRAME_W, config.FRAME_H)
+        window_ready = True
+    except Exception:
+        window_ready = False
     try:
         while not _table_obj_stop.is_set() and not brain.shutdown_event.is_set():
             ok, frame = cap.read()
@@ -1274,9 +1282,20 @@ def _table_object_worker():
                 _maybe_pick_table_object_from_frame(frame, time.time())
             except Exception:
                 pass
+            if window_ready:
+                try:
+                    cv2.imshow(window_name, frame)
+                    cv2.waitKey(1)
+                except Exception:
+                    window_ready = False
             time.sleep(0.05)
     finally:
         cap.release()
+        if window_ready:
+            try:
+                cv2.destroyWindow(window_name)
+            except Exception:
+                pass
         print("--- Table object worker stopped ---")
 
 
