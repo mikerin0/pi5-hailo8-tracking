@@ -402,6 +402,22 @@ def _take_item_sequence(auto_pick=False):
 def start_take_item_sequence(auto_pick=False):
     threading.Thread(target=lambda: _take_item_sequence(auto_pick=auto_pick), daemon=True).start()
 
+
+def start_table_pick_sequence():
+    """Switch to TABLE_CAM and run autonomous pickup routine."""
+    switch_camera("TABLE_CAM")
+    start_take_item_sequence(auto_pick=True)
+
+
+def release_item_manual():
+    """Release held item via GUI even if holding-state desync occurs."""
+    if release_item_to_user(reason="manual GUI release"):
+        return
+    move_servo(1, 1500, 700)
+    set_holding_item(False)
+    send_to_crestron("ITEM_RELEASED")
+    print("Manual release: gripper opened")
+
 def reach_for_coordinate(x, y, z, speed=800):
     global last_angles
     try:
@@ -840,6 +856,10 @@ class RobotTuner:
         tk.Button(left_col, text="HOME ARM", command=go_home, bg="gray", fg="white").pack(pady=10)
         tk.Button(left_col, text="TAKE ITEM", command=start_take_item_sequence,
               bg="purple", fg="white").pack(pady=6)
+          tk.Button(left_col, text="TABLE PICK", command=start_table_pick_sequence,
+              bg="darkgreen", fg="white").pack(pady=6)
+          tk.Button(left_col, text="RELEASE ITEM", command=release_item_manual,
+              bg="orange", fg="black").pack(pady=6)
 
         # --- Handoff Tune Frame (left column) ---
         tk.Label(left_col, text="--- TAKE ITEM TUNE ---", font=("Arial", 12, "bold")).pack(pady=8)
