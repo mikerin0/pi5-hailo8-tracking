@@ -39,6 +39,7 @@ thermal_status_provider = None
 thermal_park_callback = None
 thermal_resume_callback = None
 servo_power_provider = None
+_first_move_capped = False
 TUNER_PARAMS_PATH = os.path.join(os.path.dirname(__file__), "tuner_params.json")
 WINDOW_STATE_PATH = os.path.join(os.path.dirname(__file__), "window_state.json")
 
@@ -289,10 +290,15 @@ def switch_camera(mode):
 # --- 4. MOVEMENT LOGIC ---
 
 def move_servo(id, pos, time_ms=800):
+    global _first_move_capped
     global _gripper_pos_est
     if ARM_MOVEMENT_DISABLED:
         print(f"ARM_MOVEMENT_DISABLED: servo {id} pos {pos} suppressed")
         return
+    cap = int(getattr(config, "SAFE_STARTUP_FIRST_MOVE_SPEED_CAP", 0))
+    if cap > 0 and not _first_move_capped:
+        time_ms = max(int(time_ms), cap)
+        _first_move_capped = True
     # Servo 1 is the claw – limit its closing range to protect the mechanism
     if id == 1:
         pos = max(1500, min(2326, pos))
@@ -425,11 +431,16 @@ def release_item_manual():
 
 def reach_for_coordinate(x, y, z, speed=800):
     global last_angles
+    global _first_move_capped
     try:
         x = float(x)
         y = float(y)
         z = float(z)
         speed = int(speed)
+        cap = int(getattr(config, "SAFE_STARTUP_FIRST_MOVE_SPEED_CAP", 0))
+        if cap > 0 and not _first_move_capped:
+            speed = min(speed, cap)
+            _first_move_capped = True
         angles = my_arm.inverse_kinematics([x, y, z], initial_position=last_angles)
         if not np.all(np.isfinite(angles)):
             print(f"IK rejected (non-finite solution) for target x={x:.3f} y={y:.3f} z={z:.3f}")
@@ -447,6 +458,7 @@ def reach_for_coordinate(x, y, z, speed=800):
 
 def reach_for_manual_coordinate(x, y, z, speed=900):
     global last_angles
+    global _first_move_capped
     x = max(float(getattr(config, "MANUAL_X_MIN", 0.14)),
             min(float(getattr(config, "MANUAL_X_MAX", 0.30)), float(x)))
     y = max(float(getattr(config, "MANUAL_Y_MIN", -0.12)),
@@ -455,6 +467,10 @@ def reach_for_manual_coordinate(x, y, z, speed=900):
             min(float(getattr(config, "MANUAL_Z_MAX", 0.40)), float(z)))
 
     speed = int(getattr(config, "MANUAL_JOG_SPEED", speed))
+    cap = int(getattr(config, "SAFE_STARTUP_FIRST_MOVE_SPEED_CAP", 0))
+    if cap > 0 and not _first_move_capped:
+        speed = min(speed, cap)
+        _first_move_capped = True
     step_m = max(0.002, float(getattr(config, "MANUAL_JOG_STEP_M", 0.01)))
     travel_z = max(z, float(getattr(config, "MANUAL_TRAVEL_Z", 0.32)))
 
@@ -1001,11 +1017,13 @@ class RobotTuner:
 tuner = RobotTuner()
 
 def start_brain_ui():
+    global _first_move_capped
     # Start the Server thread immediately
     _init_gripper_switch()
     # Safety: do not move the arm automatically on program startup.
     # Startup should only initialise UI/network state; motion must come from
     # explicit commands (resume, table pick, take item, etc.).
+    _first_move_capped = False
     tuner.shared_params["busy"] = 0
     threading.Thread(target=tcp_listener, daemon=True).start()
     try:

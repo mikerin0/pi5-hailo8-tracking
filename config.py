@@ -156,6 +156,12 @@ TABLE_OBJECT_ARM_DELAY_SEC = 4.0
 # Extra Z offset applied only to autonomous TABLE PICK (meters).
 TABLE_PICK_Z_OFFSET_M = -0.03
 
+# --- Startup safety ---
+# Prevent any automatic arm movement during application startup.
+SAFE_STARTUP_NO_MOTION = True
+# Cap speed of the very first commanded move after startup (set <=0 to disable).
+SAFE_STARTUP_FIRST_MOVE_SPEED_CAP = 450
+
 # --- Pose gesture events to Crestron (outbound) ---
 # Uses yolov8 pose keypoints (wrists + shoulders). These are coarse gestures,
 # not finger-level hand-pose classification.
