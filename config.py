@@ -132,7 +132,7 @@ TABLE_HANDOFF_OVERLAY_ENABLED = False
 # --- TABLE_CAM object pickup (MVP) ---
 # Detects the largest blob on the lower camera feed and triggers the
 # existing take-item sequence using tuned take_* values.
-TABLE_OBJECT_PICKUP_ENABLED = False
+TABLE_OBJECT_PICKUP_ENABLED = True
 TABLE_OBJECT_MIN_AREA_PX = 1200
 TABLE_OBJECT_FRAMES_REQUIRED = 5
 TABLE_OBJECT_COOLDOWN_SEC = 20.0
