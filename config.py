@@ -156,6 +156,14 @@ TABLE_OBJECT_ARM_DELAY_SEC = 4.0
 # Extra Z offset applied only to autonomous TABLE PICK (meters).
 TABLE_PICK_Z_OFFSET_M = -0.01
 
+# --- TABLE_CAM model-based object detection (Hailo) ---
+TABLE_OBJECT_MODEL_ENABLED = True
+TABLE_OBJECT_HEF_PATH = "/usr/local/hailo/resources/models/hailo8/yolov8n.hef"
+TABLE_OBJECT_SO_PATH = "/usr/local/hailo/resources/so/libyolo_hailortpp_postprocess.so"
+TABLE_OBJECT_MIN_CONFIDENCE = 0.35
+# Optional class filter by detector label text (empty => accept all labels).
+TABLE_OBJECT_TARGET_LABEL = ""
+
 # --- Startup safety ---
 # Prevent any automatic arm movement during application startup.
 SAFE_STARTUP_NO_MOTION = True

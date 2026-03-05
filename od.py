@@ -555,6 +555,210 @@ _last_table_obj_align_log_time = 0.0
 _table_cam_enter_time = 0.0
 
 
+def _detection_bbox_center_norm(detection):
+    """Best-effort extraction of normalized bbox center/area from Hailo detection."""
+    try:
+        bbox = detection.get_bbox()
+    except Exception:
+        return None
+    if bbox is None:
+        return None
+
+    def _get_num(obj, names):
+        for name in names:
+            attr = getattr(obj, name, None)
+            if callable(attr):
+                try:
+                    return float(attr())
+                except Exception:
+                    continue
+            if attr is not None:
+                try:
+                    return float(attr)
+                except Exception:
+                    continue
+        return None
+
+    x = _get_num(bbox, ("xmin", "x_min", "left", "x"))
+    y = _get_num(bbox, ("ymin", "y_min", "top", "y"))
+    w = _get_num(bbox, ("width", "w"))
+    h = _get_num(bbox, ("height", "h"))
+
+    if x is not None and y is not None and w is not None and h is not None:
+        cx = x + (w * 0.5)
+        cy = y + (h * 0.5)
+        area = max(0.0, w * h)
+        return (
+            max(0.0, min(1.0, cx)),
+            max(0.0, min(1.0, cy)),
+            area,
+        )
+
+    x2 = _get_num(bbox, ("xmax", "x_max", "right"))
+    y2 = _get_num(bbox, ("ymax", "y_max", "bottom"))
+    if x is not None and y is not None and x2 is not None and y2 is not None:
+        cx = (x + x2) * 0.5
+        cy = (y + y2) * 0.5
+        area = max(0.0, (x2 - x) * (y2 - y))
+        return (
+            max(0.0, min(1.0, cx)),
+            max(0.0, min(1.0, cy)),
+            area,
+        )
+    return None
+
+
+def _table_object_model_callback(_pad, info, _user_data):
+    """Model-based TABLE_CAM detection callback using Hailo detection objects."""
+    global _table_obj_hits, _table_obj_center_hits
+    global _last_table_obj_trigger_time, _last_table_obj_block_log_time, _last_table_obj_align_log_time
+
+    if not bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False)):
+        _table_obj_hits = 0
+        _table_obj_center_hits = 0
+        return Gst.PadProbeReturn.OK
+    if brain.tuner.shared_params.get("camera_mode", "HIGH_CAM") != "TABLE_CAM":
+        _table_obj_hits = 0
+        _table_obj_center_hits = 0
+        return Gst.PadProbeReturn.OK
+
+    now = time.time()
+    arm_delay = max(0.0, float(getattr(config, "TABLE_OBJECT_ARM_DELAY_SEC", 4.0)))
+    if now - _table_cam_enter_time < arm_delay:
+        _table_obj_hits = 0
+        _table_obj_center_hits = 0
+        return Gst.PadProbeReturn.OK
+    if brain.tuner.shared_params.get("busy", 0) != 0 or brain.is_holding_item():
+        _table_obj_hits = 0
+        _table_obj_center_hits = 0
+        return Gst.PadProbeReturn.OK
+
+    cooldown = max(2.0, float(getattr(config, "TABLE_OBJECT_COOLDOWN_SEC", 20.0)))
+    if now - _last_table_obj_trigger_time < cooldown:
+        _table_obj_hits = 0
+        _table_obj_center_hits = 0
+        return Gst.PadProbeReturn.OK
+
+    buffer = info.get_buffer()
+    if not buffer:
+        return Gst.PadProbeReturn.OK
+
+    try:
+        roi = hailo.get_roi_from_buffer(buffer)
+        detections = roi.get_objects_typed(hailo.HAILO_DETECTION)
+    except Exception:
+        return Gst.PadProbeReturn.OK
+
+    target_label = str(getattr(config, "TABLE_OBJECT_TARGET_LABEL", "")).strip().lower()
+    min_conf = float(getattr(config, "TABLE_OBJECT_MIN_CONFIDENCE", 0.35))
+
+    best = None
+    best_conf = -1.0
+    best_label = ""
+    best_center = None
+    for det in detections:
+        try:
+            label = str(det.get_label()).strip().lower()
+        except Exception:
+            label = ""
+        if target_label and label != target_label:
+            continue
+
+        conf = 1.0
+        cattr = getattr(det, "get_confidence", None)
+        if callable(cattr):
+            try:
+                conf = float(cattr())
+            except Exception:
+                conf = 1.0
+        if conf < min_conf:
+            continue
+
+        center = _detection_bbox_center_norm(det)
+        if center is None:
+            continue
+        if conf > best_conf:
+            best = det
+            best_conf = conf
+            best_label = label
+            best_center = center
+
+    if best is None or best_center is None:
+        _table_obj_hits = 0
+        _table_obj_center_hits = 0
+        return Gst.PadProbeReturn.OK
+
+    x_norm, y_norm, area_norm = best_center
+    x_min = float(getattr(config, "TABLE_OBJECT_X_MIN_NORM", 0.25))
+    x_max = float(getattr(config, "TABLE_OBJECT_X_MAX_NORM", 0.75))
+    y_min = float(getattr(config, "TABLE_OBJECT_Y_MIN_NORM", 0.45))
+    max_area_frac = float(getattr(config, "TABLE_OBJECT_MAX_AREA_FRAC", 0.80))
+    if not (x_min <= x_norm <= x_max and y_norm >= y_min and area_norm <= max_area_frac):
+        _table_obj_hits = 0
+        _table_obj_center_hits = 0
+        return Gst.PadProbeReturn.OK
+
+    _table_obj_hits += 1
+    frames_required = max(1, int(getattr(config, "TABLE_OBJECT_FRAMES_REQUIRED", 3)))
+    if _table_obj_hits < frames_required:
+        return Gst.PadProbeReturn.OK
+
+    p = brain.tuner.get_params()
+    y_gain = float(getattr(config, "TABLE_OBJECT_Y_GAIN", 0.24))
+    x_bias_gain = float(getattr(config, "TABLE_OBJECT_X_BIAS_GAIN", 0.03))
+    center_x = float(getattr(config, "TABLE_OBJECT_CENTER_X_NORM", 0.50))
+    center_y = float(getattr(config, "TABLE_OBJECT_CENTER_Y_NORM", 0.62))
+    center_tol = float(getattr(config, "TABLE_OBJECT_CENTER_TOL_NORM", 0.10))
+    align_alpha = float(getattr(config, "TABLE_OBJECT_ALIGN_ALPHA", 0.35))
+    center_frames_required = max(1, int(getattr(config, "TABLE_OBJECT_CENTER_FRAMES_REQUIRED", 4)))
+
+    target_take_y = max(-0.12, min(0.12, (center_x - x_norm) * y_gain))
+    target_take_x = float(p.get("take_x", 0.16)) + ((center_y - y_norm) * x_bias_gain)
+    target_take_x = max(0.12, min(0.28, target_take_x))
+
+    prev_take_x = float(p.get("take_x", 0.16))
+    prev_take_y = float(p.get("take_y", 0.0))
+    take_x = prev_take_x + (target_take_x - prev_take_x) * max(0.05, min(1.0, align_alpha))
+    take_y = prev_take_y + (target_take_y - prev_take_y) * max(0.05, min(1.0, align_alpha))
+
+    err = ((x_norm - center_x) ** 2 + (y_norm - center_y) ** 2) ** 0.5
+    if err <= max(0.02, center_tol):
+        _table_obj_center_hits += 1
+    else:
+        _table_obj_center_hits = 0
+
+    if now - _last_table_obj_align_log_time > 1.0:
+        print(
+            "TABLE_CAM model align: "
+            f"label={best_label or 'unknown'} conf={best_conf:.2f} "
+            f"x={x_norm:.2f} y={y_norm:.2f} err={err:.3f} "
+            f"center_hits={_table_obj_center_hits}/{center_frames_required}"
+        )
+        _last_table_obj_align_log_time = now
+
+    take_z = float(getattr(config, "TABLE_OBJECT_TAKE_Z", 0.27))
+    take_z = max(0.18, min(0.40, take_z))
+    take_lift_z = max(take_z + 0.05, min(0.45, float(p.get("take_lift_z", 0.36))))
+    brain.tuner.shared_params["take_x"] = take_x
+    brain.tuner.shared_params["take_y"] = take_y
+    brain.tuner.shared_params["take_z"] = take_z
+    brain.tuner.shared_params["take_lift_z"] = take_lift_z
+
+    if _table_obj_center_hits < center_frames_required:
+        return Gst.PadProbeReturn.OK
+
+    print(
+        "TABLE_CAM model object detected: "
+        f"label={best_label or 'unknown'} conf={best_conf:.2f} "
+        f"x={x_norm:.2f} y={y_norm:.2f} -> starting pickup"
+    )
+    brain.start_take_item_sequence(auto_pick=True)
+    _last_table_obj_trigger_time = now
+    _table_obj_hits = 0
+    _table_obj_center_hits = 0
+    return Gst.PadProbeReturn.OK
+
+
 def _point_confidence(point):
     """Best-effort confidence extraction across Hailo point API variants."""
     for name in ("confidence", "score", "probability"):
@@ -1566,9 +1770,17 @@ def camera_loop():
                 and bool(getattr(config, "FINGER_GESTURE_EVENTS_ENABLED", True))
                 and mp is not None
             )
+            table_model_branch_enabled = (
+                mode == "TABLE_CAM"
+                and bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False))
+                and bool(getattr(config, "TABLE_OBJECT_MODEL_ENABLED", False))
+                and os.path.isfile(getattr(config, "TABLE_OBJECT_HEF_PATH", ""))
+                and os.path.isfile(getattr(config, "TABLE_OBJECT_SO_PATH", ""))
+            )
             table_object_branch_enabled = (
                 mode == "TABLE_CAM"
                 and bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False))
+                and not table_model_branch_enabled
             )
 
             if finger_branch_enabled:
@@ -1586,6 +1798,17 @@ def camera_loop():
                     f"t. ! queue leaky=downstream max-size-buffers=1 ! "
                     f"video/x-raw,format=RGB,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
                     f"appsink name=finger_sink emit-signals=false sync=false drop=true max-buffers=1"
+                )
+            elif table_model_branch_enabled:
+                launch_str = (
+                    f"libcamerasrc camera-name={cam_path} ! "
+                    f"video/x-raw,format=NV12,width={config.CAM_SENSOR_W},height={config.CAM_SENSOR_H} ! "
+                    f"videoconvert ! videoscale ! "
+                    f"video/x-raw,format=RGB,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
+                    f"queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
+                    f"hailonet hef-path={config.TABLE_OBJECT_HEF_PATH} force-writable=true ! "
+                    f"hailofilter name=table_hailofilter so-path={config.TABLE_OBJECT_SO_PATH} ! "
+                    f"hailooverlay ! videoconvert ! autovideosink sync=false"
                 )
             elif table_object_branch_enabled:
                 launch_str = (
@@ -1637,6 +1860,12 @@ def camera_loop():
             else:
                 if not table_object_branch_enabled:
                     print("WARNING: hailofilter element not found – probe not attached")
+
+            table_hailofilter = pipe.get_by_name("table_hailofilter") if table_model_branch_enabled else None
+            if table_hailofilter:
+                table_hailofilter.get_static_pad("src").add_probe(
+                    Gst.PadProbeType.BUFFER, _table_object_model_callback, None
+                )
 
             if overlay_enabled:
                 release_overlay = pipe.get_by_name("release_overlay")
