@@ -701,6 +701,12 @@ class RobotTuner:
         self.root = tk.Tk()
         self.root.title("Robot Master - Pi Server Mode")
         self.root.geometry("1180x860")
+        try:
+            self.root.state("zoomed")
+        except Exception:
+            sw = max(1024, int(self.root.winfo_screenwidth()))
+            sh = max(700, int(self.root.winfo_screenheight()))
+            self.root.geometry(f"{sw}x{sh}+0+0")
         self.root.protocol("WM_DELETE_WINDOW", shutdown_program)
 
         columns = tk.Frame(self.root)
