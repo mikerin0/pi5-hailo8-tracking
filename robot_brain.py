@@ -1003,12 +1003,9 @@ tuner = RobotTuner()
 def start_brain_ui():
     # Start the Server thread immediately
     _init_gripper_switch()
-    tuner.shared_params["busy"] = 1
-    if thermal_resume_callback:
-        try:
-            thermal_resume_callback()
-        except Exception:
-            pass
+    # Safety: do not move the arm automatically on program startup.
+    # Startup should only initialise UI/network state; motion must come from
+    # explicit commands (resume, table pick, take item, etc.).
     tuner.shared_params["busy"] = 0
     threading.Thread(target=tcp_listener, daemon=True).start()
     try:
