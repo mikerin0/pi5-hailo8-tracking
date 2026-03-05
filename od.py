@@ -550,6 +550,8 @@ _finger_state_streak = {"ONE": 0, "TWO": 0}
 _table_obj_hits = 0
 _last_table_obj_trigger_time = 0.0
 _last_table_obj_block_log_time = 0.0
+_table_obj_center_hits = 0
+_last_table_obj_align_log_time = 0.0
 
 
 def _point_confidence(point):
@@ -1181,24 +1183,21 @@ _table_obj_thread = None
 def _maybe_pick_table_object_from_frame(frame_bgr, now):
     """Detect a table object in DUAL_CAM worker and trigger take-item sequence."""
     global _table_obj_hits, _last_table_obj_trigger_time, _last_table_obj_block_log_time
+    global _table_obj_center_hits, _last_table_obj_align_log_time
 
     if not bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False)):
         _table_obj_hits = 0
         return
     if brain.tuner.shared_params.get("camera_mode", "HIGH_CAM") != "DUAL_CAM":
         _table_obj_hits = 0
-        return
-    if brain.tuner.shared_params.get("busy", 0) != 0:
-        if now - _last_table_obj_block_log_time > 2.0:
-            print("DUAL_CAM auto-pick blocked: robot busy")
-            _last_table_obj_block_log_time = now
-        _table_obj_hits = 0
+        _table_obj_center_hits = 0
         return
     if brain.is_holding_item():
         if now - _last_table_obj_block_log_time > 2.0:
             print("DUAL_CAM auto-pick blocked: already holding item")
             _last_table_obj_block_log_time = now
         _table_obj_hits = 0
+        _table_obj_center_hits = 0
         return
 
     cooldown = max(2.0, float(getattr(config, "TABLE_OBJECT_COOLDOWN_SEC", 20.0)))
@@ -1207,6 +1206,7 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
             print("DUAL_CAM auto-pick blocked: cooldown active")
             _last_table_obj_block_log_time = now
         _table_obj_hits = 0
+        _table_obj_center_hits = 0
         return
 
     h, w = frame_bgr.shape[:2]
@@ -1216,6 +1216,7 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
     contours, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
         _table_obj_hits = 0
+        _table_obj_center_hits = 0
         return
 
     c = max(contours, key=cv2.contourArea)
@@ -1223,17 +1224,20 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
     min_area = float(getattr(config, "TABLE_OBJECT_MIN_AREA_PX", 1200))
     if area < min_area:
         _table_obj_hits = 0
+        _table_obj_center_hits = 0
         return
 
     frame_area = float(max(1, w * h))
     max_area_frac = float(getattr(config, "TABLE_OBJECT_MAX_AREA_FRAC", 0.35))
     if (area / frame_area) > max(0.05, max_area_frac):
         _table_obj_hits = 0
+        _table_obj_center_hits = 0
         return
 
     m = cv2.moments(c)
     if m.get("m00", 0.0) == 0.0:
         _table_obj_hits = 0
+        _table_obj_center_hits = 0
         return
 
     cx = float(m["m10"] / m["m00"])
@@ -1246,6 +1250,7 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
     y_min = float(getattr(config, "TABLE_OBJECT_Y_MIN_NORM", 0.45))
     if not (x_min <= x_norm <= x_max and y_norm >= y_min):
         _table_obj_hits = 0
+        _table_obj_center_hits = 0
         return
 
     _table_obj_hits += 1
@@ -1256,10 +1261,34 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
     p = brain.tuner.get_params()
     y_gain = float(getattr(config, "TABLE_OBJECT_Y_GAIN", 0.24))
     x_bias_gain = float(getattr(config, "TABLE_OBJECT_X_BIAS_GAIN", 0.03))
+    center_x = float(getattr(config, "TABLE_OBJECT_CENTER_X_NORM", 0.50))
+    center_y = float(getattr(config, "TABLE_OBJECT_CENTER_Y_NORM", 0.62))
+    center_tol = float(getattr(config, "TABLE_OBJECT_CENTER_TOL_NORM", 0.10))
+    align_alpha = float(getattr(config, "TABLE_OBJECT_ALIGN_ALPHA", 0.35))
+    center_frames_required = max(1, int(getattr(config, "TABLE_OBJECT_CENTER_FRAMES_REQUIRED", 4)))
 
-    take_y = max(-0.12, min(0.12, (0.5 - x_norm) * y_gain))
-    take_x = float(p.get("take_x", 0.16)) + ((0.75 - y_norm) * x_bias_gain)
-    take_x = max(0.12, min(0.28, take_x))
+    target_take_y = max(-0.12, min(0.12, (center_x - x_norm) * y_gain))
+    target_take_x = float(p.get("take_x", 0.16)) + ((center_y - y_norm) * x_bias_gain)
+    target_take_x = max(0.12, min(0.28, target_take_x))
+
+    prev_take_x = float(p.get("take_x", 0.16))
+    prev_take_y = float(p.get("take_y", 0.0))
+    take_x = prev_take_x + (target_take_x - prev_take_x) * max(0.05, min(1.0, align_alpha))
+    take_y = prev_take_y + (target_take_y - prev_take_y) * max(0.05, min(1.0, align_alpha))
+
+    err = ((x_norm - center_x) ** 2 + (y_norm - center_y) ** 2) ** 0.5
+    if err <= max(0.02, center_tol):
+        _table_obj_center_hits += 1
+    else:
+        _table_obj_center_hits = 0
+
+    if now - _last_table_obj_align_log_time > 1.0:
+        print(
+            "DUAL_CAM align: "
+            f"x={x_norm:.2f} y={y_norm:.2f} err={err:.3f} "
+            f"center_hits={_table_obj_center_hits}/{center_frames_required}"
+        )
+        _last_table_obj_align_log_time = now
     take_z = float(getattr(config, "TABLE_OBJECT_TAKE_Z", 0.27))
     take_z = max(0.24, min(0.40, take_z))
     take_lift_z = max(take_z + 0.05, min(0.45, float(p.get("take_lift_z", 0.36))))
@@ -1268,6 +1297,10 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
     brain.tuner.shared_params["take_y"] = take_y
     brain.tuner.shared_params["take_z"] = take_z
     brain.tuner.shared_params["take_lift_z"] = take_lift_z
+
+    if _table_obj_center_hits < center_frames_required:
+        return
+
     print(
         "DUAL_CAM object detected: "
         f"x_norm={x_norm:.2f} y_norm={y_norm:.2f} area={int(area)} "
@@ -1276,6 +1309,7 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
     brain.start_take_item_sequence()
     _last_table_obj_trigger_time = now
     _table_obj_hits = 0
+    _table_obj_center_hits = 0
 
 
 def _table_object_worker():
