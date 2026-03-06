@@ -554,6 +554,7 @@ _table_obj_center_hits = 0
 _last_table_obj_align_log_time = 0.0
 _table_cam_enter_time = 0.0
 _person_lost_park_in_progress = False
+_last_table_pick_steer_time = 0.0
 _vision_summary_lock = threading.Lock()
 _vision_summary_state = {
     "updated_at": 0.0,
@@ -603,6 +604,28 @@ def _extract_detection_labels(detections):
         except Exception:
             continue
     return labels
+
+
+def _maybe_update_table_pick_approach_pose(take_x, take_y, take_lift_z, now):
+    """During manual TABLE PICK arming, actively steer arm above target."""
+    global _last_table_pick_steer_time
+    if not bool(brain.tuner.shared_params.get("table_pick_request_active", 0)):
+        return
+    if brain.tuner.shared_params.get("camera_mode", "HIGH_CAM") != "TABLE_CAM":
+        return
+    if brain.tuner.shared_params.get("busy", 0) != 0 or brain.is_holding_item():
+        return
+
+    min_period = max(0.12, float(getattr(config, "TABLE_PICK_STEER_PERIOD_SEC", 0.25)))
+    if (now - _last_table_pick_steer_time) < min_period:
+        return
+
+    speed = int(getattr(config, "TABLE_PICK_STEER_SPEED", 800))
+    try:
+        brain.reach_for_manual_coordinate(float(take_x), float(take_y), float(take_lift_z), speed=speed)
+        _last_table_pick_steer_time = now
+    except Exception as e:
+        print(f"TABLE_PICK steer skipped: {e}")
 
 
 def update_table_model_paths(hef_path, so_path):
@@ -865,6 +888,7 @@ def _table_object_model_callback(_pad, info, _user_data):
     brain.tuner.shared_params["take_y"] = take_y
     brain.tuner.shared_params["take_z"] = take_z
     brain.tuner.shared_params["take_lift_z"] = take_lift_z
+    _maybe_update_table_pick_approach_pose(take_x, take_y, take_lift_z, now)
 
     if _table_obj_center_hits < center_frames_required:
         return Gst.PadProbeReturn.OK
@@ -1642,6 +1666,7 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
     brain.tuner.shared_params["take_y"] = take_y
     brain.tuner.shared_params["take_z"] = take_z
     brain.tuner.shared_params["take_lift_z"] = take_lift_z
+    _maybe_update_table_pick_approach_pose(take_x, take_y, take_lift_z, now)
 
     if _table_obj_center_hits < center_frames_required:
         return
