@@ -769,6 +769,9 @@ def _table_object_model_callback(_pad, info, _user_data):
             getattr(config, "TABLE_OBJECT_TARGET_LABEL", ""),
         )
     ).strip().lower()
+    manual_pick_active = bool(brain.tuner.shared_params.get("table_pick_request_active", 0))
+    if manual_pick_active and bool(getattr(config, "TABLE_PICK_IGNORE_LABEL_FILTER", True)):
+        target_label = ""
     min_conf = float(getattr(config, "TABLE_OBJECT_MIN_CONFIDENCE", 0.35))
 
     best = None
@@ -871,6 +874,7 @@ def _table_object_model_callback(_pad, info, _user_data):
         f"label={best_label or 'unknown'} conf={best_conf:.2f} "
         f"x={x_norm:.2f} y={y_norm:.2f} -> starting pickup"
     )
+    brain.tuner.shared_params["table_pick_request_active"] = 0
     brain.start_take_item_sequence(auto_pick=True)
     _last_table_obj_trigger_time = now
     _table_obj_hits = 0
@@ -1647,6 +1651,7 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
         f"x_norm={x_norm:.2f} y_norm={y_norm:.2f} area={int(area)} "
         f"-> take_x={take_x:.3f} take_y={take_y:.3f} take_z={take_z:.3f}; starting pickup"
     )
+    brain.tuner.shared_params["table_pick_request_active"] = 0
     brain.start_take_item_sequence(auto_pick=True)
     _last_table_obj_trigger_time = now
     _table_obj_hits = 0

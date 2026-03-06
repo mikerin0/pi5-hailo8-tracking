@@ -169,6 +169,9 @@ TABLE_OBJECT_ARM_DELAY_SEC = 4.0
 TABLE_PICK_Z_OFFSET_M = -0.01
 # If servo 1 closes beyond this pulse during TABLE PICK, treat as a miss.
 TABLE_PICK_MISS_SERVO1_POS = 2140
+# When TABLE PICK is manually armed, ignore strict model class label filtering
+# (helps when small objects are misclassified, e.g., bottle -> toothbrush).
+TABLE_PICK_IGNORE_LABEL_FILTER = True
 
 # --- TABLE_CAM model-based object detection (Hailo) ---
 TABLE_OBJECT_MODEL_ENABLED = True
