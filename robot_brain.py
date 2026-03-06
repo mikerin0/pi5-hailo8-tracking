@@ -140,6 +140,14 @@ def _get_gripper_position_estimate():
         return int(_gripper_pos_est)
 
 
+def _set_pickup_status(text):
+    try:
+        if hasattr(tuner, "pickup_status_var"):
+            tuner.root.after(0, lambda: tuner.pickup_status_var.set(str(text)))
+    except Exception:
+        pass
+
+
 def set_holding_item(value):
     global _holding_item
     with _holding_item_lock:
@@ -156,6 +164,7 @@ def release_item_to_user(reason=""):
         return False
     move_servo(1, 1500, 700)
     set_holding_item(False)
+    _set_pickup_status("Pickup: released")
     send_to_crestron("ITEM_RELEASED")
     if reason:
         print(f"Item released ({reason})")
@@ -404,6 +413,7 @@ def _take_item_sequence(auto_pick=False):
     prev_mode = tuner.shared_params.get("camera_mode", "HIGH_CAM")
     prev_busy = tuner.shared_params.get("busy", 0)
     try:
+        _set_pickup_status("Pickup: running")
         tuner.shared_params["busy"] = 1
         switch_camera("TABLE_CAM")
 
@@ -446,6 +456,7 @@ def _take_item_sequence(auto_pick=False):
                 f"(>{int(getattr(config, 'TABLE_PICK_MISS_SERVO1_POS', 2140))})"
             )
             set_holding_item(False)
+            _set_pickup_status("Pickup: missed")
             move_servo(1, 1500, 700)
             reach_for_coordinate(take_x, take_y, take_lift_z, speed=900)
             send_to_crestron("ITEM_MISSED")
@@ -458,11 +469,13 @@ def _take_item_sequence(auto_pick=False):
         time.sleep(1.0)
 
         reach_for_coordinate(take_x, take_y, take_lift_z, speed=900)
+        _set_pickup_status("Pickup: item taken")
         say("Got it")
         send_to_crestron("ITEM_TAKEN")
         time.sleep(0.6)
     except Exception as e:
         print(f"Take-item sequence error: {e}")
+        _set_pickup_status("Pickup: error")
     finally:
         switch_camera(prev_mode)
         tuner.shared_params["busy"] = prev_busy
@@ -485,6 +498,7 @@ def release_item_manual():
         return
     move_servo(1, 1500, 700)
     set_holding_item(False)
+    _set_pickup_status("Pickup: released")
     send_to_crestron("ITEM_RELEASED")
     print("Manual release: gripper opened")
 
@@ -1088,6 +1102,8 @@ class RobotTuner:
               bg="lightblue", command=self._what_do_you_see_clicked).pack(pady=(4, 4))
         self.vision_summary_var = tk.StringVar(value="Vision: ready")
         tk.Label(status_col, textvariable=self.vision_summary_var, wraplength=260, justify="left").pack(pady=(0, 8))
+        self.pickup_status_var = tk.StringVar(value="Pickup: idle")
+        tk.Label(status_col, textvariable=self.pickup_status_var, wraplength=260, justify="left").pack(pady=(0, 8))
 
         tk.Label(status_col, text="Pickup Target", font=("Arial", 10, "bold")).pack(pady=(8, 2))
         self.object_target_var = tk.StringVar(value=self.shared_params.get("table_object_target_type", "any"))
