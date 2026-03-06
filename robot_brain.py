@@ -235,39 +235,43 @@ def tcp_listener():
                         except socket.timeout:
                             continue
                         if not data: break # Disconnect
-                        
+                        cmd = data.replace(" ", "_")
+
                         print(f"Incoming from Crestron: {data}")
                         # Handle commands received FROM Crestron (e.g., Alexa)
-                        if data == "HOME": go_home()
-                        elif data == "OPEN":
+                        if cmd == "HOME": go_home()
+                        elif cmd == "OPEN":
                             move_servo(1, 1500, 900)
                             set_holding_item(False)
-                        elif data == "CLOSE":
+                        elif cmd == "CLOSE":
                             move_servo(1, 2300, 900)
                             set_holding_item(True)
                             block_auto_release(getattr(config, "TABLE_HANDOFF_MIN_HOLD_SEC", 1.5))
-                        elif data == "HAND_OPEN":
+                        elif cmd == "HAND_OPEN":
                             print("Hand open received – gripper open")
                             move_servo(1, 1500, 900)
                             set_holding_item(False)
-                        elif data == "HAND_CLOSED":
+                        elif cmd == "HAND_CLOSED":
                             print("Hand closed received – gripper close")
                             move_servo(1, 2300, 900)
                             set_holding_item(True)
                             block_auto_release(getattr(config, "TABLE_HANDOFF_MIN_HOLD_SEC", 1.5))
-                        elif data in ("TAKE_ITEM", "TAKE", "HANDOFF"):
+                        elif cmd in ("TABLE_PICK", "TABLE_TAKE"):
+                            print("Table-pick sequence requested")
+                            start_table_pick_sequence()
+                        elif cmd in ("TAKE_ITEM", "TAKE", "HANDOFF"):
                             print("Take-item sequence requested")
                             start_take_item_sequence()
-                        elif data in ("EXIT", "SHUTDOWN", "STOP"):
+                        elif cmd in ("EXIT", "SHUTDOWN", "STOP"):
                             print("Shutdown requested")
                             shutdown_program()
-                        elif data in ("HIGH_CAM", "TABLE_CAM", "DUAL_CAM"):
-                            switch_camera(data)
-                        elif data == "FLAGPOLE":
+                        elif cmd in ("HIGH_CAM", "TABLE_CAM", "DUAL_CAM"):
+                            switch_camera(cmd)
+                        elif cmd == "FLAGPOLE":
                             tuner.shared_params["busy"] = 1
                             reach_for_coordinate(0.05, 0.0, 0.46, speed=500)
                             say("Flagpole Mode. Manual lock engaged.")
-                        elif data == "RESUME":
+                        elif cmd == "RESUME":
                             tuner.shared_params["busy"] = 1
                             if thermal_resume_callback:
                                 thermal_resume_callback()
@@ -450,9 +454,13 @@ def _take_item_sequence(auto_pick=False):
             move_servo(1, 1500, 900)
         # Approach from above first to avoid tipping the base by dipping too low.
         if auto_pick:
-            reach_for_manual_coordinate(take_x, take_y, take_lift_z, speed=700)
+            if not reach_for_manual_coordinate(take_x, take_y, take_lift_z, speed=700):
+                print("Auto-pick: stepped IK rejected lift approach, falling back to direct IK")
+                reach_for_coordinate(take_x, take_y, take_lift_z, speed=700)
             time.sleep(0.4)
-            reach_for_manual_coordinate(take_x, take_y, take_z, speed=550)
+            if not reach_for_manual_coordinate(take_x, take_y, take_z, speed=550):
+                print("Auto-pick: stepped IK rejected descend approach, falling back to direct IK")
+                reach_for_coordinate(take_x, take_y, take_z, speed=550)
         else:
             reach_for_coordinate(take_x, take_y, take_lift_z, speed=900)
             time.sleep(0.6)
@@ -643,13 +651,15 @@ def reach_for_manual_coordinate(x, y, z, speed=900):
 
     try:
         if not _safe_step_path(x0, y0, z0, x0, y0, max(z0, travel_z)):
-            return
+            return False
         if not _safe_step_path(x0, y0, max(z0, travel_z), x, y, travel_z):
-            return
-        _safe_step_path(x, y, travel_z, x, y, z)
+            return False
+        if not _safe_step_path(x, y, travel_z, x, y, z):
+            return False
+        return True
     except Exception as e:
         print(f"IK Error: {e}")
-        return
+        return False
 
 def say(text):
     """Non-blocking Piper TTS speech via PipeWire audio output."""
