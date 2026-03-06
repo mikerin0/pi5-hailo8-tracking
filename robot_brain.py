@@ -39,6 +39,7 @@ thermal_status_provider = None
 thermal_park_callback = None
 thermal_resume_callback = None
 servo_power_provider = None
+servo_power_up_callback = None
 vision_summary_provider = None
 table_model_update_callback = None
 table_pick_arm_callback = None
@@ -362,12 +363,29 @@ def switch_camera(mode):
 
 # --- 4. MOVEMENT LOGIC ---
 
+def _ensure_servo_power_for_motion():
+    callback = servo_power_up_callback
+    if callback is None:
+        return
+    provider = servo_power_provider
+    try:
+        power_state = provider() if provider is not None else True
+    except Exception:
+        power_state = None
+    if power_state is True:
+        return
+    try:
+        callback()
+    except Exception as e:
+        print(f"Servo power-up before motion failed: {e}")
+
 def move_servo(id, pos, time_ms=800):
     global _first_move_capped
     global _gripper_pos_est
     if ARM_MOVEMENT_DISABLED:
         print(f"ARM_MOVEMENT_DISABLED: servo {id} pos {pos} suppressed")
         return
+    _ensure_servo_power_for_motion()
     cap = int(getattr(config, "SAFE_STARTUP_FIRST_MOVE_SPEED_CAP", 0))
     if cap > 0 and not _first_move_capped:
         time_ms = max(int(time_ms), cap)
@@ -454,13 +472,9 @@ def _take_item_sequence(auto_pick=False):
             move_servo(1, 1500, 900)
         # Approach from above first to avoid tipping the base by dipping too low.
         if auto_pick:
-            if not reach_for_manual_coordinate(take_x, take_y, take_lift_z, speed=700):
-                print("Auto-pick: stepped IK rejected lift approach, falling back to direct IK")
-                reach_for_coordinate(take_x, take_y, take_lift_z, speed=700)
+            reach_for_coordinate(take_x, take_y, take_lift_z, speed=700)
             time.sleep(0.4)
-            if not reach_for_manual_coordinate(take_x, take_y, take_z, speed=550):
-                print("Auto-pick: stepped IK rejected descend approach, falling back to direct IK")
-                reach_for_coordinate(take_x, take_y, take_z, speed=550)
+            reach_for_coordinate(take_x, take_y, take_z, speed=550)
         else:
             reach_for_coordinate(take_x, take_y, take_lift_z, speed=900)
             time.sleep(0.6)

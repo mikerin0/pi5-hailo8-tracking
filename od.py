@@ -661,7 +661,13 @@ def _table_pick_steer_worker():
 
         speed = int(getattr(config, "TABLE_PICK_STEER_SPEED", 800))
         try:
-            brain.reach_for_manual_coordinate(tx, ty, tz, speed=speed)
+            use_stepped = bool(getattr(config, "TABLE_PICK_STEER_USE_STEPPED_IK", False))
+            if use_stepped:
+                moved = bool(brain.reach_for_manual_coordinate(tx, ty, tz, speed=speed))
+                if not moved:
+                    brain.reach_for_coordinate(tx, ty, tz, speed=speed)
+            else:
+                brain.reach_for_coordinate(tx, ty, tz, speed=speed)
             last_sent = (tx, ty, tz)
         except Exception as e:
             print(f"TABLE_PICK steer skipped: {e}")
@@ -2166,10 +2172,15 @@ if __name__ == "__main__":
     brain.thermal_park_callback = servo_integration.park_arm
     brain.thermal_resume_callback = servo_integration.resume_arm
     brain.servo_power_provider = servo_integration.is_servo_power_on
+    brain.servo_power_up_callback = servo_integration.power_up_servos
     brain.vision_summary_provider = get_vision_summary_text
     brain.table_model_update_callback = update_table_model_paths
     brain.table_pick_arm_callback = arm_table_pick_tracking
-    servo_integration.power_up_servos()
+    startup_power_on = bool(getattr(config, "SAFE_STARTUP_POWER_ON", not bool(getattr(config, "SAFE_STARTUP_NO_MOTION", True))))
+    if startup_power_on:
+        servo_integration.power_up_servos()
+    else:
+        print("Startup safety: servo power remains OFF until an explicit motion command")
     servo_integration.thermal_monitor.start()
     servo_integration.start_status_poller()
     _start_table_pick_steer_worker()

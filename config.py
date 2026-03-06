@@ -172,6 +172,10 @@ TABLE_PICK_MISS_SERVO1_POS = 2140
 # When TABLE PICK is manually armed, ignore strict model class label filtering
 # (helps when small objects are misclassified, e.g., bottle -> toothbrush).
 TABLE_PICK_IGNORE_LABEL_FILTER = True
+# Use stepped/manual IK safety path for TABLE PICK steering updates.
+# False uses direct coordinate IK to avoid strict pose-error rejections
+# during small tracking corrections.
+TABLE_PICK_STEER_USE_STEPPED_IK = False
 
 # --- TABLE_CAM model-based object detection (Hailo) ---
 TABLE_OBJECT_MODEL_ENABLED = True
@@ -186,6 +190,9 @@ TABLE_OBJECT_TARGET_LABEL = ""
 SAFE_STARTUP_NO_MOTION = True
 # Cap speed of the very first commanded move after startup (set <=0 to disable).
 SAFE_STARTUP_FIRST_MOVE_SPEED_CAP = 1500
+# When SAFE_STARTUP_NO_MOTION is True, keep servo torque/power off until first
+# explicit motion command (or RESUME).
+SAFE_STARTUP_POWER_ON = False
 
 # --- Pose gesture events to Crestron (outbound) ---
 # Uses yolov8 pose keypoints (wrists + shoulders). These are coarse gestures,
