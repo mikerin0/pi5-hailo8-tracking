@@ -54,23 +54,38 @@ def _discover_table_model_presets():
         ),
     }
     so_default = str(getattr(config, "TABLE_OBJECT_SO_PATH", "")).strip()
-    model_dirs = [
-        "/usr/local/hailo/resources/models/hailo8",
+    model_roots = [
         "/usr/local/hailo/resources/models",
+        "/usr/local/hailo/resources/models/hailo8",
     ]
-    for model_dir in model_dirs:
-        if not os.path.isdir(model_dir):
+    hef_by_name = {}
+    for root in model_roots:
+        if not os.path.isdir(root):
             continue
         try:
-            for filename in sorted(os.listdir(model_dir)):
-                if not filename.lower().endswith(".hef"):
-                    continue
-                hef_path = os.path.join(model_dir, filename)
-                label = filename
-                if label not in presets:
-                    presets[label] = (hef_path, so_default)
+            for dirpath, _dirnames, filenames in os.walk(root):
+                for filename in filenames:
+                    if not filename.lower().endswith(".hef"):
+                        continue
+                    full_path = os.path.join(dirpath, filename)
+                    if filename not in hef_by_name:
+                        hef_by_name[filename] = full_path
         except Exception:
             continue
+
+    preferred = [
+        ("YOLOv8s (recommended)", "yolov8s.hef"),
+        ("YOLOv8n (fast)", "yolov8n.hef"),
+        ("YOLOv8m (accurate)", "yolov8m.hef"),
+    ]
+    for label, filename in preferred:
+        path = hef_by_name.get(filename)
+        if path:
+            presets[label] = (path, so_default)
+
+    for filename in sorted(hef_by_name.keys()):
+        presets[filename] = (hef_by_name[filename], so_default)
+
     presets["Custom path"] = ("", "")
     return presets
 
@@ -937,6 +952,30 @@ class RobotTuner:
         if hasattr(self, "table_model_status_var"):
             self.table_model_status_var.set(f"AI model selected: {name}")
 
+    def _refresh_table_model_presets(self):
+        previous = ""
+        if hasattr(self, "table_model_preset_var"):
+            previous = str(self.table_model_preset_var.get() or "")
+        self.table_model_presets = _discover_table_model_presets()
+        names = list(self.table_model_presets.keys())
+        if not names:
+            return
+        if previous not in self.table_model_presets:
+            previous = "YOLOv8s (recommended)" if "YOLOv8s (recommended)" in self.table_model_presets else names[0]
+
+        if hasattr(self, "table_model_option_menu"):
+            menu = self.table_model_option_menu["menu"]
+            menu.delete(0, "end")
+            for name in names:
+                menu.add_command(
+                    label=name,
+                    command=tk._setit(self.table_model_preset_var, name, self._apply_table_model_preset),
+                )
+
+        if hasattr(self, "table_model_preset_var"):
+            self.table_model_preset_var.set(previous)
+        self._apply_table_model_preset(previous)
+
     def _save_tuner_params(self):
         try:
             with open(TUNER_PARAMS_PATH, "w", encoding="utf-8") as f:
@@ -1121,10 +1160,19 @@ class RobotTuner:
 
         tk.Label(status_col, text="AI Model (TABLE_CAM)", font=("Arial", 10, "bold")).pack(pady=(2, 2))
         preset_names = list(self.table_model_presets.keys())
-        default_preset = "Current AI model" if "Current AI model" in self.table_model_presets else preset_names[0]
+        default_preset = "YOLOv8s (recommended)" if "YOLOv8s (recommended)" in self.table_model_presets else (
+            "Current AI model" if "Current AI model" in self.table_model_presets else preset_names[0]
+        )
         self.table_model_preset_var = tk.StringVar(value=default_preset)
-        tk.OptionMenu(status_col, self.table_model_preset_var, *preset_names,
-              command=self._apply_table_model_preset).pack(pady=(0, 6), fill="x")
+        self.table_model_option_menu = tk.OptionMenu(
+            status_col,
+            self.table_model_preset_var,
+            *preset_names,
+            command=self._apply_table_model_preset,
+        )
+        self.table_model_option_menu.pack(pady=(0, 6), fill="x")
+        tk.Button(status_col, text="REFRESH MODELS", width=18,
+                  command=self._refresh_table_model_presets).pack(pady=(0, 6))
 
         tk.Label(status_col, text="Table HEF Path", font=("Arial", 10, "bold")).pack(pady=(2, 2))
         self.table_hef_var = tk.StringVar(value=self.shared_params.get("table_object_hef_path", ""))
