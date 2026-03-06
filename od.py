@@ -1846,6 +1846,10 @@ def camera_loop():
     global _table_obj_dualcam_disabled_warned
     while not brain.shutdown_event.is_set():
         mode = brain.tuner.shared_params.get("camera_mode", "HIGH_CAM")
+        if mode == "DUAL_CAM" and not bool(getattr(config, "ALLOW_DUAL_CAM", False)):
+            brain.tuner.shared_params["camera_mode"] = "HIGH_CAM"
+            mode = "HIGH_CAM"
+            print("Camera safety: DUAL_CAM disabled by config, forced HIGH_CAM")
         if mode != prev_mode:
             if mode == "TABLE_CAM":
                 _table_cam_enter_time = time.time()

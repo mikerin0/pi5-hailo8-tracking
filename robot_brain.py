@@ -292,6 +292,9 @@ def send_to_crestron(command):
 def switch_camera(mode):
     """Switch the active camera pipeline and update the GUI indicator."""
     global _last_camera_switch_time
+    if mode == "DUAL_CAM" and not bool(getattr(config, "ALLOW_DUAL_CAM", False)):
+        print("DUAL_CAM blocked by config (ALLOW_DUAL_CAM=False); using HIGH_CAM")
+        mode = "HIGH_CAM"
     now = time.time()
     if now - _last_camera_switch_time < 1.0:
         print(f"Camera switch ignored (debounce): {mode}")
