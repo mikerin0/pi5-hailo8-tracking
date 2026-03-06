@@ -553,6 +553,7 @@ _last_table_obj_block_log_time = 0.0
 _table_obj_center_hits = 0
 _last_table_obj_align_log_time = 0.0
 _table_cam_enter_time = 0.0
+_person_lost_park_in_progress = False
 
 
 def _detection_bbox_center_norm(detection):
@@ -649,7 +650,12 @@ def _table_object_model_callback(_pad, info, _user_data):
     except Exception:
         return Gst.PadProbeReturn.OK
 
-    target_label = str(getattr(config, "TABLE_OBJECT_TARGET_LABEL", "")).strip().lower()
+    target_label = str(
+        brain.tuner.shared_params.get(
+            "table_object_target_label",
+            getattr(config, "TABLE_OBJECT_TARGET_LABEL", ""),
+        )
+    ).strip().lower()
     min_conf = float(getattr(config, "TABLE_OBJECT_MIN_CONFIDENCE", 0.35))
 
     best = None
@@ -757,6 +763,30 @@ def _table_object_model_callback(_pad, info, _user_data):
     _table_obj_hits = 0
     _table_obj_center_hits = 0
     return Gst.PadProbeReturn.OK
+
+
+def _person_lost_park_async():
+    global _person_lost_park_in_progress
+    if _person_lost_park_in_progress:
+        return
+    park_cb = getattr(brain, "thermal_park_callback", None)
+    if not callable(park_cb):
+        print("WARNING: person-lost park callback unavailable")
+        return
+
+    _person_lost_park_in_progress = True
+
+    def _worker():
+        global _person_lost_park_in_progress
+        try:
+            park_cb()
+            print("Person-lost safety park complete")
+        except Exception as e:
+            print(f"Person-lost safety park failed: {e}")
+        finally:
+            _person_lost_park_in_progress = False
+
+    threading.Thread(target=_worker, daemon=True).start()
 
 
 def _point_confidence(point):
@@ -1218,10 +1248,10 @@ def app_callback(pad, info, user_data):
             if now - _last_seen_time > config.FLAGPOLE_TIMEOUT:
                 p = brain.tuner.get_params()
                 if p.get("busy", 0) == 0 and _search_mode is False:
-                    print("Pose tracking: person lost – entering standby (latched, RESUME required)")
+                    print("Pose tracking: person lost – parking arm + power off (RESUME required)")
                     brain.tuner.shared_params["busy"] = 1
                     _search_mode = True
-                    brain.reach_for_coordinate(0.06, 0.0, 0.40, speed=500)
+                    _person_lost_park_async()
 
     except Exception as e:
         print(f"app_callback error: {e}")

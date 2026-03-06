@@ -599,6 +599,7 @@ class RobotTuner:
             "table_release_radius": float(getattr(config, "TABLE_HANDOFF_RADIUS_NORM", 0.14)),
             "table_release_cooldown": float(getattr(config, "TABLE_HANDOFF_RELEASE_COOLDOWN", 2.5)),
             "table_object_target_type": str(getattr(config, "TABLE_OBJECT_TARGET_TYPE", "any")),
+            "table_object_target_label": str(getattr(config, "TABLE_OBJECT_TARGET_LABEL", "")),
         }
         self.scale_widgets = {}
         self._syncing_scales = False
@@ -973,6 +974,14 @@ class RobotTuner:
         tk.OptionMenu(status_col, self.object_target_var, *target_opts,
                   command=self.update_object_target_type).pack(pady=(0, 6), fill="x")
 
+          tk.Label(status_col, text="Model Label (optional)", font=("Arial", 10, "bold")).pack(pady=(2, 2))
+          self.object_label_var = tk.StringVar(value=self.shared_params.get("table_object_target_label", ""))
+          label_entry = tk.Entry(status_col, textvariable=self.object_label_var)
+          label_entry.pack(pady=(0, 2), fill="x")
+          label_entry.bind("<Return>", lambda _e: self.update_object_target_label())
+          tk.Button(status_col, text="SET LABEL", width=12,
+              command=self.update_object_target_label).pack(pady=(0, 8))
+
         thermal_btn_frame = tk.Frame(status_col)
         thermal_btn_frame.pack(pady=6)
         tk.Button(thermal_btn_frame, text="PARK ARM", width=12,
@@ -1019,6 +1028,11 @@ class RobotTuner:
 
     def update_object_target_type(self, value):
         self.shared_params["table_object_target_type"] = str(value).strip().lower()
+
+    def update_object_target_label(self, value=None):
+        if value is None and hasattr(self, "object_label_var"):
+            value = self.object_label_var.get()
+        self.shared_params["table_object_target_label"] = str(value or "").strip().lower()
 
 tuner = RobotTuner()
 
