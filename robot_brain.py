@@ -45,6 +45,35 @@ _first_move_capped = False
 TUNER_PARAMS_PATH = os.path.join(os.path.dirname(__file__), "tuner_params.json")
 WINDOW_STATE_PATH = os.path.join(os.path.dirname(__file__), "window_state.json")
 
+
+def _discover_table_model_presets():
+    presets = {
+        "Current config": (
+            str(getattr(config, "TABLE_OBJECT_HEF_PATH", "")),
+            str(getattr(config, "TABLE_OBJECT_SO_PATH", "")),
+        ),
+    }
+    so_default = str(getattr(config, "TABLE_OBJECT_SO_PATH", "")).strip()
+    model_dirs = [
+        "/usr/local/hailo/resources/models/hailo8",
+        "/usr/local/hailo/resources/models",
+    ]
+    for model_dir in model_dirs:
+        if not os.path.isdir(model_dir):
+            continue
+        try:
+            for filename in sorted(os.listdir(model_dir)):
+                if not filename.lower().endswith(".hef"):
+                    continue
+                hef_path = os.path.join(model_dir, filename)
+                label = f"Auto: {filename}"
+                if label not in presets:
+                    presets[label] = (hef_path, so_default)
+        except Exception:
+            continue
+    presets["Custom"] = ("", "")
+    return presets
+
 try:
     ser = serial.Serial(PORT, BAUD, timeout=1)
 except:
@@ -609,6 +638,7 @@ class RobotTuner:
         self._syncing_scales = False
         self.manual_mode = False 
         self.needs_camera_restart = False
+        self.table_model_presets = _discover_table_model_presets()
         self._window_geometry = None
         self._window_state = None
         self._load_tuner_params(silent=True)
@@ -861,6 +891,16 @@ class RobotTuner:
         if ok:
             say("Table model updated")
 
+    def _apply_table_model_preset(self, preset_name):
+        name = str(preset_name or "").strip()
+        hef_path, so_path = self.table_model_presets.get(name, ("", ""))
+        if hasattr(self, "table_hef_var"):
+            self.table_hef_var.set(str(hef_path or ""))
+        if hasattr(self, "table_so_var"):
+            self.table_so_var.set(str(so_path or ""))
+        if hasattr(self, "table_model_status_var"):
+            self.table_model_status_var.set(f"Preset loaded: {name}")
+
     def _save_tuner_params(self):
         try:
             with open(TUNER_PARAMS_PATH, "w", encoding="utf-8") as f:
@@ -1034,6 +1074,13 @@ class RobotTuner:
         tk.Button(status_col, text="SET LABEL", width=12,
               command=self.update_object_target_label).pack(pady=(0, 8))
 
+        tk.Label(status_col, text="Table Model Preset", font=("Arial", 10, "bold")).pack(pady=(2, 2))
+        preset_names = list(self.table_model_presets.keys())
+        default_preset = "Current config" if "Current config" in self.table_model_presets else preset_names[0]
+        self.table_model_preset_var = tk.StringVar(value=default_preset)
+        tk.OptionMenu(status_col, self.table_model_preset_var, *preset_names,
+              command=self._apply_table_model_preset).pack(pady=(0, 6), fill="x")
+
         tk.Label(status_col, text="Table HEF Path", font=("Arial", 10, "bold")).pack(pady=(2, 2))
         self.table_hef_var = tk.StringVar(value=self.shared_params.get("table_object_hef_path", ""))
         tk.Entry(status_col, textvariable=self.table_hef_var).pack(pady=(0, 4), fill="x")
@@ -1041,6 +1088,8 @@ class RobotTuner:
         tk.Label(status_col, text="Table Postproc .so", font=("Arial", 10, "bold")).pack(pady=(2, 2))
         self.table_so_var = tk.StringVar(value=self.shared_params.get("table_object_so_path", ""))
         tk.Entry(status_col, textvariable=self.table_so_var).pack(pady=(0, 4), fill="x")
+
+        self._apply_table_model_preset(default_preset)
 
         tk.Button(status_col, text="APPLY TABLE MODEL", width=18,
               bg="khaki", command=self._apply_table_model_clicked).pack(pady=(2, 4))
