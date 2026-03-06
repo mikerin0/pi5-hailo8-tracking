@@ -1700,17 +1700,18 @@ def _table_object_worker():
 
 def _table_preview_worker():
     """Run a table-camera preview in a separate rpicam window for DUAL_CAM mode."""
+    preview_cam_id = str(getattr(config, "ARDUCAM_DEVICE_ID", 0))
     preview_cmds = [
         [
             "rpicam-hello",
-            "--camera", "0",
+            "--camera", preview_cam_id,
             "--width", str(config.FRAME_W),
             "--height", str(config.FRAME_H),
             "-t", "0",
         ],
         [
             "libcamera-hello",
-            "--camera", "0",
+            "--camera", preview_cam_id,
             "--width", str(config.FRAME_W),
             "--height", str(config.FRAME_H),
             "-t", "0",
@@ -1858,7 +1859,10 @@ def camera_loop():
             # separate rpicam/libcamera preview process.
             cam_path = config.PI_CAMERA_DEVICE
             _stop_table_object_worker()
-            _start_table_preview()
+            if bool(getattr(config, "DUAL_CAM_TABLE_PREVIEW_ENABLED", False)):
+                _start_table_preview()
+            else:
+                _stop_table_preview()
             if bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False)) and not _table_obj_dualcam_disabled_warned:
                 print("WARNING: DUAL_CAM object worker disabled for stability (gst-libcamera crash guard)")
                 _table_obj_dualcam_disabled_warned = True

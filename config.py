@@ -7,6 +7,10 @@ PI_CAMERA_DEVICE = "/base/axi/pcie@1000120000/rp1/i2c@80000/imx708@1a"
 ARDUCAM_DEVICE = "/base/axi/pcie@1000120000/rp1/i2c@88000/imx708@1a"
 # USB ArduCAM fallback device index (used only when CSI port 0 is unavailable)
 ARDUCAM_DEVICE_ID = 0
+# DUAL_CAM preview safety:
+# Running an extra rpicam/libcamera preview process can trigger libcamera
+# segfaults on some Pi5 + dual-IMX708 setups. Keep disabled by default.
+DUAL_CAM_TABLE_PREVIEW_ENABLED = False
 
 # --- Hailo Pose Model Paths (yolov8m_pose + post-processing .so) ---
 HEF_PATH = "/usr/local/hailo/resources/models/hailo8/yolov8m_pose.hef"
