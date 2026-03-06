@@ -555,6 +555,10 @@ _last_table_obj_align_log_time = 0.0
 _table_cam_enter_time = 0.0
 _person_lost_park_in_progress = False
 _last_table_pick_steer_time = 0.0
+_table_pick_steer_lock = threading.Lock()
+_table_pick_steer_target = None
+_table_pick_steer_stop = threading.Event()
+_table_pick_steer_thread = None
 _vision_summary_lock = threading.Lock()
 _vision_summary_state = {
     "updated_at": 0.0,
@@ -607,8 +611,8 @@ def _extract_detection_labels(detections):
 
 
 def _maybe_update_table_pick_approach_pose(take_x, take_y, take_lift_z, now):
-    """During manual TABLE PICK arming, actively steer arm above target."""
-    global _last_table_pick_steer_time
+    """Queue TABLE PICK approach updates without blocking camera callback thread."""
+    global _last_table_pick_steer_time, _table_pick_steer_target
     if not bool(brain.tuner.shared_params.get("table_pick_request_active", 0)):
         return
     if brain.tuner.shared_params.get("camera_mode", "HIGH_CAM") != "TABLE_CAM":
@@ -620,12 +624,65 @@ def _maybe_update_table_pick_approach_pose(take_x, take_y, take_lift_z, now):
     if (now - _last_table_pick_steer_time) < min_period:
         return
 
-    speed = int(getattr(config, "TABLE_PICK_STEER_SPEED", 800))
-    try:
-        brain.reach_for_manual_coordinate(float(take_x), float(take_y), float(take_lift_z), speed=speed)
-        _last_table_pick_steer_time = now
-    except Exception as e:
-        print(f"TABLE_PICK steer skipped: {e}")
+    with _table_pick_steer_lock:
+        _table_pick_steer_target = (float(take_x), float(take_y), float(take_lift_z))
+    _last_table_pick_steer_time = now
+
+
+def _table_pick_steer_worker():
+    """Send low-rate arm steering updates for TABLE PICK on a background thread."""
+    global _table_pick_steer_target
+    last_sent = None
+    while not _table_pick_steer_stop.is_set() and not brain.shutdown_event.is_set():
+        if not bool(brain.tuner.shared_params.get("table_pick_request_active", 0)):
+            with _table_pick_steer_lock:
+                _table_pick_steer_target = None
+            last_sent = None
+            time.sleep(0.05)
+            continue
+        if brain.tuner.shared_params.get("camera_mode", "HIGH_CAM") != "TABLE_CAM":
+            time.sleep(0.05)
+            continue
+        if brain.tuner.shared_params.get("busy", 0) != 0 or brain.is_holding_item():
+            time.sleep(0.05)
+            continue
+
+        with _table_pick_steer_lock:
+            target = _table_pick_steer_target
+        if target is None:
+            time.sleep(0.05)
+            continue
+
+        tx, ty, tz = target
+        if last_sent is not None:
+            if abs(tx - last_sent[0]) < 0.002 and abs(ty - last_sent[1]) < 0.002 and abs(tz - last_sent[2]) < 0.002:
+                time.sleep(0.04)
+                continue
+
+        speed = int(getattr(config, "TABLE_PICK_STEER_SPEED", 800))
+        try:
+            brain.reach_for_manual_coordinate(tx, ty, tz, speed=speed)
+            last_sent = (tx, ty, tz)
+        except Exception as e:
+            print(f"TABLE_PICK steer skipped: {e}")
+        time.sleep(0.04)
+
+
+def _start_table_pick_steer_worker():
+    global _table_pick_steer_thread
+    if _table_pick_steer_thread and _table_pick_steer_thread.is_alive():
+        return
+    _table_pick_steer_stop.clear()
+    _table_pick_steer_thread = threading.Thread(target=_table_pick_steer_worker, daemon=True, name="TablePickSteer")
+    _table_pick_steer_thread.start()
+
+
+def _stop_table_pick_steer_worker():
+    global _table_pick_steer_thread
+    _table_pick_steer_stop.set()
+    if _table_pick_steer_thread and _table_pick_steer_thread.is_alive():
+        _table_pick_steer_thread.join(timeout=1.0)
+    _table_pick_steer_thread = None
 
 
 def update_table_model_paths(hef_path, so_path):
@@ -2115,6 +2172,7 @@ if __name__ == "__main__":
     servo_integration.power_up_servos()
     servo_integration.thermal_monitor.start()
     servo_integration.start_status_poller()
+    _start_table_pick_steer_worker()
     print("--- Servo thermal monitor started ---")
     camera_thread = threading.Thread(target=camera_loop, daemon=True, name="CameraLoop")
     camera_thread.start()
@@ -2129,6 +2187,7 @@ if __name__ == "__main__":
             print(f"WARNING: power_down_servos failed during shutdown: {e}")
         brain.request_shutdown()
         camera_thread.join(timeout=3.0)
+        _stop_table_pick_steer_worker()
         servo_integration.stop_status_poller()
         servo_integration.thermal_monitor.stop()
         print("--- Servo thermal monitor stopped ---")
