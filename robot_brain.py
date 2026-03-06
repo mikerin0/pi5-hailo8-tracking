@@ -982,10 +982,10 @@ class RobotTuner:
         self.thermal_status_var = tk.StringVar(value="Thermal monitor: initializing...")
         tk.Label(status_col, textvariable=self.thermal_status_var, wraplength=260, justify="left").pack(pady=4)
 
-                tk.Button(status_col, text="WHAT DO YOU SEE", width=18,
-                            bg="lightblue", command=self._what_do_you_see_clicked).pack(pady=(4, 4))
-                self.vision_summary_var = tk.StringVar(value="Vision: ready")
-                tk.Label(status_col, textvariable=self.vision_summary_var, wraplength=260, justify="left").pack(pady=(0, 8))
+        tk.Button(status_col, text="WHAT DO YOU SEE", width=18,
+              bg="lightblue", command=self._what_do_you_see_clicked).pack(pady=(4, 4))
+        self.vision_summary_var = tk.StringVar(value="Vision: ready")
+        tk.Label(status_col, textvariable=self.vision_summary_var, wraplength=260, justify="left").pack(pady=(0, 8))
 
         tk.Label(status_col, text="Pickup Target", font=("Arial", 10, "bold")).pack(pady=(8, 2))
         self.object_target_var = tk.StringVar(value=self.shared_params.get("table_object_target_type", "any"))
