@@ -950,6 +950,10 @@ class RobotTuner:
                   width=12, command=lambda: switch_camera("DUAL_CAM")).pack(side="left", padx=4)
         self.cam_mode_label = tk.Label(left_col, text="Mode: HIGH CAM", font=("Arial", 10))
         self.cam_mode_label.pack(pady=3)
+        dual_allowed = bool(getattr(config, "ALLOW_DUAL_CAM", False))
+        dual_text = "DUAL_CAM enabled" if dual_allowed else "DUAL_CAM disabled for stability"
+        dual_color = "darkgreen" if dual_allowed else "red"
+        tk.Label(left_col, text=dual_text, fg=dual_color, font=("Arial", 10, "bold")).pack(pady=(0, 6))
 
         # --- Calibration Jog (left column) ---
         tk.Label(left_col, text="--- CALIBRATION JOG ---", font=("Arial", 12, "bold")).pack(pady=5)
