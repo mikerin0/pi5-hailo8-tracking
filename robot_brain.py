@@ -135,6 +135,11 @@ def _is_gripper_open_enough(target_open=1500, tolerance=20):
         return _gripper_pos_est <= (int(target_open) + int(tolerance))
 
 
+def _get_gripper_position_estimate():
+    with _gripper_motion_lock:
+        return int(_gripper_pos_est)
+
+
 def set_holding_item(value):
     global _holding_item
     with _holding_item_lock:
@@ -434,6 +439,20 @@ def _take_item_sequence(auto_pick=False):
             time.sleep(take_wait_s)
 
         move_servo(1, 2300, 900)
+        close_pos = _get_gripper_position_estimate()
+        if auto_pick and close_pos > int(getattr(config, "TABLE_PICK_MISS_SERVO1_POS", 2140)):
+            print(
+                f"Auto-pick miss detected: gripper closed to {close_pos} "
+                f"(>{int(getattr(config, 'TABLE_PICK_MISS_SERVO1_POS', 2140))})"
+            )
+            set_holding_item(False)
+            move_servo(1, 1500, 700)
+            reach_for_coordinate(take_x, take_y, take_lift_z, speed=900)
+            send_to_crestron("ITEM_MISSED")
+            say("Missed it")
+            time.sleep(0.4)
+            return
+
         set_holding_item(True)
         block_auto_release(getattr(config, "TABLE_HANDOFF_TAKE_LOCKOUT_SEC", 4.0))
         time.sleep(1.0)

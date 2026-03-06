@@ -162,6 +162,8 @@ TABLE_OBJECT_TARGET_TYPE = "any"
 TABLE_OBJECT_ARM_DELAY_SEC = 4.0
 # Extra Z offset applied only to autonomous TABLE PICK (meters).
 TABLE_PICK_Z_OFFSET_M = -0.01
+# If servo 1 closes beyond this pulse during TABLE PICK, treat as a miss.
+TABLE_PICK_MISS_SERVO1_POS = 2140
 
 # --- TABLE_CAM model-based object detection (Hailo) ---
 TABLE_OBJECT_MODEL_ENABLED = True
