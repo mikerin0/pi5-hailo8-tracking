@@ -623,6 +623,24 @@ def update_table_model_paths(hef_path, so_path):
     return True, "Table model updated; restarting camera pipeline"
 
 
+def arm_table_pick_tracking():
+    """Arm TABLE_CAM object tracking so pickup starts after stable alignment."""
+    global _table_obj_hits, _table_obj_center_hits
+    global _last_table_obj_trigger_time, _last_table_obj_block_log_time, _last_table_obj_align_log_time
+    global _table_cam_enter_time
+
+    config.TABLE_OBJECT_PICKUP_ENABLED = True
+    _table_obj_hits = 0
+    _table_obj_center_hits = 0
+    _last_table_obj_trigger_time = 0.0
+    _last_table_obj_block_log_time = 0.0
+    _last_table_obj_align_log_time = 0.0
+
+    arm_delay = max(0.0, float(getattr(config, "TABLE_OBJECT_ARM_DELAY_SEC", 4.0)))
+    _table_cam_enter_time = time.time() - arm_delay - 0.1
+    return "TABLE PICK armed: tracking object for alignment before grab"
+
+
 def get_vision_summary_text():
     with _vision_summary_lock:
         updated_at = float(_vision_summary_state.get("updated_at", 0.0))
@@ -2063,6 +2081,7 @@ if __name__ == "__main__":
     brain.servo_power_provider = servo_integration.is_servo_power_on
     brain.vision_summary_provider = get_vision_summary_text
     brain.table_model_update_callback = update_table_model_paths
+    brain.table_pick_arm_callback = arm_table_pick_tracking
     servo_integration.power_up_servos()
     servo_integration.thermal_monitor.start()
     servo_integration.start_status_poller()

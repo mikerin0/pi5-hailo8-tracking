@@ -41,6 +41,7 @@ thermal_resume_callback = None
 servo_power_provider = None
 vision_summary_provider = None
 table_model_update_callback = None
+table_pick_arm_callback = None
 _first_move_capped = False
 TUNER_PARAMS_PATH = os.path.join(os.path.dirname(__file__), "tuner_params.json")
 WINDOW_STATE_PATH = os.path.join(os.path.dirname(__file__), "window_state.json")
@@ -502,9 +503,21 @@ def start_take_item_sequence(auto_pick=False):
 
 
 def start_table_pick_sequence():
-    """Switch to TABLE_CAM and run autonomous pickup routine."""
+    """Switch to TABLE_CAM and arm detection-driven tracking before pickup."""
     switch_camera("TABLE_CAM")
-    start_take_item_sequence(auto_pick=True)
+    tuner.shared_params["busy"] = 0
+    _set_pickup_status("Pickup: tracking target")
+    callback = table_pick_arm_callback
+    if callback is not None:
+        try:
+            msg = callback()
+            if msg:
+                print(msg)
+        except Exception as e:
+            print(f"Table-pick arm callback failed: {e}")
+    else:
+        config.TABLE_OBJECT_PICKUP_ENABLED = True
+        print("TABLE PICK armed: waiting for object alignment before pickup")
 
 
 def release_item_manual():
