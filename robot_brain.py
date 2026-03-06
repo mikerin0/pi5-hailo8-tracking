@@ -40,6 +40,7 @@ thermal_park_callback = None
 thermal_resume_callback = None
 servo_power_provider = None
 vision_summary_provider = None
+table_model_update_callback = None
 _first_move_capped = False
 TUNER_PARAMS_PATH = os.path.join(os.path.dirname(__file__), "tuner_params.json")
 WINDOW_STATE_PATH = os.path.join(os.path.dirname(__file__), "window_state.json")
@@ -601,6 +602,8 @@ class RobotTuner:
             "table_release_cooldown": float(getattr(config, "TABLE_HANDOFF_RELEASE_COOLDOWN", 2.5)),
             "table_object_target_type": str(getattr(config, "TABLE_OBJECT_TARGET_TYPE", "any")),
             "table_object_target_label": str(getattr(config, "TABLE_OBJECT_TARGET_LABEL", "")),
+            "table_object_hef_path": str(getattr(config, "TABLE_OBJECT_HEF_PATH", "")),
+            "table_object_so_path": str(getattr(config, "TABLE_OBJECT_SO_PATH", "")),
         }
         self.scale_widgets = {}
         self._syncing_scales = False
@@ -828,6 +831,36 @@ class RobotTuner:
             self.vision_summary_var.set(summary)
         say(summary)
 
+    def _apply_table_model_clicked(self):
+        callback = table_model_update_callback
+        hef_path = ""
+        so_path = ""
+        if hasattr(self, "table_hef_var"):
+            hef_path = str(self.table_hef_var.get() or "").strip()
+        if hasattr(self, "table_so_var"):
+            so_path = str(self.table_so_var.get() or "").strip()
+
+        self.shared_params["table_object_hef_path"] = hef_path
+        self.shared_params["table_object_so_path"] = so_path
+
+        if callback is None:
+            msg = "Table model update unavailable"
+            print(msg)
+            if hasattr(self, "table_model_status_var"):
+                self.table_model_status_var.set(msg)
+            return
+
+        try:
+            ok, msg = callback(hef_path, so_path)
+        except Exception as e:
+            ok, msg = False, f"Table model update failed: {e}"
+
+        print(msg)
+        if hasattr(self, "table_model_status_var"):
+            self.table_model_status_var.set(msg)
+        if ok:
+            say("Table model updated")
+
     def _save_tuner_params(self):
         try:
             with open(TUNER_PARAMS_PATH, "w", encoding="utf-8") as f:
@@ -1000,6 +1033,20 @@ class RobotTuner:
         label_entry.bind("<Return>", lambda _e: self.update_object_target_label())
         tk.Button(status_col, text="SET LABEL", width=12,
               command=self.update_object_target_label).pack(pady=(0, 8))
+
+        tk.Label(status_col, text="Table HEF Path", font=("Arial", 10, "bold")).pack(pady=(2, 2))
+        self.table_hef_var = tk.StringVar(value=self.shared_params.get("table_object_hef_path", ""))
+        tk.Entry(status_col, textvariable=self.table_hef_var).pack(pady=(0, 4), fill="x")
+
+        tk.Label(status_col, text="Table Postproc .so", font=("Arial", 10, "bold")).pack(pady=(2, 2))
+        self.table_so_var = tk.StringVar(value=self.shared_params.get("table_object_so_path", ""))
+        tk.Entry(status_col, textvariable=self.table_so_var).pack(pady=(0, 4), fill="x")
+
+        tk.Button(status_col, text="APPLY TABLE MODEL", width=18,
+              bg="khaki", command=self._apply_table_model_clicked).pack(pady=(2, 4))
+        self.table_model_status_var = tk.StringVar(value="Table model: ready")
+        tk.Label(status_col, textvariable=self.table_model_status_var,
+              wraplength=260, justify="left").pack(pady=(0, 8))
 
         thermal_btn_frame = tk.Frame(status_col)
         thermal_btn_frame.pack(pady=6)

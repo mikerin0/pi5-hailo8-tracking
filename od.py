@@ -587,6 +587,24 @@ def _extract_detection_labels(detections):
     return labels
 
 
+def update_table_model_paths(hef_path, so_path):
+    """Update TABLE_CAM model paths at runtime and request pipeline restart."""
+    hef = os.path.abspath(str(hef_path or "").strip())
+    so = os.path.abspath(str(so_path or "").strip())
+    if not hef or not os.path.isfile(hef):
+        return False, f"Invalid HEF path: {hef or '(empty)'}"
+    if not so or not os.path.isfile(so):
+        return False, f"Invalid postprocess .so path: {so or '(empty)'}"
+
+    config.TABLE_OBJECT_HEF_PATH = hef
+    config.TABLE_OBJECT_SO_PATH = so
+    config.TABLE_OBJECT_MODEL_ENABLED = True
+    config.TABLE_OBJECT_PICKUP_ENABLED = True
+
+    _restart_event.set()
+    return True, "Table model updated; restarting camera pipeline"
+
+
 def get_vision_summary_text():
     with _vision_summary_lock:
         updated_at = float(_vision_summary_state.get("updated_at", 0.0))
@@ -2022,6 +2040,7 @@ if __name__ == "__main__":
     brain.thermal_resume_callback = servo_integration.resume_arm
     brain.servo_power_provider = servo_integration.is_servo_power_on
     brain.vision_summary_provider = get_vision_summary_text
+    brain.table_model_update_callback = update_table_model_paths
     servo_integration.power_up_servos()
     servo_integration.thermal_monitor.start()
     servo_integration.start_status_poller()
