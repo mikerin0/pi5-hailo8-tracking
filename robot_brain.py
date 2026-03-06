@@ -974,12 +974,12 @@ class RobotTuner:
         tk.OptionMenu(status_col, self.object_target_var, *target_opts,
                   command=self.update_object_target_type).pack(pady=(0, 6), fill="x")
 
-          tk.Label(status_col, text="Model Label (optional)", font=("Arial", 10, "bold")).pack(pady=(2, 2))
-          self.object_label_var = tk.StringVar(value=self.shared_params.get("table_object_target_label", ""))
-          label_entry = tk.Entry(status_col, textvariable=self.object_label_var)
-          label_entry.pack(pady=(0, 2), fill="x")
-          label_entry.bind("<Return>", lambda _e: self.update_object_target_label())
-          tk.Button(status_col, text="SET LABEL", width=12,
+        tk.Label(status_col, text="Model Label (optional)", font=("Arial", 10, "bold")).pack(pady=(2, 2))
+        self.object_label_var = tk.StringVar(value=self.shared_params.get("table_object_target_label", ""))
+        label_entry = tk.Entry(status_col, textvariable=self.object_label_var)
+        label_entry.pack(pady=(0, 2), fill="x")
+        label_entry.bind("<Return>", lambda _e: self.update_object_target_label())
+        tk.Button(status_col, text="SET LABEL", width=12,
               command=self.update_object_target_label).pack(pady=(0, 8))
 
         thermal_btn_frame = tk.Frame(status_col)
