@@ -554,6 +554,63 @@ _table_obj_center_hits = 0
 _last_table_obj_align_log_time = 0.0
 _table_cam_enter_time = 0.0
 _person_lost_park_in_progress = False
+_vision_summary_lock = threading.Lock()
+_vision_summary_state = {
+    "updated_at": 0.0,
+    "mode": "HIGH_CAM",
+    "labels": {},
+}
+
+
+def _update_vision_summary(labels, mode=None):
+    now = time.time()
+    mode_name = mode or brain.tuner.shared_params.get("camera_mode", "HIGH_CAM")
+    norm = {}
+    for raw_label in labels or []:
+        label = str(raw_label or "").strip().lower()
+        if not label:
+            continue
+        norm[label] = int(norm.get(label, 0)) + 1
+    with _vision_summary_lock:
+        _vision_summary_state["updated_at"] = now
+        _vision_summary_state["mode"] = str(mode_name)
+        _vision_summary_state["labels"] = norm
+
+
+def _extract_detection_labels(detections):
+    labels = []
+    for det in detections or []:
+        try:
+            labels.append(det.get_label())
+        except Exception:
+            continue
+    return labels
+
+
+def get_vision_summary_text():
+    with _vision_summary_lock:
+        updated_at = float(_vision_summary_state.get("updated_at", 0.0))
+        mode = str(_vision_summary_state.get("mode", "HIGH_CAM"))
+        labels = dict(_vision_summary_state.get("labels", {}))
+
+    age = max(0.0, time.time() - updated_at)
+    if not labels:
+        if age > 3.0:
+            return f"I do not see anything right now on {mode}."
+        return f"I do not currently detect objects on {mode}."
+
+    ordered = sorted(labels.items(), key=lambda item: (-int(item[1]), item[0]))
+    top_items = ordered[:4]
+    parts = []
+    for name, count in top_items:
+        if int(count) > 1:
+            parts.append(f"{name} x{int(count)}")
+        else:
+            parts.append(name)
+    summary = ", ".join(parts)
+    if age > 2.5:
+        return f"Last seen on {mode}: {summary}."
+    return f"I see {summary} on {mode}."
 
 
 def _detection_bbox_center_norm(detection):
@@ -649,6 +706,8 @@ def _table_object_model_callback(_pad, info, _user_data):
         detections = roi.get_objects_typed(hailo.HAILO_DETECTION)
     except Exception:
         return Gst.PadProbeReturn.OK
+
+    _update_vision_summary(_extract_detection_labels(detections), mode="TABLE_CAM")
 
     target_label = str(
         brain.tuner.shared_params.get(
@@ -1179,6 +1238,10 @@ def app_callback(pad, info, user_data):
     try:
         roi = hailo.get_roi_from_buffer(buffer)
         detections = roi.get_objects_typed(hailo.HAILO_DETECTION)
+        _update_vision_summary(
+            _extract_detection_labels(detections),
+            mode=brain.tuner.shared_params.get("camera_mode", "HIGH_CAM"),
+        )
         person = next(
             (d for d in detections if d.get_label() == "person"), None
         )
@@ -1474,6 +1537,8 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
         _table_obj_hits = 0
         _table_obj_center_hits = 0
         return
+
+    _update_vision_summary([target_type if target_type != "any" else "object"], mode="TABLE_CAM")
 
     _table_obj_hits += 1
     frames_required = max(1, int(getattr(config, "TABLE_OBJECT_FRAMES_REQUIRED", 5)))
@@ -1956,6 +2021,7 @@ if __name__ == "__main__":
     brain.thermal_park_callback = servo_integration.park_arm
     brain.thermal_resume_callback = servo_integration.resume_arm
     brain.servo_power_provider = servo_integration.is_servo_power_on
+    brain.vision_summary_provider = get_vision_summary_text
     servo_integration.power_up_servos()
     servo_integration.thermal_monitor.start()
     servo_integration.start_status_poller()

@@ -39,6 +39,7 @@ thermal_status_provider = None
 thermal_park_callback = None
 thermal_resume_callback = None
 servo_power_provider = None
+vision_summary_provider = None
 _first_move_capped = False
 TUNER_PARAMS_PATH = os.path.join(os.path.dirname(__file__), "tuner_params.json")
 WINDOW_STATE_PATH = os.path.join(os.path.dirname(__file__), "window_state.json")
@@ -814,6 +815,19 @@ class RobotTuner:
         self._save_window_state(silent=True)
         shutdown_program()
 
+    def _what_do_you_see_clicked(self):
+        provider = vision_summary_provider
+        if provider is None:
+            summary = "Vision summary is unavailable."
+        else:
+            try:
+                summary = str(provider() or "I do not have a current vision summary.").strip()
+            except Exception as e:
+                summary = f"Vision summary error: {e}"
+        if hasattr(self, "vision_summary_var"):
+            self.vision_summary_var.set(summary)
+        say(summary)
+
     def _save_tuner_params(self):
         try:
             with open(TUNER_PARAMS_PATH, "w", encoding="utf-8") as f:
@@ -967,6 +981,11 @@ class RobotTuner:
         tk.Label(status_col, textvariable=self.shelly_power_var, justify="left").pack(pady=2)
         self.thermal_status_var = tk.StringVar(value="Thermal monitor: initializing...")
         tk.Label(status_col, textvariable=self.thermal_status_var, wraplength=260, justify="left").pack(pady=4)
+
+          tk.Button(status_col, text="WHAT DO YOU SEE", width=18,
+              bg="lightblue", command=self._what_do_you_see_clicked).pack(pady=(4, 4))
+          self.vision_summary_var = tk.StringVar(value="Vision: ready")
+          tk.Label(status_col, textvariable=self.vision_summary_var, wraplength=260, justify="left").pack(pady=(0, 8))
 
         tk.Label(status_col, text="Pickup Target", font=("Arial", 10, "bold")).pack(pady=(8, 2))
         self.object_target_var = tk.StringVar(value=self.shared_params.get("table_object_target_type", "any"))
