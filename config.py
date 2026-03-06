@@ -7,6 +7,11 @@ PI_CAMERA_DEVICE = "/base/axi/pcie@1000120000/rp1/i2c@80000/imx708@1a"
 ARDUCAM_DEVICE = "/base/axi/pcie@1000120000/rp1/i2c@88000/imx708@1a"
 # USB ArduCAM fallback device index (used only when CSI port 0 is unavailable)
 ARDUCAM_DEVICE_ID = 0
+# Camera backend for GStreamer source: "libcamera" (default) or "v4l2".
+# If you hit libcamera native segfaults, switch to "v4l2".
+CAMERA_BACKEND = "libcamera"
+PI_CAMERA_V4L2_DEVICE = "/dev/video0"
+ARDUCAM_V4L2_DEVICE = "/dev/video1"
 # Hard safety gate for unstable dual-camera/libcamera combinations.
 # Keep False unless your specific image + hardware proves stable.
 ALLOW_DUAL_CAM = False

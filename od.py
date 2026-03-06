@@ -562,6 +562,24 @@ _vision_summary_state = {
 }
 
 
+def _build_camera_src_segment(mode, cam_path):
+    backend = str(getattr(config, "CAMERA_BACKEND", "libcamera")).strip().lower()
+    if backend == "v4l2":
+        if mode == "TABLE_CAM":
+            dev = str(getattr(config, "ARDUCAM_V4L2_DEVICE", "/dev/video1"))
+        else:
+            dev = str(getattr(config, "PI_CAMERA_V4L2_DEVICE", "/dev/video0"))
+        return (
+            f"v4l2src device={dev} ! "
+            f"video/x-raw,width={config.CAM_SENSOR_W},height={config.CAM_SENSOR_H} ! "
+        )
+
+    return (
+        f"libcamerasrc camera-name={cam_path} ! "
+        f"video/x-raw,format=NV12,width={config.CAM_SENSOR_W},height={config.CAM_SENSOR_H} ! "
+    )
+
+
 def _update_vision_summary(labels, mode=None):
     now = time.time()
     mode_name = mode or brain.tuner.shared_params.get("camera_mode", "HIGH_CAM")
@@ -1879,6 +1897,7 @@ def camera_loop():
 
         pipe = None
         try:
+            src_segment = _build_camera_src_segment(mode, cam_path)
             # Capture at IMX708 native 16:9, downscale to the 640×640 square the
             # yolov8m_pose network expects.  hailotracker provides consistent IDs
             # across frames; hailooverlay draws skeleton overlays on the preview.
@@ -1906,8 +1925,7 @@ def camera_loop():
 
             if finger_branch_enabled:
                 launch_str = (
-                    f"libcamerasrc camera-name={cam_path} ! "
-                    f"video/x-raw,format=NV12,width={config.CAM_SENSOR_W},height={config.CAM_SENSOR_H} ! "
+                    src_segment +
                     f"videoconvert ! videoscale ! "
                     f"video/x-raw,format=RGB,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
                     f"hailonet hef-path={HEF_PATH} force-writable=true ! "
@@ -1922,8 +1940,7 @@ def camera_loop():
                 )
             elif table_model_branch_enabled:
                 launch_str = (
-                    f"libcamerasrc camera-name={cam_path} ! "
-                    f"video/x-raw,format=NV12,width={config.CAM_SENSOR_W},height={config.CAM_SENSOR_H} ! "
+                    src_segment +
                     f"videoconvert ! videoscale ! "
                     f"video/x-raw,format=RGB,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
                     f"queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
@@ -1933,8 +1950,7 @@ def camera_loop():
                 )
             elif table_object_branch_enabled:
                 launch_str = (
-                    f"libcamerasrc camera-name={cam_path} ! "
-                    f"video/x-raw,format=NV12,width={config.CAM_SENSOR_W},height={config.CAM_SENSOR_H} ! "
+                    src_segment +
                     f"videoconvert ! videoscale ! "
                     f"video/x-raw,format=RGB,width={config.FRAME_W},height={config.FRAME_H} ! "
                     f"tee name=t "
@@ -1945,9 +1961,7 @@ def camera_loop():
                 )
             else:
                 launch_str = (
-                    f"libcamerasrc camera-name={cam_path} ! "
-                    f"video/x-raw,format=NV12,"
-                    f"width={config.CAM_SENSOR_W},height={config.CAM_SENSOR_H} ! "
+                    src_segment +
                     f"videoconvert ! videoscale ! "
                     f"video/x-raw,format=RGB,"
                     f"width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
