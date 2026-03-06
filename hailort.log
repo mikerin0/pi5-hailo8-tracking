@@ -5649,3 +5649,19 @@
 [2026-03-06 08:57:40.129] [126637] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] NmsPPMuxEl0YOLOV8-Post-Process | inputs: MultiPushQEl0YOLOV8-Post-Process[0] | outputs: LastAsyncEl0NmsPPMuxEl0YOLOV8-Post-Process
 [2026-03-06 08:57:40.129] [126637] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl0NmsPPMuxEl0YOLOV8-Post-Process | inputs: NmsPPMuxEl0YOLOV8-Post-Process[0] | outputs: user
 [2026-03-06 08:57:40.207] [126714] [HailoRT] [info] [hef.cpp:1929] [get_network_group_and_network_name] No name was given. Addressing all networks of default network_group: yolov11x
+[2026-03-06 08:59:41.917] [126637] [HailoRT] [info] [async_infer_runner.cpp:86] [shutdown] Pipeline was aborted. Shutting it down
+[2026-03-06 08:59:41.917] [126735] [HailoRT] [info] [queue_elements.cpp:497] [operator()] Thread in element EntryPushQEl0yolov11x/input_layer1 is not running anymore, exiting..
+[2026-03-06 08:59:41.918] [126723] [HailoRT] [info] [network_group.cpp:857] [operator()] Infer request was aborted by user
+[2026-03-06 08:59:41.918] [126723] [HailoRT] [info] [network_group.cpp:857] [operator()] Infer request was aborted by user
+[2026-03-06 08:59:41.918] [126723] [HailoRT] [info] [network_group.cpp:857] [operator()] Infer request was aborted by user
+[2026-03-06 08:59:41.918] [126723] [HailoRT] [info] [network_group.cpp:857] [operator()] Infer request was aborted by user
+[2026-03-06 08:59:41.918] [126637] [HailoRT] [info] [queue_elements.cpp:1131] [execute_deactivate] enqueue() in element MultiPushQEl0YOLOV8-Post-Process was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-06 08:59:41.918] [126637] [HailoRT] [info] [queue_elements.cpp:1131] [execute_deactivate] enqueue() in element MultiPushQEl0YOLOV8-Post-Process was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-06 08:59:41.918] [126637] [HailoRT] [info] [queue_elements.cpp:1131] [execute_deactivate] enqueue() in element MultiPushQEl0YOLOV8-Post-Process was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-06 08:59:41.918] [126637] [HailoRT] [info] [queue_elements.cpp:1131] [execute_deactivate] enqueue() in element MultiPushQEl0YOLOV8-Post-Process was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-06 08:59:41.918] [126637] [HailoRT] [info] [queue_elements.cpp:1131] [execute_deactivate] enqueue() in element MultiPushQEl0YOLOV8-Post-Process was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-06 08:59:41.918] [126637] [HailoRT] [info] [queue_elements.cpp:1131] [execute_deactivate] enqueue() in element MultiPushQEl0YOLOV8-Post-Process was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-06 08:59:41.918] [126637] [HailoRT] [info] [queue_elements.cpp:570] [execute_deactivate] enqueue() in element PushQEl0yolov11x/input_layer1 was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-06 08:59:41.918] [126637] [HailoRT] [info] [queue_elements.cpp:570] [execute_deactivate] enqueue() in element EntryPushQEl0yolov11x/input_layer1 was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-06 08:59:41.919] [126637] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element EntryPushQEl0yolov11x/input_layer1 has 0 frames in his Queue on destruction
+[2026-03-06 08:59:41.919] [126637] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element PushQEl0yolov11x/input_layer1 has 0 frames in his Queue on destruction

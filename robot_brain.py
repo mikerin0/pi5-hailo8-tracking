@@ -946,11 +946,14 @@ class RobotTuner:
                   width=12, command=lambda: switch_camera("HIGH_CAM")).pack(side="left", padx=4)
         tk.Button(cam_frame, text="TABLE CAM\n(Manipulation)", bg="green", fg="white",
                   width=12, command=lambda: switch_camera("TABLE_CAM")).pack(side="left", padx=4)
-        tk.Button(cam_frame, text="DUAL CAM\n(Track+Preview)", bg="purple", fg="white",
-                  width=12, command=lambda: switch_camera("DUAL_CAM")).pack(side="left", padx=4)
+        dual_allowed = bool(getattr(config, "ALLOW_DUAL_CAM", False))
+        dual_btn_bg = "purple" if dual_allowed else "gray"
+        dual_btn_fg = "white" if dual_allowed else "black"
+        dual_btn_state = "normal" if dual_allowed else "disabled"
+        tk.Button(cam_frame, text="DUAL CAM\n(Track+Preview)", bg=dual_btn_bg, fg=dual_btn_fg,
+              state=dual_btn_state, width=12, command=lambda: switch_camera("DUAL_CAM")).pack(side="left", padx=4)
         self.cam_mode_label = tk.Label(left_col, text="Mode: HIGH CAM", font=("Arial", 10))
         self.cam_mode_label.pack(pady=3)
-        dual_allowed = bool(getattr(config, "ALLOW_DUAL_CAM", False))
         dual_text = "DUAL_CAM enabled" if dual_allowed else "DUAL_CAM disabled for stability"
         dual_color = "darkgreen" if dual_allowed else "red"
         tk.Label(left_col, text=dual_text, fg=dual_color, font=("Arial", 10, "bold")).pack(pady=(0, 6))
