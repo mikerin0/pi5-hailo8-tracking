@@ -475,6 +475,14 @@ def get_thermal_status():
         return dict(_status_cache)
 
 
+def get_last_commanded_pose():
+    """Return last commanded pulse snapshot from the servo controller."""
+    try:
+        return controller.get_commanded_positions()
+    except Exception:
+        return {}
+
+
 def park_arm():
     """Manually park the arm at the configured thermal rest position."""
     thermal_monitor.park_now()

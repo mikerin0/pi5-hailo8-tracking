@@ -306,6 +306,10 @@ STARTUP_ABS_SERVO_POSITIONS = {
 # (busy=1) until operator explicitly presses RESUME.
 STARTUP_ENABLE_TRACKING_ON_STEP3 = False
 
+# Tracking re-enable safety: hold arm motion briefly after busy goes 1->0
+# so IK state can be re-seeded and first-frame jumps are avoided.
+TRACKING_RESUME_WARMUP_SEC = 1.5
+
 # --- Resume motion behavior ---
 # On RESUME, move to a known absolute HOME pose slowly before tracking.
 RESUME_USE_HOME_POSE = True

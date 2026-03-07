@@ -261,6 +261,11 @@ class LSC6Controller:
         """Return {servo_id: deviation_or_None} for all servos."""
         return {sid: self.get_deviation(sid) for sid in ALL_SERVO_IDS}
 
+    def get_commanded_positions(self):
+        """Return a snapshot of the last commanded pulse for each servo."""
+        with self._cmd_lock:
+            return dict(self._commanded)
+
     def close(self):
         """Close the serial port (only if this instance owns it)."""
         if self._owns_ser and self._ser and self._ser.is_open:

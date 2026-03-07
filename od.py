@@ -245,6 +245,34 @@ def _seed_brain_ik_from_servo_readback(retry_sec=0.0, retry_interval_sec=0.25):
             return False
         time.sleep(interval)
 
+
+def _seed_brain_ik_from_last_commanded():
+    """Fallback IK seeding from last commanded servo pulses."""
+    try:
+        commanded = servo_integration.get_last_commanded_pose() or {}
+    except Exception as e:
+        _startup_log(f"IK seed (commanded): failed: {e}")
+        return False
+
+    try:
+        p6 = commanded.get(6)
+        p5 = commanded.get(5)
+        p4 = commanded.get(4)
+        p3 = commanded.get(3)
+        if None in (p6, p5, p4, p3):
+            _startup_log(f"IK seed (commanded): incomplete {commanded}")
+            return False
+        a1 = (float(p6) - 1500.0) / 637.0
+        a2 = (float(p5) - 1500.0) / 637.0
+        a3 = (float(p4) - 1500.0) / 637.0
+        a4 = (float(p3) - 1500.0) / 637.0
+        brain.last_angles = [0.0, a1, a2, a3, a4]
+        _startup_log(f"IK seed (commanded): last_angles set from {commanded}")
+        return True
+    except Exception as e:
+        _startup_log(f"IK seed (commanded): conversion failed: {e}")
+        return False
+
 _HAILO_ELEMENTS = ("hailonet", "hailofilter", "hailooverlay", "hailotracker")
 
 def _clear_gst_registry():
@@ -636,6 +664,8 @@ _vision_summary_state = {
     "mode": "HIGH_CAM",
     "labels": {},
 }
+_tracking_prev_busy = 1
+_tracking_resume_warmup_until = 0.0
 
 
 def _build_camera_src_segment(mode, cam_path):
@@ -1446,6 +1476,7 @@ def _release_overlay_draw(_overlay, cr, _timestamp, _duration):
 def app_callback(pad, info, user_data):
     """GStreamer pad probe: parse Hailo pose detections and drive the arm."""
     global _smooth_x, _smooth_y, _last_move_time, _search_mode, _last_seen_time
+    global _tracking_prev_busy, _tracking_resume_warmup_until
 
     buffer = info.get_buffer()
     if not buffer:
@@ -1462,6 +1493,15 @@ def app_callback(pad, info, user_data):
             (d for d in detections if d.get_label() == "person"), None
         )
         now = time.time()
+
+        busy_now = int(brain.tuner.shared_params.get("busy", 0))
+        if _tracking_prev_busy != 0 and busy_now == 0:
+            warmup_s = max(0.0, float(getattr(config, "TRACKING_RESUME_WARMUP_SEC", 1.5)))
+            _tracking_resume_warmup_until = now + warmup_s
+            _seed_brain_ik_from_last_commanded()
+            _last_move_time = now
+            print(f"Tracking re-enable warmup: holding arm motion for {warmup_s:.2f}s")
+        _tracking_prev_busy = busy_now
 
         if person:
             _last_seen_time = now
@@ -1499,6 +1539,9 @@ def app_callback(pad, info, user_data):
                 sf = p.get("smooth", 0.2)
                 _smooth_x = raw_x * sf + _smooth_x * (1.0 - sf)
                 _smooth_y = raw_y * sf + _smooth_y * (1.0 - sf)
+
+                if now < _tracking_resume_warmup_until:
+                    return Gst.PadProbeReturn.OK
 
                 if (now - _last_move_time > config.MOVE_COOLDOWN
                         and p.get("busy", 0) == 0
