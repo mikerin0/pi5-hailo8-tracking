@@ -267,6 +267,8 @@ STARTUP_SEED_TIME_MS = 1200
 SERVO_MOVE_DELTA_GUARD_ENABLED = True
 SERVO_MOVE_MAX_DELTA_US = 90
 SERVO_MOVE_DELTA_MODE = "clamp"
+# Servo IDs exempt from delta guard (claw should close fully on one command).
+SERVO_MOVE_DELTA_GUARD_EXEMPT_IDS = [1]
 
 # Preferred startup motion: go to absolute IK startup pose slowly, then begin tracking.
 # Uses the same coordinate frame as HOME_X/HOME_Y/HOME_Z.

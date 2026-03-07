@@ -142,34 +142,43 @@ def _send_servo_packet(id, pos, time_ms=800):
 
 
 def _guard_target_pulse(servo_id, target_pos):
+    sid = int(servo_id)
     target = int(max(500, min(2500, int(target_pos))))
-    if int(servo_id) == 1:
+    if sid == 1:
         target = int(max(1500, min(2326, target)))
+
+    exempt_ids = getattr(config, "SERVO_MOVE_DELTA_GUARD_EXEMPT_IDS", [1])
+    try:
+        exempt = {int(x) for x in (exempt_ids or [])}
+    except Exception:
+        exempt = {1}
+    if sid in exempt:
+        return target
 
     if not bool(getattr(config, "SERVO_MOVE_DELTA_GUARD_ENABLED", True)):
         return target
 
     max_delta = max(10, int(getattr(config, "SERVO_MOVE_MAX_DELTA_US", 90)))
     mode = str(getattr(config, "SERVO_MOVE_DELTA_MODE", "clamp")).strip().lower()
-    prev = int(_servo_last_commanded.get(int(servo_id), 1500))
+    prev = int(_servo_last_commanded.get(sid, 1500))
     delta = int(target) - int(prev)
     if abs(delta) <= max_delta:
         return target
 
     if mode == "reject":
         print(
-            f"Servo {int(servo_id)} command rejected by delta guard: "
+            f"Servo {sid} command rejected by delta guard: "
             f"prev={prev} target={int(target)} max={max_delta}"
         )
         return None
 
     clamped = prev + (max_delta if delta > 0 else -max_delta)
-    if int(servo_id) == 1:
+    if sid == 1:
         clamped = int(max(1500, min(2326, clamped)))
     else:
         clamped = int(max(500, min(2500, clamped)))
     print(
-        f"Servo {int(servo_id)} command clamped by delta guard: "
+        f"Servo {sid} command clamped by delta guard: "
         f"prev={prev} target={int(target)} clamped={int(clamped)} max={max_delta}"
     )
     return clamped

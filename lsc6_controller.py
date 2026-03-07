@@ -85,7 +85,15 @@ class LSC6Controller:
 
     def _guard_target(self, servo_id, target_pos):
         """Apply configured max-delta guard to a commanded target pulse."""
-        guarded = self.clamp(int(servo_id), int(target_pos))
+        sid = int(servo_id)
+        guarded = self.clamp(sid, int(target_pos))
+        exempt_ids = getattr(config, "SERVO_MOVE_DELTA_GUARD_EXEMPT_IDS", [1])
+        try:
+            exempt = {int(x) for x in (exempt_ids or [])}
+        except Exception:
+            exempt = {1}
+        if sid in exempt:
+            return guarded
         if not bool(getattr(config, "SERVO_MOVE_DELTA_GUARD_ENABLED", True)):
             return guarded
 
@@ -93,7 +101,7 @@ class LSC6Controller:
         mode = str(getattr(config, "SERVO_MOVE_DELTA_MODE", "clamp")).strip().lower()
 
         with self._cmd_lock:
-            prev = self._commanded.get(int(servo_id), SERVO_POS_NEUTRAL)
+            prev = self._commanded.get(sid, SERVO_POS_NEUTRAL)
         delta = int(guarded) - int(prev)
         if abs(delta) <= max_delta:
             return guarded
