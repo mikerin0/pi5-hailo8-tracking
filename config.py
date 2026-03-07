@@ -199,6 +199,10 @@ SAFE_STARTUP_POWER_ON = False
 STARTUP_SLOW_HOME_ENABLED = True
 STARTUP_SLOW_HOME_TIME_MS = 5000
 STARTUP_SLOW_HOME_SETTLE_SEC = 0.4
+# Before startup slow-home, clear any queued controller motion and wait briefly
+# after torque/power enable to avoid snap/jerk from stale targets.
+STARTUP_CLEAR_MOTION_QUEUE = True
+STARTUP_POWER_SETTLE_SEC = 0.8
 
 # --- Pose gesture events to Crestron (outbound) ---
 # Uses yolov8 pose keypoints (wrists + shoulders). These are coarse gestures,

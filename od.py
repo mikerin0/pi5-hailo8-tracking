@@ -2182,14 +2182,7 @@ if __name__ == "__main__":
     startup_settle_s = max(0.1, float(getattr(config, "STARTUP_SLOW_HOME_SETTLE_SEC", 0.4)))
 
     if startup_slow_home:
-        startup_power_on = True
-
-    if startup_power_on:
-        servo_integration.power_up_servos()
-    else:
-        print("Startup safety: servo power remains OFF until an explicit motion command")
-
-    if startup_slow_home:
+        servo_integration.startup_power_up_quiet()
         print(f"Startup: slow move to HOME ({startup_home_time_ms} ms)")
         brain.tuner.shared_params["busy"] = 1
         try:
@@ -2199,6 +2192,10 @@ if __name__ == "__main__":
             print(f"Startup slow-home failed: {e}")
         finally:
             brain.tuner.shared_params["busy"] = 0
+    elif startup_power_on:
+        servo_integration.power_up_servos()
+    else:
+        print("Startup safety: servo power remains OFF until an explicit motion command")
 
     servo_integration.thermal_monitor.start()
     servo_integration.start_status_poller()

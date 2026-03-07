@@ -189,6 +189,19 @@ def power_up_servos():
     _set_servo_power(True)
 
 
+def startup_power_up_quiet():
+    """Power/torque up in a startup-safe way to reduce first-motion jerk."""
+    if bool(getattr(config, "STARTUP_CLEAR_MOTION_QUEUE", True)):
+        try:
+            controller.stop_all()
+        except Exception:
+            pass
+    _set_servo_power(True)
+    settle_s = max(0.0, float(getattr(config, "STARTUP_POWER_SETTLE_SEC", 0.8)))
+    if settle_s > 0.0:
+        time.sleep(settle_s)
+
+
 def is_servo_power_on():
     with _SERVO_POWER_LOCK:
         return _servo_power_on
