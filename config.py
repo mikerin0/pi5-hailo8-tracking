@@ -263,7 +263,7 @@ STARTUP_SEED_TIME_MS = 1200
 
 # Preferred startup motion: go to absolute IK startup pose slowly, then begin tracking.
 # Uses the same coordinate frame as HOME_X/HOME_Y/HOME_Z.
-STARTUP_COORD_MOVE_ENABLED = True
+STARTUP_COORD_MOVE_ENABLED = False
 STARTUP_COORD_X = HOME_X
 STARTUP_COORD_Y = HOME_Y
 STARTUP_COORD_Z = HOME_Z
