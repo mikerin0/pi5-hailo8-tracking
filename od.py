@@ -1027,11 +1027,12 @@ def _table_object_model_callback(_pad, info, _user_data):
         center = _detection_bbox_center_norm(det)
         if center is None:
             continue
+        _cx, _cy, det_area_norm = center
         if manual_pick_active:
-            if area_norm > best_area or (abs(area_norm - best_area) < 1e-6 and conf > best_conf):
+            if det_area_norm > best_area or (abs(det_area_norm - best_area) < 1e-6 and conf > best_conf):
                 best = det
                 best_conf = conf
-                best_area = area_norm
+                best_area = det_area_norm
                 best_label = label
                 best_center = center
         elif conf > best_conf:
