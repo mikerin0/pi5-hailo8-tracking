@@ -483,6 +483,13 @@ def park_arm():
 def resume_arm():
     """Resume thermal monitoring after a manual park."""
     power_up_servos()
+    if bool(getattr(config, "RESUME_HOLD_CURRENT_POSE", True)):
+        settle_s = max(0.05, float(getattr(config, "RESUME_SETTLE_SEC", 0.2)))
+        if settle_s > 0.0:
+            time.sleep(settle_s)
+        thermal_monitor.resume()
+        return
+
     if bool(getattr(config, "RESUME_SAFE_SEQUENCE_ENABLED", True)):
         step_time_ms = max(200, int(getattr(config, "RESUME_SAFE_STEP_TIME_MS", 500)))
         step_pause_s = max(0.0, float(getattr(config, "RESUME_SAFE_STEP_PAUSE_SEC", 1.0)))

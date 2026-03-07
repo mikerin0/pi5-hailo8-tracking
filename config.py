@@ -304,6 +304,9 @@ STARTUP_ENABLE_TRACKING_ON_STEP3 = False
 RESUME_USE_HOME_POSE = True
 RESUME_HOME_TIME_MS = 3500
 RESUME_SETTLE_SEC = 0.2
+# When enabled, RESUME powers servos but does not command any reposition move.
+# This keeps the arm at shutdown/current pose to avoid wake-up jumps.
+RESUME_HOLD_CURRENT_POSE = True
 # Use sequential per-servo RESUME pattern (proven jerk-free on this setup).
 RESUME_SAFE_SEQUENCE_ENABLED = True
 RESUME_SAFE_STEP_TIME_MS = 500
