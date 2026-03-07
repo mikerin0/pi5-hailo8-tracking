@@ -285,7 +285,7 @@ STARTUP_SEED_RETRY_SEC = 6.0
 STARTUP_SEED_RETRY_INTERVAL_SEC = 0.25
 # Interactive startup wizard: require operator confirmation between
 # power-up, absolute-start move, and tracking start.
-STARTUP_STEP_PROMPTS_ENABLED = True
+STARTUP_STEP_PROMPTS_ENABLED = False
 # Initial busy state applied when UI starts (1 keeps tracking paused).
 STARTUP_INITIAL_BUSY = 0
 
@@ -308,7 +308,7 @@ STARTUP_ENABLE_TRACKING_ON_STEP3 = False
 
 # Tracking re-enable safety: hold arm motion briefly after busy goes 1->0
 # so IK state can be re-seeded and first-frame jumps are avoided.
-TRACKING_RESUME_WARMUP_SEC = 1.5
+TRACKING_RESUME_WARMUP_SEC = 2.5
 
 # --- Resume motion behavior ---
 # On RESUME, move to a known absolute HOME pose slowly before tracking.
