@@ -735,7 +735,7 @@ def _maybe_update_table_pick_approach_pose(take_x, take_y, take_lift_z, now):
 
 def _table_pick_steer_worker():
     """Send low-rate arm steering updates for TABLE PICK on a background thread."""
-    global _table_pick_steer_target, _table_obj_center_hits
+    global _table_pick_steer_target, _table_obj_center_hits, _last_table_pick_target_update
     last_sent = None
     while not _table_pick_steer_stop.is_set() and not brain.shutdown_event.is_set():
         now = time.time()
@@ -780,6 +780,7 @@ def _table_pick_steer_worker():
             manual_pick_active
             and bool(getattr(config, "TABLE_PICK_MANUAL_HUNT_ENABLED", True))
             and int(_table_obj_center_hits) <= 0
+            and (now - float(_last_table_pick_target_update)) > max(0.25, float(getattr(config, "TABLE_PICK_STEER_PERIOD_SEC", 0.25)) * 1.5)
         ):
             amp = max(0.0, min(0.11, float(getattr(config, "TABLE_PICK_MANUAL_HUNT_AMPLITUDE_Y", 0.07))))
             period = max(1.0, float(getattr(config, "TABLE_PICK_MANUAL_HUNT_PERIOD_SEC", 3.0)))
@@ -1103,6 +1104,21 @@ def _table_object_model_callback(_pad, info, _user_data):
             return Gst.PadProbeReturn.OK
 
     if _table_obj_center_hits < center_frames_required:
+        if manual_pick_active:
+            force_after = max(0.5, float(getattr(config, "TABLE_PICK_MANUAL_FORCE_GRAB_AFTER_SEC", 3.0)))
+            elapsed = now - float(_table_pick_manual_arm_time)
+            if elapsed >= force_after:
+                print(
+                    "TABLE_CAM manual force-grab: "
+                    f"label={best_label or 'unknown'} conf={best_conf:.2f} "
+                    f"x={x_norm:.2f} y={y_norm:.2f} elapsed={elapsed:.1f}s"
+                )
+                brain.tuner.shared_params["table_pick_request_active"] = 0
+                brain.start_take_item_sequence(auto_pick=True)
+                _last_table_obj_trigger_time = now
+                _table_obj_hits = 0
+                _table_obj_center_hits = 0
+                return Gst.PadProbeReturn.OK
         return Gst.PadProbeReturn.OK
 
     print(
