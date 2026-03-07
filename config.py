@@ -304,3 +304,15 @@ STARTUP_ENABLE_TRACKING_ON_STEP3 = False
 RESUME_USE_HOME_POSE = True
 RESUME_HOME_TIME_MS = 3500
 RESUME_SETTLE_SEC = 0.2
+# Use sequential per-servo RESUME pattern (proven jerk-free on this setup).
+RESUME_SAFE_SEQUENCE_ENABLED = True
+RESUME_SAFE_STEP_TIME_MS = 500
+RESUME_SAFE_STEP_PAUSE_SEC = 1.0
+RESUME_SAFE_SEQUENCE = [
+    (1, 1500),  # gripper
+    (2, 1500),  # wrist rotation
+    (3, 1497),  # wrist
+    (4, 1782),  # elbow
+    (5, 2078),  # shoulder
+    (6, 1183),  # waist
+]

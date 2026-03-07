@@ -483,6 +483,32 @@ def park_arm():
 def resume_arm():
     """Resume thermal monitoring after a manual park."""
     power_up_servos()
+    if bool(getattr(config, "RESUME_SAFE_SEQUENCE_ENABLED", True)):
+        step_time_ms = max(200, int(getattr(config, "RESUME_SAFE_STEP_TIME_MS", 500)))
+        step_pause_s = max(0.0, float(getattr(config, "RESUME_SAFE_STEP_PAUSE_SEC", 1.0)))
+        sequence = getattr(config, "RESUME_SAFE_SEQUENCE", None)
+        if not isinstance(sequence, (list, tuple)) or not sequence:
+            sequence = [(1, 1500), (2, 1500), (3, 1497), (4, 1782), (5, 2078), (6, 1183)]
+
+        for item in sequence:
+            try:
+                sid, pos = int(item[0]), int(item[1])
+            except Exception:
+                continue
+            controller.move_servo(sid, pos, time_ms=step_time_ms)
+            try:
+                controller.note_commanded_position(sid, pos)
+            except Exception:
+                pass
+            thermal_monitor.notify_move()
+            if step_pause_s > 0.0:
+                time.sleep(step_pause_s)
+
+        settle_s = max(0.05, float(getattr(config, "RESUME_SETTLE_SEC", 0.2)))
+        time.sleep(settle_s)
+        thermal_monitor.resume()
+        return
+
     use_home_pose = bool(getattr(config, "RESUME_USE_HOME_POSE", True))
     settle_s = max(0.05, float(getattr(config, "RESUME_SETTLE_SEC", 0.2)))
     if use_home_pose:
