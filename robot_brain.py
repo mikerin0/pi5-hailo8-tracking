@@ -562,6 +562,7 @@ def _take_item_sequence(auto_pick=False):
         if auto_pick:
             z_offset = float(getattr(config, "TABLE_PICK_Z_OFFSET_M", -0.06))
             take_z = max(0.12, min(0.40, take_z + z_offset))
+            take_z = max(float(getattr(config, "TABLE_PICK_MIN_AUTO_TAKE_Z", 0.24)), take_z)
             take_lift_z = max(take_z + 0.05, min(0.45, take_lift_z + z_offset))
 
         if not _is_gripper_open_enough(1500, tolerance=20):

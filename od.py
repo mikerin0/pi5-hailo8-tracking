@@ -1000,6 +1000,7 @@ def _table_object_model_callback(_pad, info, _user_data):
 
     best = None
     best_conf = -1.0
+    best_area = -1.0
     best_label = ""
     best_center = None
     for det in detections:
@@ -1026,7 +1027,14 @@ def _table_object_model_callback(_pad, info, _user_data):
         center = _detection_bbox_center_norm(det)
         if center is None:
             continue
-        if conf > best_conf:
+        if manual_pick_active:
+            if area_norm > best_area or (abs(area_norm - best_area) < 1e-6 and conf > best_conf):
+                best = det
+                best_conf = conf
+                best_area = area_norm
+                best_label = label
+                best_center = center
+        elif conf > best_conf:
             best = det
             best_conf = conf
             best_label = label
@@ -1079,6 +1087,13 @@ def _table_object_model_callback(_pad, info, _user_data):
     prev_take_y = float(p.get("take_y", 0.0))
     take_x = prev_take_x + (target_take_x - prev_take_x) * max(0.05, min(1.0, align_alpha))
     take_y = prev_take_y + (target_take_y - prev_take_y) * max(0.05, min(1.0, align_alpha))
+    if manual_pick_active:
+        max_step_x = max(0.002, float(getattr(config, "TABLE_PICK_MANUAL_MAX_TARGET_STEP_X", 0.015)))
+        max_step_y = max(0.002, float(getattr(config, "TABLE_PICK_MANUAL_MAX_TARGET_STEP_Y", 0.020)))
+        dx = max(-max_step_x, min(max_step_x, take_x - prev_take_x))
+        dy = max(-max_step_y, min(max_step_y, take_y - prev_take_y))
+        take_x = prev_take_x + dx
+        take_y = prev_take_y + dy
 
     err = ((x_norm - center_x) ** 2 + (y_norm - center_y) ** 2) ** 0.5
     if err <= max(0.02, center_tol):
@@ -1111,7 +1126,7 @@ def _table_object_model_callback(_pad, info, _user_data):
             return Gst.PadProbeReturn.OK
 
     if _table_obj_center_hits < center_frames_required:
-        if manual_pick_active:
+        if manual_pick_active and bool(getattr(config, "TABLE_PICK_MANUAL_FORCE_GRAB_ENABLED", False)):
             force_after = max(0.5, float(getattr(config, "TABLE_PICK_MANUAL_FORCE_GRAB_AFTER_SEC", 3.0)))
             elapsed = now - float(_table_pick_manual_arm_time)
             if elapsed >= force_after:
