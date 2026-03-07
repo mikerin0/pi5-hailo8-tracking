@@ -2297,7 +2297,10 @@ if __name__ == "__main__":
                     time.sleep(startup_coord_settle_s)
                     _startup_log("startup path: forced unseeded move settle complete")
                 else:
-                    print("Startup move blocked: IK seed/readback failed. Tracking remains paused.")
+                    print(
+                        "Startup move blocked: IK seed/readback failed. "
+                        "No motion will be commanded; tracking remains paused."
+                    )
                     startup_abort_tracking = True
             else:
                 if startup_coord_safe:
