@@ -659,6 +659,7 @@ _table_pick_steer_target = None
 _table_pick_steer_stop = threading.Event()
 _table_pick_steer_thread = None
 _last_table_pick_target_update = 0.0
+_table_pick_manual_arm_time = 0.0
 _vision_summary_lock = threading.Lock()
 _vision_summary_state = {
     "updated_at": 0.0,
@@ -832,7 +833,7 @@ def arm_table_pick_tracking():
     """Arm TABLE_CAM object tracking so pickup starts after stable alignment."""
     global _table_obj_hits, _table_obj_center_hits
     global _last_table_obj_trigger_time, _last_table_obj_block_log_time, _last_table_obj_align_log_time
-    global _table_cam_enter_time
+    global _table_cam_enter_time, _table_pick_manual_arm_time
 
     config.TABLE_OBJECT_PICKUP_ENABLED = True
     _table_obj_hits = 0
@@ -843,6 +844,7 @@ def arm_table_pick_tracking():
 
     arm_delay = max(0.0, float(getattr(config, "TABLE_OBJECT_ARM_DELAY_SEC", 4.0)))
     _table_cam_enter_time = time.time() - arm_delay - 0.1
+    _table_pick_manual_arm_time = time.time()
     return "TABLE PICK armed: tracking object for alignment before grab"
 
 
@@ -929,6 +931,7 @@ def _table_object_model_callback(_pad, info, _user_data):
     """Model-based TABLE_CAM detection callback using Hailo detection objects."""
     global _table_obj_hits, _table_obj_center_hits
     global _last_table_obj_trigger_time, _last_table_obj_block_log_time, _last_table_obj_align_log_time
+    global _table_pick_manual_arm_time
 
     if not bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False)):
         _table_obj_hits = 0
@@ -1080,6 +1083,11 @@ def _table_object_model_callback(_pad, info, _user_data):
     brain.tuner.shared_params["take_z"] = take_z
     brain.tuner.shared_params["take_lift_z"] = take_lift_z
     _maybe_update_table_pick_approach_pose(take_x, take_y, take_lift_z, now)
+
+    if manual_pick_active:
+        min_hunt_sec = max(0.0, float(getattr(config, "TABLE_PICK_MANUAL_MIN_HUNT_SEC", 1.8)))
+        if (now - float(_table_pick_manual_arm_time)) < min_hunt_sec:
+            return Gst.PadProbeReturn.OK
 
     if _table_obj_center_hits < center_frames_required:
         return Gst.PadProbeReturn.OK
