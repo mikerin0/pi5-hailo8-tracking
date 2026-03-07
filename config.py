@@ -269,6 +269,7 @@ STARTUP_COORD_Y = HOME_Y
 STARTUP_COORD_Z = HOME_Z
 STARTUP_COORD_TIME_MS = 4500
 STARTUP_COORD_SETTLE_SEC = 0.6
+STARTUP_COORD_USE_SAFE_STEPPED_IK = True
 # Interactive startup wizard: require operator confirmation between
 # power-up, absolute-start move, and tracking start.
 STARTUP_STEP_PROMPTS_ENABLED = True
