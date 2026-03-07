@@ -993,6 +993,14 @@ def _table_object_model_callback(_pad, info, _user_data):
             getattr(config, "TABLE_OBJECT_TARGET_LABEL", ""),
         )
     ).strip().lower()
+    ignored_labels_cfg = getattr(config, "TABLE_OBJECT_IGNORED_LABELS", ())
+    if isinstance(ignored_labels_cfg, str):
+        ignored_labels = {item.strip().lower() for item in ignored_labels_cfg.split(",") if item.strip()}
+    else:
+        try:
+            ignored_labels = {str(item).strip().lower() for item in ignored_labels_cfg if str(item).strip()}
+        except Exception:
+            ignored_labels = set()
     manual_pick_active = bool(brain.tuner.shared_params.get("table_pick_request_active", 0))
     if manual_pick_active and bool(getattr(config, "TABLE_PICK_IGNORE_LABEL_FILTER", True)):
         target_label = ""
@@ -1010,6 +1018,8 @@ def _table_object_model_callback(_pad, info, _user_data):
             label = str(det.get_label()).strip().lower()
         except Exception:
             label = ""
+        if label and label in ignored_labels:
+            continue
         if manual_pick_active and bool(getattr(config, "TABLE_PICK_MANUAL_IGNORE_PERSON", True)):
             if label == "person":
                 continue

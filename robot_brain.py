@@ -579,6 +579,8 @@ def _take_item_sequence(auto_pick=False):
         if auto_pick:
             pick_label = str(tuner.shared_params.get("table_pick_last_label", "")).strip().lower()
             if pick_label:
+                if pick_label in {"table", "dining table"}:
+                    pick_label = "object"
                 spoken = pick_label.replace("_", " ")
                 say(f"Picking up {spoken}")
             print("Auto-pick: object aligned, closing gripper")

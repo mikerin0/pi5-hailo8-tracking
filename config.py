@@ -197,7 +197,7 @@ TABLE_PICK_MANUAL_IGNORE_PERSON = True
 TABLE_PICK_MANUAL_MAX_TARGET_STEP_X = 0.015
 TABLE_PICK_MANUAL_MAX_TARGET_STEP_Y = 0.020
 # Keep autonomous pickup from descending too low.
-TABLE_PICK_MIN_AUTO_TAKE_Z = 0.34
+TABLE_PICK_MIN_AUTO_TAKE_Z = 0.24
 
 # After returning from TABLE_CAM to HIGH_CAM, wait this long before applying
 # person-lost timeout logic so reacquisition has time to lock.
@@ -210,6 +210,8 @@ TABLE_OBJECT_SO_PATH = "/usr/local/hailo/resources/so/libyolo_hailortpp_postproc
 TABLE_OBJECT_MIN_CONFIDENCE = 0.35
 # Optional class filter by detector label text (empty => accept all labels).
 TABLE_OBJECT_TARGET_LABEL = ""
+# Never trigger pickup from these detector labels (prevents tabletop lock-on).
+TABLE_OBJECT_IGNORED_LABELS = ("table", "dining table")
 
 # --- Startup safety ---
 # Prevent any automatic arm movement during application startup.
