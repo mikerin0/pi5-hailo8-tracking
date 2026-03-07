@@ -31,6 +31,7 @@ import serial
 import threading
 import time
 import logging
+import config
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +82,37 @@ class LSC6Controller:
             except serial.SerialException as exc:
                 logger.error("LSC6Controller: cannot open serial port – %s", exc)
                 self._ser = None
+
+    def _guard_target(self, servo_id, target_pos):
+        """Apply configured max-delta guard to a commanded target pulse."""
+        guarded = self.clamp(int(servo_id), int(target_pos))
+        if not bool(getattr(config, "SERVO_MOVE_DELTA_GUARD_ENABLED", True)):
+            return guarded
+
+        max_delta = max(10, int(getattr(config, "SERVO_MOVE_MAX_DELTA_US", 90)))
+        mode = str(getattr(config, "SERVO_MOVE_DELTA_MODE", "clamp")).strip().lower()
+
+        with self._cmd_lock:
+            prev = self._commanded.get(int(servo_id), SERVO_POS_NEUTRAL)
+        delta = int(guarded) - int(prev)
+        if abs(delta) <= max_delta:
+            return guarded
+
+        if mode == "reject":
+            logger.warning(
+                "Servo %d command rejected by delta guard: prev=%d target=%d max=%d",
+                int(servo_id), int(prev), int(guarded), int(max_delta)
+            )
+            return None
+
+        step = max_delta if delta > 0 else -max_delta
+        clamped = int(prev) + int(step)
+        clamped = self.clamp(int(servo_id), clamped)
+        logger.warning(
+            "Servo %d command clamped by delta guard: prev=%d target=%d clamped=%d max=%d",
+            int(servo_id), int(prev), int(guarded), int(clamped), int(max_delta)
+        )
+        return clamped
 
     def _build_packet(self, cmd, data):
         """Return a bytearray for *cmd* with *data* payload."""
@@ -146,7 +178,10 @@ class LSC6Controller:
                 "arm_disabled: servo %d pos %d suppressed", servo_id, pos
             )
             return
-        pos = self.clamp(servo_id, pos)
+        guarded_pos = self._guard_target(servo_id, pos)
+        if guarded_pos is None:
+            return
+        pos = guarded_pos
         with self._cmd_lock:
             self._commanded[servo_id] = pos
         data = [
@@ -170,11 +205,19 @@ class LSC6Controller:
             return
         n = len(positions)
         data = [n, time_ms & 0xFF, (time_ms >> 8) & 0xFF]
+        guarded_positions = {}
         for sid, pos in positions.items():
-            pos = self.clamp(sid, pos)
+            guarded_pos = self._guard_target(sid, pos)
+            if guarded_pos is None:
+                continue
+            pos = guarded_pos
             with self._cmd_lock:
                 self._commanded[sid] = pos
+            guarded_positions[sid] = pos
             data += [sid, pos & 0xFF, (pos >> 8) & 0xFF]
+        if not guarded_positions:
+            return
+        data[0] = len(guarded_positions)
         self._write(self._build_packet(CMD_SERVO_MOVE, data))
 
     def stop_all(self):

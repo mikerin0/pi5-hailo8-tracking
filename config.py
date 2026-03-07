@@ -261,6 +261,13 @@ SERVO_TORQUE_STEP_SEC = 0.03
 STARTUP_SEED_CURRENT_POSE = True
 STARTUP_SEED_TIME_MS = 1200
 
+# --- Global servo jump guard ---
+# Applies a hard guard to commanded pulse jumps to reduce jerk risk.
+# mode: "clamp" (limit to max delta) or "reject" (drop command)
+SERVO_MOVE_DELTA_GUARD_ENABLED = True
+SERVO_MOVE_MAX_DELTA_US = 90
+SERVO_MOVE_DELTA_MODE = "clamp"
+
 # Preferred startup motion: go to absolute IK startup pose slowly, then begin tracking.
 # Uses the same coordinate frame as HOME_X/HOME_Y/HOME_Z.
 STARTUP_COORD_MOVE_ENABLED = False

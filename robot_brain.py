@@ -15,6 +15,7 @@ L1, L2, L3, L4 = 0.05, 0.055, 0.091, 0.170
 PORT, BAUD = "/dev/ttyAMA10", 9600
 CRESTRON_PORT = 50005
 last_angles = [0, 0, 0.2, 0.5, 0.1]
+_servo_last_commanded = {1: 1500, 2: 1500, 3: 1500, 4: 1500, 5: 1500, 6: 1500}
 
 # --- Camera switch callbacks (populated by external modules at runtime) ---
 # Keys: "HIGH_CAM", "TABLE_CAM", "DUAL_CAM"  →  callable with no arguments
@@ -138,6 +139,40 @@ def _gripper_switch_pressed():
 def _send_servo_packet(id, pos, time_ms=800):
     packet = bytearray([0x55, 0x55, 0x08, 0x03, 0x01, time_ms & 0xFF, (time_ms >> 8) & 0xFF, id, pos & 0xFF, (pos >> 8) & 0xFF])
     ser.write(packet)
+
+
+def _guard_target_pulse(servo_id, target_pos):
+    target = int(max(500, min(2500, int(target_pos))))
+    if int(servo_id) == 1:
+        target = int(max(1500, min(2326, target)))
+
+    if not bool(getattr(config, "SERVO_MOVE_DELTA_GUARD_ENABLED", True)):
+        return target
+
+    max_delta = max(10, int(getattr(config, "SERVO_MOVE_MAX_DELTA_US", 90)))
+    mode = str(getattr(config, "SERVO_MOVE_DELTA_MODE", "clamp")).strip().lower()
+    prev = int(_servo_last_commanded.get(int(servo_id), 1500))
+    delta = int(target) - int(prev)
+    if abs(delta) <= max_delta:
+        return target
+
+    if mode == "reject":
+        print(
+            f"Servo {int(servo_id)} command rejected by delta guard: "
+            f"prev={prev} target={int(target)} max={max_delta}"
+        )
+        return None
+
+    clamped = prev + (max_delta if delta > 0 else -max_delta)
+    if int(servo_id) == 1:
+        clamped = int(max(1500, min(2326, clamped)))
+    else:
+        clamped = int(max(500, min(2500, clamped)))
+    print(
+        f"Servo {int(servo_id)} command clamped by delta guard: "
+        f"prev={prev} target={int(target)} clamped={int(clamped)} max={max_delta}"
+    )
+    return clamped
 
 
 def _notify_servo_move(servo_id=None, pos=None):
@@ -403,6 +438,10 @@ def move_servo(id, pos, time_ms=800):
         _first_move_capped = True
     # Servo 1 is the claw – limit its closing range to protect the mechanism
     if id == 1:
+        guarded = _guard_target_pulse(id, pos)
+        if guarded is None:
+            return
+        pos = guarded
         pos = max(1500, min(2326, pos))
         with _gripper_motion_lock:
             closing = pos > _gripper_pos_est
@@ -421,22 +460,29 @@ def move_servo(id, pos, time_ms=800):
                         print(f"Gripper microswitch triggered at pos {current}; stopping close")
                         _send_servo_packet(1, current, 120)
                         _gripper_pos_est = current
+                        _servo_last_commanded[1] = int(current)
                         return
                     current = min(pos, current + step_us)
                     _send_servo_packet(1, current, step_time_ms)
                     _notify_servo_move(1, current)
                     _gripper_pos_est = current
+                    _servo_last_commanded[1] = int(current)
                     time.sleep(step_time_ms / 1000.0)
                 return
 
             _send_servo_packet(id, pos, time_ms)
             _notify_servo_move(id, pos)
             _gripper_pos_est = pos
+            _servo_last_commanded[1] = int(pos)
             return
     else:
-        pos = max(500, min(2500, pos))
+        guarded = _guard_target_pulse(id, pos)
+        if guarded is None:
+            return
+        pos = int(max(500, min(2500, guarded)))
     _send_servo_packet(id, pos, time_ms)
     _notify_servo_move(id, pos)
+    _servo_last_commanded[int(id)] = int(pos)
 
 def go_home():
     # Open gripper first to reduce collision/load risk while parking.
