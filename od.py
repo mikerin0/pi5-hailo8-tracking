@@ -658,6 +658,7 @@ _table_pick_steer_lock = threading.Lock()
 _table_pick_steer_target = None
 _table_pick_steer_stop = threading.Event()
 _table_pick_steer_thread = None
+_last_table_pick_target_update = 0.0
 _vision_summary_lock = threading.Lock()
 _vision_summary_state = {
     "updated_at": 0.0,
@@ -713,7 +714,7 @@ def _extract_detection_labels(detections):
 
 def _maybe_update_table_pick_approach_pose(take_x, take_y, take_lift_z, now):
     """Queue TABLE PICK approach updates without blocking camera callback thread."""
-    global _last_table_pick_steer_time, _table_pick_steer_target
+    global _last_table_pick_steer_time, _table_pick_steer_target, _last_table_pick_target_update
     if not bool(brain.tuner.shared_params.get("table_pick_request_active", 0)):
         return
     if brain.tuner.shared_params.get("camera_mode", "HIGH_CAM") != "TABLE_CAM":
@@ -727,6 +728,7 @@ def _maybe_update_table_pick_approach_pose(take_x, take_y, take_lift_z, now):
 
     with _table_pick_steer_lock:
         _table_pick_steer_target = (float(take_x), float(take_y), float(take_lift_z))
+        _last_table_pick_target_update = now
     _last_table_pick_steer_time = now
 
 
@@ -735,6 +737,7 @@ def _table_pick_steer_worker():
     global _table_pick_steer_target
     last_sent = None
     while not _table_pick_steer_stop.is_set() and not brain.shutdown_event.is_set():
+        now = time.time()
         if not bool(brain.tuner.shared_params.get("table_pick_request_active", 0)):
             with _table_pick_steer_lock:
                 _table_pick_steer_target = None
@@ -751,9 +754,24 @@ def _table_pick_steer_worker():
         with _table_pick_steer_lock:
             target = _table_pick_steer_target
         if target is None:
-            time.sleep(0.05)
-            continue
-
+            if bool(getattr(config, "TABLE_PICK_MANUAL_HUNT_ENABLED", True)):
+                stale_after = max(0.2, float(getattr(config, "TABLE_PICK_STEER_PERIOD_SEC", 0.25)) * 2.0)
+                age = now - float(_last_table_pick_target_update)
+                if age >= stale_after:
+                    p = brain.tuner.get_params()
+                    base_x = max(0.12, min(0.28, float(p.get("take_x", 0.16))))
+                    base_z = max(0.18, min(0.45, float(p.get("take_lift_z", 0.36))))
+                    amp = max(0.0, min(0.11, float(getattr(config, "TABLE_PICK_MANUAL_HUNT_AMPLITUDE_Y", 0.07))))
+                    period = max(1.0, float(getattr(config, "TABLE_PICK_MANUAL_HUNT_PERIOD_SEC", 3.0)))
+                    phase = (now % period) / period
+                    hunt_y = amp * np.sin(2.0 * np.pi * phase)
+                    target = (base_x, hunt_y, base_z)
+                else:
+                    time.sleep(0.05)
+                    continue
+            else:
+                time.sleep(0.05)
+                continue
         tx, ty, tz = target
         if last_sent is not None:
             if abs(tx - last_sent[0]) < 0.002 and abs(ty - last_sent[1]) < 0.002 and abs(tz - last_sent[2]) < 0.002:
