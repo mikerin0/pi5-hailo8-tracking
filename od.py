@@ -1007,6 +1007,9 @@ def _table_object_model_callback(_pad, info, _user_data):
             label = str(det.get_label()).strip().lower()
         except Exception:
             label = ""
+        if manual_pick_active and bool(getattr(config, "TABLE_PICK_MANUAL_IGNORE_PERSON", True)):
+            if label == "person":
+                continue
         if target_label and label != target_label:
             continue
 
