@@ -359,24 +359,44 @@ def go_home_staged(time_ms=None, steps=None):
     steps = max(2, int(steps))
 
     step_pause_s = max(0.0, float(getattr(config, "STARTUP_SLOW_HOME_STEP_PAUSE_SEC", 0.08)))
+    max_step_delta = max(20, int(getattr(config, "STARTUP_SLOW_HOME_MAX_STEP_DELTA_US", 90)))
+    min_valid = max(3, int(getattr(config, "STARTUP_MIN_VALID_READBACK_SERVOS", 5)))
 
     try:
         current = controller.read_positions(ALL_SERVO_IDS)
     except Exception:
         current = {}
 
-    seeded = {
+    seeded_raw = {
         int(sid): int(pos)
         for sid, pos in (current or {}).items()
         if pos is not None
     }
-    if len(seeded) < 4:
-        _startup_log("go_home_staged: insufficient readback, falling back to go_home")
-        go_home(time_ms=total_time_ms)
+    seeded = {
+        int(sid): int(controller.clamp(int(sid), int(pos)))
+        for sid, pos in seeded_raw.items()
+        if 400 <= int(pos) <= 2600
+    }
+    if len(seeded) < min_valid:
+        _startup_log(
+            f"go_home_staged: abort (valid readbacks {len(seeded)} < required {min_valid}); no auto motion"
+        )
         return
 
-    _startup_log(f"go_home_staged: begin total_time_ms={total_time_ms} steps={steps}")
-    per_step_ms = max(700, int(total_time_ms / steps))
+    max_delta = 0
+    for sid, target in HOME.items():
+        src = seeded.get(int(sid), None)
+        if src is None:
+            continue
+        max_delta = max(max_delta, abs(int(target) - int(src)))
+    required_steps = max(1, int(np.ceil(max_delta / float(max_step_delta)))) if max_delta > 0 else 1
+    steps = max(steps, required_steps)
+
+    _startup_log(
+        f"go_home_staged: begin total_time_ms={total_time_ms} steps={steps} "
+        f"max_delta={max_delta} max_step_delta={max_step_delta}"
+    )
+    per_step_ms = max(700, int(total_time_ms / max(1, steps)))
 
     for step_idx in range(1, steps + 1):
         t = step_idx / float(steps)
@@ -385,8 +405,13 @@ def go_home_staged(time_ms=None, steps=None):
             src = seeded.get(int(sid), None)
             if src is None:
                 continue
-            blended = int(round(src + ((int(target) - int(src)) * t)))
-            pose[int(sid)] = controller.clamp(int(sid), blended)
+            intended = int(round(src + ((int(target) - int(src)) * t)))
+            prev = seeded.get(int(sid), intended)
+            low = prev - max_step_delta
+            high = prev + max_step_delta
+            bounded = max(low, min(high, intended))
+            clamped = controller.clamp(int(sid), bounded)
+            pose[int(sid)] = clamped
         if not pose:
             continue
 
@@ -397,6 +422,7 @@ def go_home_staged(time_ms=None, steps=None):
                 controller.note_commanded_position(int(sid), int(pos))
             except Exception:
                 pass
+            seeded[int(sid)] = int(pos)
         thermal_monitor.notify_move()
         time.sleep((per_step_ms / 1000.0) + step_pause_s)
 

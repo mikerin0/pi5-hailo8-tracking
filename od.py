@@ -2187,16 +2187,46 @@ if __name__ == "__main__":
     brain.table_model_update_callback = update_table_model_paths
     brain.table_pick_arm_callback = arm_table_pick_tracking
     startup_power_on = bool(getattr(config, "SAFE_STARTUP_POWER_ON", not bool(getattr(config, "SAFE_STARTUP_NO_MOTION", True))))
+    startup_coord_enabled = bool(getattr(config, "STARTUP_COORD_MOVE_ENABLED", True))
+    startup_coord_x = float(getattr(config, "STARTUP_COORD_X", getattr(config, "HOME_X", 0.06)))
+    startup_coord_y = float(getattr(config, "STARTUP_COORD_Y", getattr(config, "HOME_Y", 0.0)))
+    startup_coord_z = float(getattr(config, "STARTUP_COORD_Z", getattr(config, "HOME_Z", 0.40)))
+    startup_coord_time_ms = max(1200, int(getattr(config, "STARTUP_COORD_TIME_MS", 4500)))
+    startup_coord_settle_s = max(0.1, float(getattr(config, "STARTUP_COORD_SETTLE_SEC", 0.6)))
     startup_slow_home = bool(getattr(config, "STARTUP_SLOW_HOME_ENABLED", True))
     startup_slow_home_staged = bool(getattr(config, "STARTUP_SLOW_HOME_STAGED", True))
     startup_home_time_ms = max(1200, int(getattr(config, "STARTUP_SLOW_HOME_TIME_MS", 5000)))
     startup_settle_s = max(0.1, float(getattr(config, "STARTUP_SLOW_HOME_SETTLE_SEC", 0.4)))
     _startup_log(
-        f"startup config: power_on={startup_power_on} slow_home={startup_slow_home} "
-        f"home_time_ms={startup_home_time_ms} settle_s={startup_settle_s:.2f}"
+        f"startup config: power_on={startup_power_on} coord_move={startup_coord_enabled} "
+        f"slow_home={startup_slow_home}"
     )
 
-    if startup_slow_home:
+    if startup_coord_enabled:
+        _startup_log("startup path: startup_power_up_quiet")
+        servo_integration.startup_power_up_quiet()
+        print(
+            "Startup: slow move to startup coordinates "
+            f"({startup_coord_x:.3f}, {startup_coord_y:.3f}, {startup_coord_z:.3f}) "
+            f"in {startup_coord_time_ms} ms"
+        )
+        brain.tuner.shared_params["busy"] = 1
+        try:
+            _startup_log("startup path: coordinate move begin")
+            brain.reach_for_coordinate(
+                startup_coord_x,
+                startup_coord_y,
+                startup_coord_z,
+                speed=startup_coord_time_ms,
+            )
+            time.sleep(startup_coord_settle_s)
+            _startup_log("startup path: coordinate move settle complete")
+        except Exception as e:
+            print(f"Startup coordinate move failed: {e}")
+            _startup_log(f"startup path: coordinate move failed: {e}")
+        finally:
+            brain.tuner.shared_params["busy"] = 0
+    elif startup_slow_home:
         _startup_log("startup path: startup_power_up_quiet")
         servo_integration.startup_power_up_quiet()
         print(f"Startup: slow move to HOME ({startup_home_time_ms} ms)")

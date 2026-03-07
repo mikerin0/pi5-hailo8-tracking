@@ -196,12 +196,17 @@ SAFE_STARTUP_POWER_ON = False
 
 # Optional startup choreography: move slowly to HOME before tracking starts.
 # This helps avoid aggressive first motion when the arm is in an unknown pose.
-STARTUP_SLOW_HOME_ENABLED = True
+STARTUP_SLOW_HOME_ENABLED = False
 STARTUP_SLOW_HOME_TIME_MS = 5000
 STARTUP_SLOW_HOME_SETTLE_SEC = 0.4
 STARTUP_SLOW_HOME_STAGED = True
 STARTUP_SLOW_HOME_STEPS = 6
 STARTUP_SLOW_HOME_STEP_PAUSE_SEC = 0.08
+# Hard safety: cap pulse change per staged-home command to avoid violent flips
+# if initial readback is noisy or far from HOME.
+STARTUP_SLOW_HOME_MAX_STEP_DELTA_US = 90
+# Require at least this many valid servo readbacks before any startup motion.
+STARTUP_MIN_VALID_READBACK_SERVOS = 5
 # Before startup slow-home, clear any queued controller motion and wait briefly
 # after torque/power enable to avoid snap/jerk from stale targets.
 STARTUP_CLEAR_MOTION_QUEUE = True
@@ -255,6 +260,15 @@ SERVO_TORQUE_STEP_SEC = 0.03
 # before enabling torque. This prevents snapping to stale prior targets.
 STARTUP_SEED_CURRENT_POSE = True
 STARTUP_SEED_TIME_MS = 1200
+
+# Preferred startup motion: go to absolute IK startup pose slowly, then begin tracking.
+# Uses the same coordinate frame as HOME_X/HOME_Y/HOME_Z.
+STARTUP_COORD_MOVE_ENABLED = True
+STARTUP_COORD_X = HOME_X
+STARTUP_COORD_Y = HOME_Y
+STARTUP_COORD_Z = HOME_Z
+STARTUP_COORD_TIME_MS = 4500
+STARTUP_COORD_SETTLE_SEC = 0.6
 
 # --- Resume motion behavior ---
 # On RESUME, move to a known absolute HOME pose slowly before tracking.
