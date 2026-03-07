@@ -577,12 +577,20 @@ def _take_item_sequence(auto_pick=False):
             time.sleep(0.6)
             reach_for_coordinate(take_x, take_y, take_z, speed=800)
         if auto_pick:
+            target_label = str(tuner.shared_params.get("table_object_target_label", "")).strip().lower()
+            target_type = str(tuner.shared_params.get("table_object_target_type", "any")).strip().lower()
             pick_label = str(tuner.shared_params.get("table_pick_last_label", "")).strip().lower()
-            if pick_label:
-                if pick_label in {"table", "dining table"}:
-                    pick_label = "object"
+            announce_detector_label = bool(getattr(config, "TABLE_PICK_ANNOUNCE_DETECTOR_LABEL", False))
+
+            spoken = "target object"
+            if target_label:
+                spoken = target_label.replace("_", " ")
+            elif target_type and target_type != "any":
+                spoken = f"{target_type} object"
+            elif announce_detector_label and pick_label and pick_label not in {"table", "dining table"}:
                 spoken = pick_label.replace("_", " ")
-                say(f"Picking up {spoken}")
+
+            say(f"Picking up {spoken}")
             print("Auto-pick: object aligned, closing gripper")
             time.sleep(auto_take_wait_s)
         else:

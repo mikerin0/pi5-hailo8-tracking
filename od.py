@@ -1063,9 +1063,16 @@ def _table_object_model_callback(_pad, info, _user_data):
     x_max = float(getattr(config, "TABLE_OBJECT_X_MAX_NORM", 0.75))
     y_min = float(getattr(config, "TABLE_OBJECT_Y_MIN_NORM", 0.45))
     max_area_frac = float(getattr(config, "TABLE_OBJECT_MAX_AREA_FRAC", 0.80))
+    min_area_frac = max(0.0, float(getattr(config, "TABLE_OBJECT_MIN_AREA_FRAC", 0.004)))
     if manual_pick_active:
-        x_min, x_max, y_min, max_area_frac = 0.0, 1.0, 0.0, 0.98
-    if not (x_min <= x_norm <= x_max and y_norm >= y_min and area_norm <= max_area_frac):
+        y_min = max(y_min, float(getattr(config, "TABLE_PICK_MANUAL_Y_MIN_NORM", 0.30)))
+        min_area_frac = max(min_area_frac, float(getattr(config, "TABLE_PICK_MANUAL_MIN_AREA_FRAC", 0.006)))
+        x_min, x_max, max_area_frac = 0.0, 1.0, 0.98
+    if not (
+        x_min <= x_norm <= x_max
+        and y_norm >= y_min
+        and min_area_frac <= area_norm <= max_area_frac
+    ):
         _table_obj_hits = 0
         _table_obj_center_hits = 0
         return Gst.PadProbeReturn.OK
@@ -2279,6 +2286,19 @@ def camera_loop():
                 and os.path.isfile(getattr(config, "TABLE_OBJECT_HEF_PATH", ""))
                 and os.path.isfile(getattr(config, "TABLE_OBJECT_SO_PATH", ""))
             )
+            try:
+                selected_target_type = str(
+                    brain.tuner.shared_params.get(
+                        "table_object_target_type",
+                        getattr(config, "TABLE_OBJECT_TARGET_TYPE", "any"),
+                    )
+                ).strip().lower()
+            except Exception:
+                selected_target_type = "any"
+            # If a color target is explicitly selected, prefer color/blob pickup
+            # path so non-COCO objects (e.g., plain colored blocks) are still pickable.
+            if selected_target_type != "any":
+                table_model_branch_enabled = False
             table_object_branch_enabled = (
                 mode == "TABLE_CAM"
                 and bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False))

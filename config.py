@@ -208,10 +208,23 @@ TABLE_OBJECT_MODEL_ENABLED = True
 TABLE_OBJECT_HEF_PATH = "/usr/local/hailo/resources/models/hailo8/yolov8n.hef"
 TABLE_OBJECT_SO_PATH = "/usr/local/hailo/resources/so/libyolo_hailortpp_postprocess.so"
 TABLE_OBJECT_MIN_CONFIDENCE = 0.35
+# Minimum normalized bbox area for model-based pickup candidates.
+# Helps reject far-away tiny detections that are likely not reachable.
+TABLE_OBJECT_MIN_AREA_FRAC = 0.004
 # Optional class filter by detector label text (empty => accept all labels).
 TABLE_OBJECT_TARGET_LABEL = ""
 # Never trigger pickup from these detector labels (prevents tabletop lock-on).
 TABLE_OBJECT_IGNORED_LABELS = ("table", "dining table")
+
+# Manual TABLE PICK proximity guards for model detections.
+# Keep some forward-depth requirement even in manual mode.
+TABLE_PICK_MANUAL_Y_MIN_NORM = 0.30
+# Require larger target when manually armed so far-away detections don't trigger.
+TABLE_PICK_MANUAL_MIN_AREA_FRAC = 0.006
+
+# Speech behavior: announce generic target object by default instead of raw
+# detector class names, which can be noisy (e.g., banana/toothbrush).
+TABLE_PICK_ANNOUNCE_DETECTOR_LABEL = False
 
 # --- Startup safety ---
 # Prevent any automatic arm movement during application startup.
