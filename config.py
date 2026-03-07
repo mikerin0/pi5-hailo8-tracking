@@ -314,6 +314,12 @@ RESUME_SETTLE_SEC = 0.2
 # When enabled, RESUME powers servos but does not command any reposition move.
 # This keeps the arm at shutdown/current pose to avoid wake-up jumps.
 RESUME_HOLD_CURRENT_POSE = True
+# Two-step resume safety: first RESUME powers/holds while paused, second RESUME
+# enables tracking motion.
+RESUME_TWO_STEP_ENABLE = True
+# If two-step is disabled, this controls whether tracking auto-enables after
+# thermal resume callback completes.
+RESUME_AUTO_ENABLE_TRACKING = True
 # Use sequential per-servo RESUME pattern (proven jerk-free on this setup).
 RESUME_SAFE_SEQUENCE_ENABLED = True
 RESUME_SAFE_STEP_TIME_MS = 500

@@ -791,6 +791,7 @@ class RobotTuner:
         self.table_model_presets = _discover_table_model_presets()
         self._window_geometry = None
         self._window_state = None
+        self._resume_ready = False
         self._load_tuner_params(silent=True)
         self._load_window_state(silent=True)
 
@@ -962,9 +963,19 @@ class RobotTuner:
 
     def _park_arm_clicked(self):
         self.shared_params["busy"] = 1
+        self._resume_ready = False
         self._run_thermal_action("Park", thermal_park_callback)
 
     def _resume_arm_clicked(self):
+        two_step = bool(getattr(config, "RESUME_TWO_STEP_ENABLE", True))
+        auto_enable = bool(getattr(config, "RESUME_AUTO_ENABLE_TRACKING", True))
+
+        if two_step and self._resume_ready:
+            self.shared_params["busy"] = 0
+            self._resume_ready = False
+            print("Resume step 2/2: tracking enabled")
+            return
+
         self.shared_params["busy"] = 1
         self.manual_mode = False
         if hasattr(self, "manual_var"):
@@ -978,9 +989,19 @@ class RobotTuner:
         def _worker():
             try:
                 thermal_resume_callback()
-                self.shared_params["busy"] = 0
-                print("Thermal resume completed")
+                if two_step:
+                    self.shared_params["busy"] = 1
+                    self._resume_ready = True
+                    print("Resume step 1/2 complete: arm powered/held. Press RESUME again to start tracking")
+                else:
+                    self._resume_ready = False
+                    self.shared_params["busy"] = 0 if auto_enable else 1
+                    if auto_enable:
+                        print("Thermal resume completed")
+                    else:
+                        print("Thermal resume completed: tracking remains paused")
             except Exception as e:
+                self._resume_ready = False
                 print(f"Thermal resume failed: {e}")
 
         threading.Thread(target=_worker, daemon=True).start()
