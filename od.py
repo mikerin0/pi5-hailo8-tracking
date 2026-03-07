@@ -2274,30 +2274,35 @@ if __name__ == "__main__":
         brain.tuner.shared_params["busy"] = 1
         try:
             _startup_log("startup path: coordinate move begin")
-            _seed_brain_ik_from_servo_readback()
-            if startup_coord_safe:
-                moved = bool(
-                    brain.reach_for_manual_coordinate(
+            seed_ok = _seed_brain_ik_from_servo_readback()
+            if not seed_ok:
+                _startup_log("startup path: IK seed failed; startup coordinate move blocked")
+                print("Startup move blocked: IK seed/readback failed. Tracking remains paused.")
+                startup_abort_tracking = True
+            else:
+                if startup_coord_safe:
+                    moved = bool(
+                        brain.reach_for_manual_coordinate(
+                            startup_coord_x,
+                            startup_coord_y,
+                            startup_coord_z,
+                            speed=startup_coord_time_ms,
+                        )
+                    )
+                    if not moved:
+                        _startup_log("startup path: safe stepped coordinate move rejected")
+                        print("Startup move rejected by IK safety checks; tracking remains paused")
+                        brain.tuner.shared_params["busy"] = 1
+                        startup_abort_tracking = True
+                else:
+                    brain.reach_for_coordinate(
                         startup_coord_x,
                         startup_coord_y,
                         startup_coord_z,
                         speed=startup_coord_time_ms,
                     )
-                )
-                if not moved:
-                    _startup_log("startup path: safe stepped coordinate move rejected")
-                    print("Startup move rejected by IK safety checks; tracking remains paused")
-                    brain.tuner.shared_params["busy"] = 1
-                    startup_abort_tracking = True
-            else:
-                brain.reach_for_coordinate(
-                    startup_coord_x,
-                    startup_coord_y,
-                    startup_coord_z,
-                    speed=startup_coord_time_ms,
-                )
-            time.sleep(startup_coord_settle_s)
-            _startup_log("startup path: coordinate move settle complete")
+                time.sleep(startup_coord_settle_s)
+                _startup_log("startup path: coordinate move settle complete")
         except Exception as e:
             print(f"Startup coordinate move failed: {e}")
             _startup_log(f"startup path: coordinate move failed: {e}")

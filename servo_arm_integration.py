@@ -203,7 +203,10 @@ def _set_servo_power(enabled):
             # each servo's present physical position before torque enable.
             if bool(getattr(config, "STARTUP_SEED_CURRENT_POSE", True)):
                 try:
-                    current_positions = controller.read_positions(ALL_SERVO_IDS)
+                    current_positions = {
+                        int(sid): controller.read_position(int(sid), fast=True)
+                        for sid in ALL_SERVO_IDS
+                    }
                     _startup_log(f"power-on: read current positions {current_positions}")
                 except Exception:
                     current_positions = {}
