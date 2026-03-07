@@ -2273,8 +2273,12 @@ if __name__ == "__main__":
     startup_abort_tracking = False
 
     _startup_log("step 1/3: power up board (auto)")
+    startup_power_initialized = False
 
     if startup_abs_prime_enabled:
+        _startup_log("startup pre-step: startup_power_up_quiet")
+        servo_integration.startup_power_up_quiet()
+        startup_power_initialized = True
         _wait_for_space("Step 1.5/3: Move to absolute servo startup pose")
         _startup_log("step 1.5 confirmed: absolute servo startup pose")
         brain.tuner.shared_params["busy"] = 1
@@ -2287,8 +2291,10 @@ if __name__ == "__main__":
         _startup_log("step 1.6 confirmed: continue normal startup")
 
     if startup_coord_enabled:
-        _startup_log("startup path: startup_power_up_quiet")
-        servo_integration.startup_power_up_quiet()
+        if not startup_power_initialized:
+            _startup_log("startup path: startup_power_up_quiet")
+            servo_integration.startup_power_up_quiet()
+            startup_power_initialized = True
         _startup_log("step 2/3: absolute startup move attempt (auto)")
         print(
             "Startup: slow move to startup coordinates "
@@ -2372,8 +2378,10 @@ if __name__ == "__main__":
         finally:
             brain.tuner.shared_params["busy"] = 0
     elif startup_slow_home:
-        _startup_log("startup path: startup_power_up_quiet")
-        servo_integration.startup_power_up_quiet()
+        if not startup_power_initialized:
+            _startup_log("startup path: startup_power_up_quiet")
+            servo_integration.startup_power_up_quiet()
+            startup_power_initialized = True
         _wait_for_space("Step 2/3: Move slowly to startup pose")
         _startup_log("step 2 confirmed: startup pose move")
         print(f"Startup: slow move to HOME ({startup_home_time_ms} ms)")
@@ -2394,7 +2402,9 @@ if __name__ == "__main__":
             brain.tuner.shared_params["busy"] = 0
     elif startup_power_on:
         _startup_log("startup path: immediate power_up_servos")
-        servo_integration.power_up_servos()
+        if not startup_power_initialized:
+            servo_integration.power_up_servos()
+            startup_power_initialized = True
     else:
         print("Startup safety: servo power remains OFF until an explicit motion command")
         _startup_log("startup path: power remains off")
