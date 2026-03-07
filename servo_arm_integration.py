@@ -15,7 +15,7 @@ import urllib.error
 import robot_brain as brain
 import config
 from lsc6_controller import ALL_SERVO_IDS, LSC6Controller
-from rest_positions import move_to_home, move_to_position
+from rest_positions import HOME, move_to_home, move_to_position
 from servo_thermal_monitor import ServoThermalMonitor
 
 logger = logging.getLogger(__name__)
@@ -346,6 +346,61 @@ def go_home(time_ms=None):
     move_to_home(controller, time_ms=move_time_ms)
     thermal_monitor.notify_move()
     _startup_log("go_home: command sent")
+
+
+def go_home_staged(time_ms=None, steps=None):
+    """Move to HOME in interpolated stages to reduce initial startup twitch."""
+    if time_ms is None:
+        time_ms = int(getattr(config, "STARTUP_SLOW_HOME_TIME_MS", 5000))
+    total_time_ms = max(1800, int(time_ms))
+
+    if steps is None:
+        steps = int(getattr(config, "STARTUP_SLOW_HOME_STEPS", 6))
+    steps = max(2, int(steps))
+
+    step_pause_s = max(0.0, float(getattr(config, "STARTUP_SLOW_HOME_STEP_PAUSE_SEC", 0.08)))
+
+    try:
+        current = controller.read_positions(ALL_SERVO_IDS)
+    except Exception:
+        current = {}
+
+    seeded = {
+        int(sid): int(pos)
+        for sid, pos in (current or {}).items()
+        if pos is not None
+    }
+    if len(seeded) < 4:
+        _startup_log("go_home_staged: insufficient readback, falling back to go_home")
+        go_home(time_ms=total_time_ms)
+        return
+
+    _startup_log(f"go_home_staged: begin total_time_ms={total_time_ms} steps={steps}")
+    per_step_ms = max(700, int(total_time_ms / steps))
+
+    for step_idx in range(1, steps + 1):
+        t = step_idx / float(steps)
+        pose = {}
+        for sid, target in HOME.items():
+            src = seeded.get(int(sid), None)
+            if src is None:
+                continue
+            blended = int(round(src + ((int(target) - int(src)) * t)))
+            pose[int(sid)] = controller.clamp(int(sid), blended)
+        if not pose:
+            continue
+
+        _startup_log(f"go_home_staged: step {step_idx}/{steps} pose={pose} time_ms={per_step_ms}")
+        controller.move_servos(pose, time_ms=per_step_ms)
+        for sid, pos in pose.items():
+            try:
+                controller.note_commanded_position(int(sid), int(pos))
+            except Exception:
+                pass
+        thermal_monitor.notify_move()
+        time.sleep((per_step_ms / 1000.0) + step_pause_s)
+
+    _startup_log("go_home_staged: complete")
 
 
 def relax_arm():

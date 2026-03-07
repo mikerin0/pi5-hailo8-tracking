@@ -199,6 +199,9 @@ SAFE_STARTUP_POWER_ON = False
 STARTUP_SLOW_HOME_ENABLED = True
 STARTUP_SLOW_HOME_TIME_MS = 5000
 STARTUP_SLOW_HOME_SETTLE_SEC = 0.4
+STARTUP_SLOW_HOME_STAGED = True
+STARTUP_SLOW_HOME_STEPS = 6
+STARTUP_SLOW_HOME_STEP_PAUSE_SEC = 0.08
 # Before startup slow-home, clear any queued controller motion and wait briefly
 # after torque/power enable to avoid snap/jerk from stale targets.
 STARTUP_CLEAR_MOTION_QUEUE = True

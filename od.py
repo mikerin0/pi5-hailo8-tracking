@@ -2188,6 +2188,7 @@ if __name__ == "__main__":
     brain.table_pick_arm_callback = arm_table_pick_tracking
     startup_power_on = bool(getattr(config, "SAFE_STARTUP_POWER_ON", not bool(getattr(config, "SAFE_STARTUP_NO_MOTION", True))))
     startup_slow_home = bool(getattr(config, "STARTUP_SLOW_HOME_ENABLED", True))
+    startup_slow_home_staged = bool(getattr(config, "STARTUP_SLOW_HOME_STAGED", True))
     startup_home_time_ms = max(1200, int(getattr(config, "STARTUP_SLOW_HOME_TIME_MS", 5000)))
     startup_settle_s = max(0.1, float(getattr(config, "STARTUP_SLOW_HOME_SETTLE_SEC", 0.4)))
     _startup_log(
@@ -2201,9 +2202,13 @@ if __name__ == "__main__":
         print(f"Startup: slow move to HOME ({startup_home_time_ms} ms)")
         brain.tuner.shared_params["busy"] = 1
         try:
-            _startup_log("startup path: go_home begin")
-            servo_integration.go_home(time_ms=startup_home_time_ms)
-            time.sleep((startup_home_time_ms / 1000.0) + startup_settle_s)
+            if startup_slow_home_staged:
+                _startup_log("startup path: go_home_staged begin")
+                servo_integration.go_home_staged(time_ms=startup_home_time_ms)
+            else:
+                _startup_log("startup path: go_home begin")
+                servo_integration.go_home(time_ms=startup_home_time_ms)
+            time.sleep(startup_settle_s)
             _startup_log("startup path: go_home settle complete")
         except Exception as e:
             print(f"Startup slow-home failed: {e}")
