@@ -168,15 +168,48 @@ def stop_status_poller():
 def _set_servo_power(enabled):
     global _servo_power_on
     with _SERVO_POWER_LOCK:
+        step_s = max(0.0, float(getattr(config, "SERVO_TORQUE_STEP_SEC", 0.03)))
+
+        if bool(enabled):
+            # If Shelly controls the arm rail, power it first and give the
+            # controller time to boot before sending torque commands.
+            shelly_state = _shelly_set_output(True)
+            if _shelly_enabled():
+                boot_settle_s = max(0.0, float(getattr(config, "SHELLY_ARM_POWER_BOOT_SETTLE_SEC", 1.2)))
+                if boot_settle_s > 0.0:
+                    time.sleep(boot_settle_s)
+
+            # Clear any queued/running motion on the controller after rail-up.
+            try:
+                controller.stop_all()
+            except Exception:
+                pass
+
+            for servo_id in ALL_SERVO_IDS:
+                try:
+                    controller.set_torque(servo_id, True)
+                except Exception as e:
+                    logger.warning("Set torque failed for servo %s: %s", servo_id, e)
+                if step_s > 0.0:
+                    time.sleep(step_s)
+
+            if shelly_state is None:
+                _servo_power_on = True if not _shelly_enabled() else None
+            else:
+                _servo_power_on = bool(shelly_state)
+            return
+
         for servo_id in ALL_SERVO_IDS:
             try:
-                controller.set_torque(servo_id, bool(enabled))
+                controller.set_torque(servo_id, False)
             except Exception as e:
                 logger.warning("Set torque failed for servo %s: %s", servo_id, e)
+            if step_s > 0.0:
+                time.sleep(step_s)
 
-        shelly_state = _shelly_set_output(enabled)
+        shelly_state = _shelly_set_output(False)
         if shelly_state is None:
-            _servo_power_on = bool(enabled) if not _shelly_enabled() else None
+            _servo_power_on = False if not _shelly_enabled() else None
         else:
             _servo_power_on = bool(shelly_state)
 
