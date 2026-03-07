@@ -1147,6 +1147,7 @@ def _table_object_model_callback(_pad, info, _user_data):
                     f"label={best_label or 'unknown'} conf={best_conf:.2f} "
                     f"x={x_norm:.2f} y={y_norm:.2f} err={err:.3f} stable={stable_elapsed:.1f}s"
                 )
+                brain.tuner.shared_params["table_pick_last_label"] = str(best_label or "unknown")
                 brain.tuner.shared_params["table_pick_request_active"] = 0
                 brain.start_take_item_sequence(auto_pick=True)
                 _last_table_obj_trigger_time = now
@@ -1164,6 +1165,7 @@ def _table_object_model_callback(_pad, info, _user_data):
                     f"label={best_label or 'unknown'} conf={best_conf:.2f} "
                     f"x={x_norm:.2f} y={y_norm:.2f} elapsed={elapsed:.1f}s"
                 )
+                brain.tuner.shared_params["table_pick_last_label"] = str(best_label or "unknown")
                 brain.tuner.shared_params["table_pick_request_active"] = 0
                 brain.start_take_item_sequence(auto_pick=True)
                 _last_table_obj_trigger_time = now
@@ -1177,6 +1179,7 @@ def _table_object_model_callback(_pad, info, _user_data):
         f"label={best_label or 'unknown'} conf={best_conf:.2f} "
         f"x={x_norm:.2f} y={y_norm:.2f} -> starting pickup"
     )
+    brain.tuner.shared_params["table_pick_last_label"] = str(best_label or "unknown")
     brain.tuner.shared_params["table_pick_request_active"] = 0
     brain.start_take_item_sequence(auto_pick=True)
     _last_table_obj_trigger_time = now
@@ -1969,6 +1972,7 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
         f"x_norm={x_norm:.2f} y_norm={y_norm:.2f} area={int(area)} "
         f"-> take_x={take_x:.3f} take_y={take_y:.3f} take_z={take_z:.3f}; starting pickup"
     )
+    brain.tuner.shared_params["table_pick_last_label"] = str(target_type or "unknown")
     brain.tuner.shared_params["table_pick_request_active"] = 0
     brain.start_take_item_sequence(auto_pick=True)
     _last_table_obj_trigger_time = now
@@ -2199,6 +2203,7 @@ def camera_loop():
     brain.camera_switch_handlers["DUAL_CAM"] = lambda: None
 
     global _last_seen_time, _table_cam_enter_time
+    global _search_mode
     _last_seen_time = time.time() + 5.0  # give Hailo 5 s to find a person at startup
     prev_mode = None
 
@@ -2212,6 +2217,12 @@ def camera_loop():
         if mode != prev_mode:
             if mode == "TABLE_CAM":
                 _table_cam_enter_time = time.time()
+            elif mode == "HIGH_CAM":
+                reacquire_grace = max(1.0, float(getattr(config, "HIGH_CAM_REACQUIRE_GRACE_SEC", 2.5)))
+                _last_seen_time = time.time() + reacquire_grace
+                if _search_mode is True:
+                    _search_mode = False
+                print(f"HIGH_CAM reacquire grace active: {reacquire_grace:.1f}s")
             prev_mode = mode
         if mode == "TABLE_CAM":
             cam_path = config.ARDUCAM_DEVICE

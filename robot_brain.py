@@ -577,6 +577,10 @@ def _take_item_sequence(auto_pick=False):
             time.sleep(0.6)
             reach_for_coordinate(take_x, take_y, take_z, speed=800)
         if auto_pick:
+            pick_label = str(tuner.shared_params.get("table_pick_last_label", "")).strip().lower()
+            if pick_label:
+                spoken = pick_label.replace("_", " ")
+                say(f"Picking up {spoken}")
             print("Auto-pick: object aligned, closing gripper")
             time.sleep(auto_take_wait_s)
         else:

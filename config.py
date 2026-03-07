@@ -197,7 +197,11 @@ TABLE_PICK_MANUAL_IGNORE_PERSON = True
 TABLE_PICK_MANUAL_MAX_TARGET_STEP_X = 0.015
 TABLE_PICK_MANUAL_MAX_TARGET_STEP_Y = 0.020
 # Keep autonomous pickup from descending too low.
-TABLE_PICK_MIN_AUTO_TAKE_Z = 0.30
+TABLE_PICK_MIN_AUTO_TAKE_Z = 0.34
+
+# After returning from TABLE_CAM to HIGH_CAM, wait this long before applying
+# person-lost timeout logic so reacquisition has time to lock.
+HIGH_CAM_REACQUIRE_GRACE_SEC = 2.5
 
 # --- TABLE_CAM model-based object detection (Hailo) ---
 TABLE_OBJECT_MODEL_ENABLED = True
