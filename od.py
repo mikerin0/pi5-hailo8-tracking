@@ -960,6 +960,8 @@ def _table_object_model_callback(_pad, info, _user_data):
     if manual_pick_active and bool(getattr(config, "TABLE_PICK_IGNORE_LABEL_FILTER", True)):
         target_label = ""
     min_conf = float(getattr(config, "TABLE_OBJECT_MIN_CONFIDENCE", 0.35))
+    if manual_pick_active:
+        min_conf = min(min_conf, float(getattr(config, "TABLE_PICK_MANUAL_MIN_CONFIDENCE", 0.20)))
 
     best = None
     best_conf = -1.0
@@ -1002,6 +1004,8 @@ def _table_object_model_callback(_pad, info, _user_data):
     x_max = float(getattr(config, "TABLE_OBJECT_X_MAX_NORM", 0.75))
     y_min = float(getattr(config, "TABLE_OBJECT_Y_MIN_NORM", 0.45))
     max_area_frac = float(getattr(config, "TABLE_OBJECT_MAX_AREA_FRAC", 0.80))
+    if manual_pick_active:
+        x_min, x_max, y_min, max_area_frac = 0.0, 1.0, 0.0, 0.98
     if not (x_min <= x_norm <= x_max and y_norm >= y_min and area_norm <= max_area_frac):
         _table_obj_hits = 0
         _table_obj_center_hits = 0
