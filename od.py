@@ -2265,14 +2265,12 @@ if __name__ == "__main__":
     )
     startup_abort_tracking = False
 
-    _wait_for_space("Step 1/3: Power up board")
-    _startup_log("step 1 confirmed: power up board")
+    _startup_log("step 1/3: power up board (auto)")
 
     if startup_coord_enabled:
         _startup_log("startup path: startup_power_up_quiet")
         servo_integration.startup_power_up_quiet()
-        _wait_for_space("Step 2/3: Move slowly to absolute startup pose")
-        _startup_log("step 2 confirmed: absolute startup move")
+        _startup_log("step 2/3: absolute startup move attempt (auto)")
         print(
             "Startup: slow move to startup coordinates "
             f"({startup_coord_x:.3f}, {startup_coord_y:.3f}, {startup_coord_z:.3f}) "
@@ -2287,6 +2285,7 @@ if __name__ == "__main__":
                 if startup_allow_force_no_seed:
                     print("Startup seed unavailable. You can force a very slow startup move.")
                     _wait_for_space("Step 2b/3: Force slow move without seed (higher risk)")
+                    _wait_for_space("Step 2b.1/3: Send first motion command")
                     _startup_log("startup path: forcing unseeded SAFE stepped move")
                     moved = bool(
                         brain.reach_for_manual_coordinate(
@@ -2294,9 +2293,11 @@ if __name__ == "__main__":
                             startup_coord_y,
                             startup_coord_z,
                             speed=startup_force_move_time_ms,
+                            respect_config_speed=False,
                         )
                     )
                     if moved:
+                        _wait_for_space("Step 2b.2/3: Continue after motion settle")
                         time.sleep(startup_coord_settle_s)
                         _startup_log("startup path: forced unseeded safe move settle complete")
                     else:

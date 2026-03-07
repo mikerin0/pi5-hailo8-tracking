@@ -592,7 +592,7 @@ def reach_for_coordinate(x, y, z, speed=800):
     except Exception as e: print(f"IK Error: {e}")
 
 
-def reach_for_manual_coordinate(x, y, z, speed=900):
+def reach_for_manual_coordinate(x, y, z, speed=900, respect_config_speed=True):
     global last_angles
     global _first_move_capped
     x = max(float(getattr(config, "MANUAL_X_MIN", 0.14)),
@@ -602,7 +602,10 @@ def reach_for_manual_coordinate(x, y, z, speed=900):
     z = max(float(getattr(config, "MANUAL_Z_MIN", 0.12)),
             min(float(getattr(config, "MANUAL_Z_MAX", 0.40)), float(z)))
 
-    speed = int(getattr(config, "MANUAL_JOG_SPEED", speed))
+    if respect_config_speed:
+        speed = int(getattr(config, "MANUAL_JOG_SPEED", speed))
+    else:
+        speed = int(speed)
     cap = int(getattr(config, "SAFE_STARTUP_FIRST_MOVE_SPEED_CAP", 0))
     if cap > 0 and not _first_move_capped:
         speed = max(speed, cap)
