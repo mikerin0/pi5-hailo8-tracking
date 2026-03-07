@@ -2287,15 +2287,22 @@ if __name__ == "__main__":
                 if startup_allow_force_no_seed:
                     print("Startup seed unavailable. You can force a very slow startup move.")
                     _wait_for_space("Step 2b/3: Force slow move without seed (higher risk)")
-                    _startup_log("startup path: forcing unseeded coordinate move")
-                    brain.reach_for_coordinate(
-                        startup_coord_x,
-                        startup_coord_y,
-                        startup_coord_z,
-                        speed=startup_force_move_time_ms,
+                    _startup_log("startup path: forcing unseeded SAFE stepped move")
+                    moved = bool(
+                        brain.reach_for_manual_coordinate(
+                            startup_coord_x,
+                            startup_coord_y,
+                            startup_coord_z,
+                            speed=startup_force_move_time_ms,
+                        )
                     )
-                    time.sleep(startup_coord_settle_s)
-                    _startup_log("startup path: forced unseeded move settle complete")
+                    if moved:
+                        time.sleep(startup_coord_settle_s)
+                        _startup_log("startup path: forced unseeded safe move settle complete")
+                    else:
+                        _startup_log("startup path: forced unseeded safe move rejected")
+                        print("Forced startup move rejected by IK safety checks; tracking remains paused.")
+                        startup_abort_tracking = True
                 else:
                     print(
                         "Startup move blocked: IK seed/readback failed. "
