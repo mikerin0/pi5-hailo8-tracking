@@ -2260,6 +2260,8 @@ if __name__ == "__main__":
     startup_force_move_time_ms = max(startup_coord_time_ms, int(getattr(config, "STARTUP_FORCE_MOVE_TIME_MS", 8000)))
     startup_seed_retry_sec = max(0.0, float(getattr(config, "STARTUP_SEED_RETRY_SEC", 6.0)))
     startup_seed_retry_interval = max(0.05, float(getattr(config, "STARTUP_SEED_RETRY_INTERVAL_SEC", 0.25)))
+    startup_abs_prime_enabled = bool(getattr(config, "STARTUP_ABS_SERVO_PRIME_ENABLED", True))
+    startup_abs_time_ms = max(1200, int(getattr(config, "STARTUP_ABS_SERVO_TIME_MS", 8000)))
     startup_slow_home = bool(getattr(config, "STARTUP_SLOW_HOME_ENABLED", True))
     startup_slow_home_staged = bool(getattr(config, "STARTUP_SLOW_HOME_STAGED", True))
     startup_home_time_ms = max(1200, int(getattr(config, "STARTUP_SLOW_HOME_TIME_MS", 5000)))
@@ -2271,6 +2273,18 @@ if __name__ == "__main__":
     startup_abort_tracking = False
 
     _startup_log("step 1/3: power up board (auto)")
+
+    if startup_abs_prime_enabled:
+        _wait_for_space("Step 1.5/3: Move to absolute servo startup pose")
+        _startup_log("step 1.5 confirmed: absolute servo startup pose")
+        brain.tuner.shared_params["busy"] = 1
+        try:
+            servo_integration.move_startup_absolute_pose(time_ms=startup_abs_time_ms)
+        except Exception as e:
+            print(f"Startup absolute-servo pre-step failed: {e}")
+            _startup_log(f"startup absolute-servo pre-step failed: {e}")
+        _wait_for_space("Step 1.6/3: Continue normal startup")
+        _startup_log("step 1.6 confirmed: continue normal startup")
 
     if startup_coord_enabled:
         _startup_log("startup path: startup_power_up_quiet")

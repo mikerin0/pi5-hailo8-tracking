@@ -340,6 +340,37 @@ def move_servos(positions, time_ms=800):
     thermal_monitor.notify_move()
 
 
+def move_startup_absolute_pose(time_ms=None):
+    """Move to configured absolute startup servo pose."""
+    if time_ms is None:
+        time_ms = int(getattr(config, "STARTUP_ABS_SERVO_TIME_MS", 8000))
+    move_time_ms = max(1200, int(time_ms))
+
+    raw_pose = getattr(config, "STARTUP_ABS_SERVO_POSITIONS", {})
+    pose = {}
+    if isinstance(raw_pose, dict):
+        for sid in ALL_SERVO_IDS:
+            val = raw_pose.get(sid, raw_pose.get(str(sid)))
+            if val is None:
+                continue
+            try:
+                pose[int(sid)] = controller.clamp(int(sid), int(val))
+            except Exception:
+                continue
+
+    if not pose:
+        pose = {6: 1883, 5: 700, 4: 655, 3: 720, 2: 1500, 1: 1500}
+
+    _startup_log(f"startup absolute pose move: pose={pose} time_ms={move_time_ms}")
+    controller.move_servos(pose, time_ms=move_time_ms)
+    for sid, pos in pose.items():
+        try:
+            controller.note_commanded_position(int(sid), int(pos))
+        except Exception:
+            pass
+    thermal_monitor.notify_move()
+
+
 def go_home(time_ms=None):
     """Move arm to the calibrated home position and notify the monitor."""
     if time_ms is None:
