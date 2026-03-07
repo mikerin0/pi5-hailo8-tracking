@@ -1009,6 +1009,8 @@ def _table_object_model_callback(_pad, info, _user_data):
 
     _table_obj_hits += 1
     frames_required = max(1, int(getattr(config, "TABLE_OBJECT_FRAMES_REQUIRED", 3)))
+    if manual_pick_active:
+        frames_required = max(1, int(getattr(config, "TABLE_PICK_MANUAL_FRAMES_REQUIRED", 1)))
     if _table_obj_hits < frames_required:
         return Gst.PadProbeReturn.OK
 
@@ -1020,6 +1022,9 @@ def _table_object_model_callback(_pad, info, _user_data):
     center_tol = float(getattr(config, "TABLE_OBJECT_CENTER_TOL_NORM", 0.10))
     align_alpha = float(getattr(config, "TABLE_OBJECT_ALIGN_ALPHA", 0.35))
     center_frames_required = max(1, int(getattr(config, "TABLE_OBJECT_CENTER_FRAMES_REQUIRED", 4)))
+    if manual_pick_active:
+        center_frames_required = max(1, int(getattr(config, "TABLE_PICK_MANUAL_CENTER_FRAMES_REQUIRED", 1)))
+        center_tol = max(center_tol, float(getattr(config, "TABLE_PICK_MANUAL_CENTER_TOL_NORM", 0.20)))
 
     target_take_y = max(-0.12, min(0.12, (center_x - x_norm) * y_gain))
     target_take_x = float(p.get("take_x", 0.16)) + ((center_y - y_norm) * x_bias_gain)

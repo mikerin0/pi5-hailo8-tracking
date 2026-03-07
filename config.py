@@ -176,6 +176,10 @@ TABLE_PICK_IGNORE_LABEL_FILTER = True
 # False uses direct coordinate IK to avoid strict pose-error rejections
 # during small tracking corrections.
 TABLE_PICK_STEER_USE_STEPPED_IK = False
+# When operator manually arms TABLE PICK, allow faster trigger behavior.
+TABLE_PICK_MANUAL_FRAMES_REQUIRED = 1
+TABLE_PICK_MANUAL_CENTER_FRAMES_REQUIRED = 1
+TABLE_PICK_MANUAL_CENTER_TOL_NORM = 0.20
 
 # --- TABLE_CAM model-based object detection (Hailo) ---
 TABLE_OBJECT_MODEL_ENABLED = True
@@ -265,7 +269,7 @@ STARTUP_SEED_TIME_MS = 1200
 # Applies a hard guard to commanded pulse jumps to reduce jerk risk.
 # mode: "clamp" (limit to max delta) or "reject" (drop command)
 SERVO_MOVE_DELTA_GUARD_ENABLED = True
-SERVO_MOVE_MAX_DELTA_US = 90
+SERVO_MOVE_MAX_DELTA_US = 160
 SERVO_MOVE_DELTA_MODE = "clamp"
 # Servo IDs exempt from delta guard (claw should close fully on one command).
 SERVO_MOVE_DELTA_GUARD_EXEMPT_IDS = [1]
