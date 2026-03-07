@@ -485,13 +485,43 @@ def move_servo(id, pos, time_ms=800):
             _servo_last_commanded[1] = int(pos)
             return
     else:
-        guarded = _guard_target_pulse(id, pos)
-        if guarded is None:
+        sid = int(id)
+        target = int(max(500, min(2500, int(pos))))
+        exempt_ids = getattr(config, "SERVO_MOVE_DELTA_GUARD_EXEMPT_IDS", [1])
+        try:
+            exempt = {int(x) for x in (exempt_ids or [])}
+        except Exception:
+            exempt = {1}
+
+        guard_enabled = bool(getattr(config, "SERVO_MOVE_DELTA_GUARD_ENABLED", True)) and sid not in exempt
+        max_delta = max(10, int(getattr(config, "SERVO_MOVE_MAX_DELTA_US", 90)))
+        mode = str(getattr(config, "SERVO_MOVE_DELTA_MODE", "clamp")).strip().lower()
+        prev = int(_servo_last_commanded.get(sid, 1500))
+        delta = target - prev
+
+        if guard_enabled and abs(delta) > max_delta and mode == "reject":
+            print(
+                f"Servo {sid} command rejected by delta guard: "
+                f"prev={prev} target={target} max={max_delta}"
+            )
             return
-        pos = int(max(500, min(2500, guarded)))
-    _send_servo_packet(id, pos, time_ms)
-    _notify_servo_move(id, pos)
-    _servo_last_commanded[int(id)] = int(pos)
+
+        if guard_enabled and abs(delta) > max_delta and mode != "reject":
+            steps = max(1, int(np.ceil(abs(delta) / float(max_delta))))
+            step_time = max(80, int(max(1, int(time_ms)) / steps))
+            direction = 1 if delta > 0 else -1
+            for step_idx in range(1, steps + 1):
+                step_target = prev + (direction * min(abs(delta), step_idx * max_delta))
+                step_target = int(max(500, min(2500, step_target)))
+                _send_servo_packet(sid, step_target, step_time)
+                _notify_servo_move(sid, step_target)
+                _servo_last_commanded[sid] = step_target
+            return
+
+        _send_servo_packet(sid, target, time_ms)
+        _notify_servo_move(sid, target)
+        _servo_last_commanded[sid] = target
+        return
 
 def go_home():
     # Open gripper first to reduce collision/load risk while parking.
