@@ -207,7 +207,12 @@ def _wait_for_space(step_label):
 def _seed_brain_ik_from_servo_readback():
     """Align brain.last_angles with physical servo pose before first IK move."""
     try:
-        readback = servo_integration.controller.read_positions([6, 5, 4, 3])
+        readback = {
+            6: servo_integration.controller.read_position(6, fast=True),
+            5: servo_integration.controller.read_position(5, fast=True),
+            4: servo_integration.controller.read_position(4, fast=True),
+            3: servo_integration.controller.read_position(3, fast=True),
+        }
     except Exception as e:
         _startup_log(f"IK seed: readback failed: {e}")
         return False
@@ -2248,6 +2253,8 @@ if __name__ == "__main__":
     startup_coord_time_ms = max(1200, int(getattr(config, "STARTUP_COORD_TIME_MS", 4500)))
     startup_coord_settle_s = max(0.1, float(getattr(config, "STARTUP_COORD_SETTLE_SEC", 0.6)))
     startup_coord_safe = bool(getattr(config, "STARTUP_COORD_USE_SAFE_STEPPED_IK", True))
+    startup_allow_force_no_seed = bool(getattr(config, "STARTUP_ALLOW_FORCE_MOVE_WITHOUT_SEED", True))
+    startup_force_move_time_ms = max(startup_coord_time_ms, int(getattr(config, "STARTUP_FORCE_MOVE_TIME_MS", 8000)))
     startup_slow_home = bool(getattr(config, "STARTUP_SLOW_HOME_ENABLED", True))
     startup_slow_home_staged = bool(getattr(config, "STARTUP_SLOW_HOME_STAGED", True))
     startup_home_time_ms = max(1200, int(getattr(config, "STARTUP_SLOW_HOME_TIME_MS", 5000)))
@@ -2277,8 +2284,21 @@ if __name__ == "__main__":
             seed_ok = _seed_brain_ik_from_servo_readback()
             if not seed_ok:
                 _startup_log("startup path: IK seed failed; startup coordinate move blocked")
-                print("Startup move blocked: IK seed/readback failed. Tracking remains paused.")
-                startup_abort_tracking = True
+                if startup_allow_force_no_seed:
+                    print("Startup seed unavailable. You can force a very slow startup move.")
+                    _wait_for_space("Step 2b/3: Force slow move without seed (higher risk)")
+                    _startup_log("startup path: forcing unseeded coordinate move")
+                    brain.reach_for_coordinate(
+                        startup_coord_x,
+                        startup_coord_y,
+                        startup_coord_z,
+                        speed=startup_force_move_time_ms,
+                    )
+                    time.sleep(startup_coord_settle_s)
+                    _startup_log("startup path: forced unseeded move settle complete")
+                else:
+                    print("Startup move blocked: IK seed/readback failed. Tracking remains paused.")
+                    startup_abort_tracking = True
             else:
                 if startup_coord_safe:
                     moved = bool(
