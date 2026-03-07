@@ -320,7 +320,7 @@ RESUME_SETTLE_SEC = 0.2
 RESUME_HOLD_CURRENT_POSE = True
 # Two-step resume safety: first RESUME powers/holds while paused, second RESUME
 # enables tracking motion.
-RESUME_TWO_STEP_ENABLE = True
+RESUME_TWO_STEP_ENABLE = False
 # If two-step is disabled, this controls whether tracking auto-enables after
 # thermal resume callback completes.
 RESUME_AUTO_ENABLE_TRACKING = True
