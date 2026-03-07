@@ -284,7 +284,7 @@ STARTUP_INITIAL_BUSY = 0
 
 # Optional pre-step before IK/coordinate startup: move to known absolute
 # servo pulses first, then continue normal startup flow.
-STARTUP_ABS_SERVO_PRIME_ENABLED = True
+STARTUP_ABS_SERVO_PRIME_ENABLED = False
 STARTUP_ABS_SERVO_TIME_MS = 8000
 STARTUP_ABS_SERVO_POSITIONS = {
     6: 1883,
@@ -294,6 +294,10 @@ STARTUP_ABS_SERVO_POSITIONS = {
     2: 1500,
     1: 1500,
 }
+
+# If False, step 3 will start camera/UI but keep arm tracking paused
+# (busy=1) until operator explicitly presses RESUME.
+STARTUP_ENABLE_TRACKING_ON_STEP3 = False
 
 # --- Resume motion behavior ---
 # On RESUME, move to a known absolute HOME pose slowly before tracking.

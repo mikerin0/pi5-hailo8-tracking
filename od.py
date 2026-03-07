@@ -2262,6 +2262,7 @@ if __name__ == "__main__":
     startup_seed_retry_interval = max(0.05, float(getattr(config, "STARTUP_SEED_RETRY_INTERVAL_SEC", 0.25)))
     startup_abs_prime_enabled = bool(getattr(config, "STARTUP_ABS_SERVO_PRIME_ENABLED", True))
     startup_abs_time_ms = max(1200, int(getattr(config, "STARTUP_ABS_SERVO_TIME_MS", 8000)))
+    startup_enable_tracking_on_step3 = bool(getattr(config, "STARTUP_ENABLE_TRACKING_ON_STEP3", False))
     startup_slow_home = bool(getattr(config, "STARTUP_SLOW_HOME_ENABLED", True))
     startup_slow_home_staged = bool(getattr(config, "STARTUP_SLOW_HOME_STAGED", True))
     startup_home_time_ms = max(1200, int(getattr(config, "STARTUP_SLOW_HOME_TIME_MS", 5000)))
@@ -2416,9 +2417,15 @@ if __name__ == "__main__":
         brain.tuner.shared_params["busy"] = 1
     else:
         _wait_for_space("Step 3/3: Start tracking")
-        _startup_log("step 3 confirmed: start tracking")
-        config.STARTUP_INITIAL_BUSY = 0
-        brain.tuner.shared_params["busy"] = 0
+        if startup_enable_tracking_on_step3:
+            _startup_log("step 3 confirmed: start tracking")
+            config.STARTUP_INITIAL_BUSY = 0
+            brain.tuner.shared_params["busy"] = 0
+        else:
+            _startup_log("step 3 confirmed: startup complete, tracking remains paused")
+            print("Startup complete. Tracking remains paused; press RESUME when ready.")
+            config.STARTUP_INITIAL_BUSY = 1
+            brain.tuner.shared_params["busy"] = 1
 
     servo_integration.thermal_monitor.start()
     servo_integration.start_status_poller()
