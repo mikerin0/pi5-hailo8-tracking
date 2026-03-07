@@ -183,6 +183,26 @@ def _startup_log(message):
     dt = time.monotonic() - _startup_t0
     print(f"[STARTUP +{dt:7.3f}s] {message}")
 
+
+def _wait_for_space(step_label):
+    """Block until user presses SPACE then Enter (interactive terminals)."""
+    prompts_enabled = bool(getattr(config, "STARTUP_STEP_PROMPTS_ENABLED", False))
+    if not prompts_enabled:
+        return
+    if not sys.stdin or not sys.stdin.isatty():
+        print(f"{step_label}: non-interactive stdin, continuing without prompt")
+        return
+
+    while True:
+        try:
+            reply = input(f"{step_label} — press SPACE then Enter to continue: ")
+        except EOFError:
+            print(f"{step_label}: input unavailable, continuing")
+            return
+        if reply == " ":
+            return
+        print("Input ignored. Press SPACE then Enter to continue.")
+
 _HAILO_ELEMENTS = ("hailonet", "hailofilter", "hailooverlay", "hailotracker")
 
 def _clear_gst_registry():
@@ -2202,9 +2222,14 @@ if __name__ == "__main__":
         f"slow_home={startup_slow_home}"
     )
 
+    _wait_for_space("Step 1/3: Power up board")
+    _startup_log("step 1 confirmed: power up board")
+
     if startup_coord_enabled:
         _startup_log("startup path: startup_power_up_quiet")
         servo_integration.startup_power_up_quiet()
+        _wait_for_space("Step 2/3: Move slowly to absolute startup pose")
+        _startup_log("step 2 confirmed: absolute startup move")
         print(
             "Startup: slow move to startup coordinates "
             f"({startup_coord_x:.3f}, {startup_coord_y:.3f}, {startup_coord_z:.3f}) "
@@ -2229,6 +2254,8 @@ if __name__ == "__main__":
     elif startup_slow_home:
         _startup_log("startup path: startup_power_up_quiet")
         servo_integration.startup_power_up_quiet()
+        _wait_for_space("Step 2/3: Move slowly to startup pose")
+        _startup_log("step 2 confirmed: startup pose move")
         print(f"Startup: slow move to HOME ({startup_home_time_ms} ms)")
         brain.tuner.shared_params["busy"] = 1
         try:
@@ -2251,6 +2278,9 @@ if __name__ == "__main__":
     else:
         print("Startup safety: servo power remains OFF until an explicit motion command")
         _startup_log("startup path: power remains off")
+
+    _wait_for_space("Step 3/3: Start tracking")
+    _startup_log("step 3 confirmed: start tracking")
 
     servo_integration.thermal_monitor.start()
     servo_integration.start_status_poller()
