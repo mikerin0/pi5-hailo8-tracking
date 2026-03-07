@@ -166,7 +166,7 @@ TABLE_OBJECT_TARGET_TYPE = "any"
 # Safety delay after entering TABLE_CAM before auto-pick is allowed.
 TABLE_OBJECT_ARM_DELAY_SEC = 4.0
 # Extra Z offset applied only to autonomous TABLE PICK (meters).
-TABLE_PICK_Z_OFFSET_M = -0.01
+TABLE_PICK_Z_OFFSET_M = 0.00
 # If servo 1 closes beyond this pulse during TABLE PICK, treat as a miss.
 TABLE_PICK_MISS_SERVO1_POS = 2140
 # When TABLE PICK is manually armed, ignore strict model class label filtering
@@ -194,7 +194,7 @@ TABLE_PICK_MANUAL_IGNORE_PERSON = True
 TABLE_PICK_MANUAL_MAX_TARGET_STEP_X = 0.015
 TABLE_PICK_MANUAL_MAX_TARGET_STEP_Y = 0.020
 # Keep autonomous pickup from descending too low.
-TABLE_PICK_MIN_AUTO_TAKE_Z = 0.24
+TABLE_PICK_MIN_AUTO_TAKE_Z = 0.30
 
 # --- TABLE_CAM model-based object detection (Hailo) ---
 TABLE_OBJECT_MODEL_ENABLED = True
@@ -272,9 +272,9 @@ SHELLY_ARM_POWER_HOST = "172.31.31.166"
 SHELLY_ARM_POWER_SWITCH_ID = 0
 SHELLY_ARM_POWER_TIMEOUT_S = 2.0
 # Delay after turning Shelly output on before sending controller commands.
-SHELLY_ARM_POWER_BOOT_SETTLE_SEC = 1.2
+SHELLY_ARM_POWER_BOOT_SETTLE_SEC = 2.0
 # Optional inter-servo delay when enabling/disabling torque.
-SERVO_TORQUE_STEP_SEC = 0.03
+SERVO_TORQUE_STEP_SEC = 0.15
 # On power-up, read current servo positions and seed those as motion targets
 # before enabling torque. This prevents snapping to stale prior targets.
 STARTUP_SEED_CURRENT_POSE = True
