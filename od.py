@@ -660,6 +660,7 @@ _table_pick_steer_stop = threading.Event()
 _table_pick_steer_thread = None
 _last_table_pick_target_update = 0.0
 _table_pick_manual_arm_time = 0.0
+_table_pick_manual_stable_since = 0.0
 _vision_summary_lock = threading.Lock()
 _vision_summary_state = {
     "updated_at": 0.0,
@@ -847,7 +848,7 @@ def arm_table_pick_tracking():
     """Arm TABLE_CAM object tracking so pickup starts after stable alignment."""
     global _table_obj_hits, _table_obj_center_hits
     global _last_table_obj_trigger_time, _last_table_obj_block_log_time, _last_table_obj_align_log_time
-    global _table_cam_enter_time, _table_pick_manual_arm_time
+    global _table_cam_enter_time, _table_pick_manual_arm_time, _table_pick_manual_stable_since
 
     config.TABLE_OBJECT_PICKUP_ENABLED = True
     _table_obj_hits = 0
@@ -859,6 +860,7 @@ def arm_table_pick_tracking():
     arm_delay = max(0.0, float(getattr(config, "TABLE_OBJECT_ARM_DELAY_SEC", 4.0)))
     _table_cam_enter_time = time.time() - arm_delay - 0.1
     _table_pick_manual_arm_time = time.time()
+    _table_pick_manual_stable_since = 0.0
     return "TABLE PICK armed: tracking object for alignment before grab"
 
 
@@ -945,7 +947,7 @@ def _table_object_model_callback(_pad, info, _user_data):
     """Model-based TABLE_CAM detection callback using Hailo detection objects."""
     global _table_obj_hits, _table_obj_center_hits
     global _last_table_obj_trigger_time, _last_table_obj_block_log_time, _last_table_obj_align_log_time
-    global _table_pick_manual_arm_time
+    global _table_pick_manual_arm_time, _table_pick_manual_stable_since
 
     if not bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False)):
         _table_obj_hits = 0
@@ -1127,6 +1129,32 @@ def _table_object_model_callback(_pad, info, _user_data):
             return Gst.PadProbeReturn.OK
 
     if _table_obj_center_hits < center_frames_required:
+        if manual_pick_active and bool(getattr(config, "TABLE_PICK_MANUAL_COMMIT_ENABLED", True)):
+            commit_err = max(0.05, float(getattr(config, "TABLE_PICK_MANUAL_COMMIT_ERR_NORM", 0.22)))
+            stable_sec = max(0.2, float(getattr(config, "TABLE_PICK_MANUAL_COMMIT_STABLE_SEC", 1.2)))
+            min_hunt_sec = max(0.0, float(getattr(config, "TABLE_PICK_MANUAL_MIN_HUNT_SEC", 0.8)))
+            if err <= commit_err:
+                if _table_pick_manual_stable_since <= 0.0:
+                    _table_pick_manual_stable_since = now
+            else:
+                _table_pick_manual_stable_since = 0.0
+
+            elapsed = now - float(_table_pick_manual_arm_time)
+            stable_elapsed = now - float(_table_pick_manual_stable_since) if _table_pick_manual_stable_since > 0.0 else 0.0
+            if elapsed >= min_hunt_sec and stable_elapsed >= stable_sec:
+                print(
+                    "TABLE_CAM manual commit: "
+                    f"label={best_label or 'unknown'} conf={best_conf:.2f} "
+                    f"x={x_norm:.2f} y={y_norm:.2f} err={err:.3f} stable={stable_elapsed:.1f}s"
+                )
+                brain.tuner.shared_params["table_pick_request_active"] = 0
+                brain.start_take_item_sequence(auto_pick=True)
+                _last_table_obj_trigger_time = now
+                _table_obj_hits = 0
+                _table_obj_center_hits = 0
+                _table_pick_manual_stable_since = 0.0
+                return Gst.PadProbeReturn.OK
+
         if manual_pick_active and bool(getattr(config, "TABLE_PICK_MANUAL_FORCE_GRAB_ENABLED", False)):
             force_after = max(0.5, float(getattr(config, "TABLE_PICK_MANUAL_FORCE_GRAB_AFTER_SEC", 3.0)))
             elapsed = now - float(_table_pick_manual_arm_time)
@@ -1154,6 +1182,7 @@ def _table_object_model_callback(_pad, info, _user_data):
     _last_table_obj_trigger_time = now
     _table_obj_hits = 0
     _table_obj_center_hits = 0
+    _table_pick_manual_stable_since = 0.0
     return Gst.PadProbeReturn.OK
 
 
