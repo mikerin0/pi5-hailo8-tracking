@@ -232,3 +232,9 @@ SHELLY_ARM_POWER_ENABLED = True
 SHELLY_ARM_POWER_HOST = "172.31.31.166"
 SHELLY_ARM_POWER_SWITCH_ID = 0
 SHELLY_ARM_POWER_TIMEOUT_S = 2.0
+
+# --- Resume motion behavior ---
+# On RESUME, move to a known absolute HOME pose slowly before tracking.
+RESUME_USE_HOME_POSE = True
+RESUME_HOME_TIME_MS = 3500
+RESUME_SETTLE_SEC = 0.2

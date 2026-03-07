@@ -264,6 +264,13 @@ def park_arm():
 def resume_arm():
     """Resume thermal monitoring after a manual park."""
     power_up_servos()
-    controller.move_servos(_TRACKING_READY_POSE, time_ms=_TRACKING_READY_TIME_MS)
-    time.sleep((_TRACKING_READY_TIME_MS / 1000.0) + 0.1)
+    use_home_pose = bool(getattr(config, "RESUME_USE_HOME_POSE", True))
+    settle_s = max(0.05, float(getattr(config, "RESUME_SETTLE_SEC", 0.2)))
+    if use_home_pose:
+        home_time_ms = max(1200, int(getattr(config, "RESUME_HOME_TIME_MS", 3500)))
+        move_to_home(controller, time_ms=home_time_ms)
+        time.sleep((home_time_ms / 1000.0) + settle_s)
+    else:
+        controller.move_servos(_TRACKING_READY_POSE, time_ms=_TRACKING_READY_TIME_MS)
+        time.sleep((_TRACKING_READY_TIME_MS / 1000.0) + settle_s)
     thermal_monitor.resume()
