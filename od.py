@@ -1062,6 +1062,9 @@ def _table_object_model_callback(_pad, info, _user_data):
     align_alpha = float(getattr(config, "TABLE_OBJECT_ALIGN_ALPHA", 0.35))
     center_frames_required = max(1, int(getattr(config, "TABLE_OBJECT_CENTER_FRAMES_REQUIRED", 4)))
     if manual_pick_active:
+        y_gain = float(getattr(config, "TABLE_PICK_MANUAL_Y_GAIN", y_gain))
+        x_bias_gain = float(getattr(config, "TABLE_PICK_MANUAL_X_GAIN", x_bias_gain))
+        align_alpha = float(getattr(config, "TABLE_PICK_MANUAL_ALIGN_ALPHA", 1.0))
         center_frames_required = max(1, int(getattr(config, "TABLE_PICK_MANUAL_CENTER_FRAMES_REQUIRED", 1)))
         center_tol = max(center_tol, float(getattr(config, "TABLE_PICK_MANUAL_CENTER_TOL_NORM", 0.20)))
 
@@ -1085,6 +1088,7 @@ def _table_object_model_callback(_pad, info, _user_data):
             "TABLE_CAM model align: "
             f"label={best_label or 'unknown'} conf={best_conf:.2f} "
             f"x={x_norm:.2f} y={y_norm:.2f} err={err:.3f} "
+            f"take_x={take_x:.3f} take_y={take_y:.3f} "
             f"center_hits={_table_obj_center_hits}/{center_frames_required}"
         )
         _last_table_obj_align_log_time = now
