@@ -194,6 +194,12 @@ SAFE_STARTUP_FIRST_MOVE_SPEED_CAP = 1500
 # explicit motion command (or RESUME).
 SAFE_STARTUP_POWER_ON = False
 
+# Optional startup choreography: move slowly to HOME before tracking starts.
+# This helps avoid aggressive first motion when the arm is in an unknown pose.
+STARTUP_SLOW_HOME_ENABLED = True
+STARTUP_SLOW_HOME_TIME_MS = 5000
+STARTUP_SLOW_HOME_SETTLE_SEC = 0.4
+
 # --- Pose gesture events to Crestron (outbound) ---
 # Uses yolov8 pose keypoints (wrists + shoulders). These are coarse gestures,
 # not finger-level hand-pose classification.

@@ -2177,10 +2177,29 @@ if __name__ == "__main__":
     brain.table_model_update_callback = update_table_model_paths
     brain.table_pick_arm_callback = arm_table_pick_tracking
     startup_power_on = bool(getattr(config, "SAFE_STARTUP_POWER_ON", not bool(getattr(config, "SAFE_STARTUP_NO_MOTION", True))))
+    startup_slow_home = bool(getattr(config, "STARTUP_SLOW_HOME_ENABLED", True))
+    startup_home_time_ms = max(1200, int(getattr(config, "STARTUP_SLOW_HOME_TIME_MS", 5000)))
+    startup_settle_s = max(0.1, float(getattr(config, "STARTUP_SLOW_HOME_SETTLE_SEC", 0.4)))
+
+    if startup_slow_home:
+        startup_power_on = True
+
     if startup_power_on:
         servo_integration.power_up_servos()
     else:
         print("Startup safety: servo power remains OFF until an explicit motion command")
+
+    if startup_slow_home:
+        print(f"Startup: slow move to HOME ({startup_home_time_ms} ms)")
+        brain.tuner.shared_params["busy"] = 1
+        try:
+            servo_integration.go_home(time_ms=startup_home_time_ms)
+            time.sleep((startup_home_time_ms / 1000.0) + startup_settle_s)
+        except Exception as e:
+            print(f"Startup slow-home failed: {e}")
+        finally:
+            brain.tuner.shared_params["busy"] = 0
+
     servo_integration.thermal_monitor.start()
     servo_integration.start_status_poller()
     _start_table_pick_steer_worker()

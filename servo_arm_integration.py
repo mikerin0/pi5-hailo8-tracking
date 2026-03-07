@@ -238,9 +238,11 @@ def move_servos(positions, time_ms=800):
     thermal_monitor.notify_move()
 
 
-def go_home():
+def go_home(time_ms=None):
     """Move arm to the calibrated home position and notify the monitor."""
-    move_to_home(controller, time_ms=2000)
+    if time_ms is None:
+        time_ms = int(getattr(config, "HOME_SPEED", 2000))
+    move_to_home(controller, time_ms=max(1200, int(time_ms)))
     thermal_monitor.notify_move()
 
 
