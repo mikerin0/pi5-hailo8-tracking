@@ -204,43 +204,46 @@ def _wait_for_space(step_label):
         print("Input ignored. Press SPACE then Enter to continue.")
 
 
-def _seed_brain_ik_from_servo_readback():
+def _seed_brain_ik_from_servo_readback(retry_sec=0.0, retry_interval_sec=0.25):
     """Align brain.last_angles with physical servo pose before first IK move."""
-    try:
-        readback = {
-            6: servo_integration.controller.read_position(6, fast=True),
-            5: servo_integration.controller.read_position(5, fast=True),
-            4: servo_integration.controller.read_position(4, fast=True),
-            3: servo_integration.controller.read_position(3, fast=True),
-        }
-    except Exception as e:
-        _startup_log(f"IK seed: readback failed: {e}")
-        return False
+    deadline = time.monotonic() + max(0.0, float(retry_sec))
+    interval = max(0.05, float(retry_interval_sec))
+    attempt = 0
 
-    if not isinstance(readback, dict):
-        _startup_log("IK seed: invalid readback payload")
-        return False
+    while True:
+        attempt += 1
+        try:
+            readback = {
+                6: servo_integration.controller.read_position(6, fast=True),
+                5: servo_integration.controller.read_position(5, fast=True),
+                4: servo_integration.controller.read_position(4, fast=True),
+                3: servo_integration.controller.read_position(3, fast=True),
+            }
+        except Exception as e:
+            _startup_log(f"IK seed: readback failed attempt {attempt}: {e}")
+            readback = None
 
-    try:
-        p6 = readback.get(6)
-        p5 = readback.get(5)
-        p4 = readback.get(4)
-        p3 = readback.get(3)
-        if None in (p6, p5, p4, p3):
-            _startup_log(f"IK seed: incomplete readback {readback}")
+        if isinstance(readback, dict):
+            try:
+                p6 = readback.get(6)
+                p5 = readback.get(5)
+                p4 = readback.get(4)
+                p3 = readback.get(3)
+                if None not in (p6, p5, p4, p3):
+                    a1 = (float(p6) - 1500.0) / 637.0
+                    a2 = (float(p5) - 1500.0) / 637.0
+                    a3 = (float(p4) - 1500.0) / 637.0
+                    a4 = (float(p3) - 1500.0) / 637.0
+                    brain.last_angles = [0.0, a1, a2, a3, a4]
+                    _startup_log(f"IK seed: last_angles set from readback {readback} (attempt {attempt})")
+                    return True
+                _startup_log(f"IK seed: incomplete readback attempt {attempt}: {readback}")
+            except Exception as e:
+                _startup_log(f"IK seed: conversion failed attempt {attempt}: {e}")
+
+        if time.monotonic() >= deadline:
             return False
-
-        # Inverse of robot_brain pulse mapping: pulse = 1500 + angle * 637
-        a1 = (float(p6) - 1500.0) / 637.0
-        a2 = (float(p5) - 1500.0) / 637.0
-        a3 = (float(p4) - 1500.0) / 637.0
-        a4 = (float(p3) - 1500.0) / 637.0
-        brain.last_angles = [0.0, a1, a2, a3, a4]
-        _startup_log(f"IK seed: last_angles set from readback {readback}")
-        return True
-    except Exception as e:
-        _startup_log(f"IK seed: conversion failed: {e}")
-        return False
+        time.sleep(interval)
 
 _HAILO_ELEMENTS = ("hailonet", "hailofilter", "hailooverlay", "hailotracker")
 
@@ -2255,6 +2258,8 @@ if __name__ == "__main__":
     startup_coord_safe = bool(getattr(config, "STARTUP_COORD_USE_SAFE_STEPPED_IK", True))
     startup_allow_force_no_seed = bool(getattr(config, "STARTUP_ALLOW_FORCE_MOVE_WITHOUT_SEED", True))
     startup_force_move_time_ms = max(startup_coord_time_ms, int(getattr(config, "STARTUP_FORCE_MOVE_TIME_MS", 8000)))
+    startup_seed_retry_sec = max(0.0, float(getattr(config, "STARTUP_SEED_RETRY_SEC", 6.0)))
+    startup_seed_retry_interval = max(0.05, float(getattr(config, "STARTUP_SEED_RETRY_INTERVAL_SEC", 0.25)))
     startup_slow_home = bool(getattr(config, "STARTUP_SLOW_HOME_ENABLED", True))
     startup_slow_home_staged = bool(getattr(config, "STARTUP_SLOW_HOME_STAGED", True))
     startup_home_time_ms = max(1200, int(getattr(config, "STARTUP_SLOW_HOME_TIME_MS", 5000)))
@@ -2286,24 +2291,37 @@ if __name__ == "__main__":
                     print("Startup seed unavailable. You can force a very slow startup move.")
                     _wait_for_space("Step 2b/3: Force slow move without seed (higher risk)")
                     _wait_for_space("Step 2b.1/3: Send first motion command")
-                    _startup_log("startup path: forcing unseeded SAFE stepped move")
-                    moved = bool(
-                        brain.reach_for_manual_coordinate(
-                            startup_coord_x,
-                            startup_coord_y,
-                            startup_coord_z,
-                            speed=startup_force_move_time_ms,
-                            respect_config_speed=False,
-                        )
+                    _startup_log("startup path: retrying IK seed before any forced move")
+                    seed_ok_force = _seed_brain_ik_from_servo_readback(
+                        retry_sec=startup_seed_retry_sec,
+                        retry_interval_sec=startup_seed_retry_interval,
                     )
-                    if moved:
-                        _wait_for_space("Step 2b.2/3: Continue after motion settle")
-                        time.sleep(startup_coord_settle_s)
-                        _startup_log("startup path: forced unseeded safe move settle complete")
-                    else:
-                        _startup_log("startup path: forced unseeded safe move rejected")
-                        print("Forced startup move rejected by IK safety checks; tracking remains paused.")
+                    if not seed_ok_force:
+                        _startup_log("startup path: forced move blocked; seed still unavailable after retries")
+                        print(
+                            "Forced startup move blocked: servo readback still unavailable after retries. "
+                            "No motion will be commanded; tracking remains paused."
+                        )
                         startup_abort_tracking = True
+                    else:
+                        _startup_log("startup path: forcing SAFE stepped move after successful seed")
+                        moved = bool(
+                            brain.reach_for_manual_coordinate(
+                                startup_coord_x,
+                                startup_coord_y,
+                                startup_coord_z,
+                                speed=startup_force_move_time_ms,
+                                respect_config_speed=False,
+                            )
+                        )
+                        if moved:
+                            _wait_for_space("Step 2b.2/3: Continue after motion settle")
+                            time.sleep(startup_coord_settle_s)
+                            _startup_log("startup path: forced safe move settle complete")
+                        else:
+                            _startup_log("startup path: forced safe move rejected")
+                            print("Forced startup move rejected by IK safety checks; tracking remains paused.")
+                            startup_abort_tracking = True
                 else:
                     print(
                         "Startup move blocked: IK seed/readback failed. "

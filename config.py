@@ -274,6 +274,8 @@ STARTUP_COORD_USE_SAFE_STEPPED_IK = True
 # slow coordinate move (higher risk than seeded move, but avoids total block).
 STARTUP_ALLOW_FORCE_MOVE_WITHOUT_SEED = True
 STARTUP_FORCE_MOVE_TIME_MS = 8000
+STARTUP_SEED_RETRY_SEC = 6.0
+STARTUP_SEED_RETRY_INTERVAL_SEC = 0.25
 # Interactive startup wizard: require operator confirmation between
 # power-up, absolute-start move, and tracking start.
 STARTUP_STEP_PROMPTS_ENABLED = True
