@@ -739,6 +739,7 @@ def _table_pick_steer_worker():
     last_sent = None
     while not _table_pick_steer_stop.is_set() and not brain.shutdown_event.is_set():
         now = time.time()
+        manual_pick_active = bool(brain.tuner.shared_params.get("table_pick_request_active", 0))
         if not bool(brain.tuner.shared_params.get("table_pick_request_active", 0)):
             with _table_pick_steer_lock:
                 _table_pick_steer_target = None
@@ -774,6 +775,14 @@ def _table_pick_steer_worker():
                 time.sleep(0.05)
                 continue
         tx, ty, tz = target
+
+        if manual_pick_active and bool(getattr(config, "TABLE_PICK_MANUAL_HUNT_ENABLED", True)):
+            amp = max(0.0, min(0.11, float(getattr(config, "TABLE_PICK_MANUAL_HUNT_AMPLITUDE_Y", 0.07))))
+            period = max(1.0, float(getattr(config, "TABLE_PICK_MANUAL_HUNT_PERIOD_SEC", 3.0)))
+            phase = (now % period) / period
+            hunt_offset = amp * np.sin(2.0 * np.pi * phase)
+            ty = max(-0.12, min(0.12, float(ty) + hunt_offset))
+
         if last_sent is not None:
             if abs(tx - last_sent[0]) < 0.002 and abs(ty - last_sent[1]) < 0.002 and abs(tz - last_sent[2]) < 0.002:
                 time.sleep(0.04)
