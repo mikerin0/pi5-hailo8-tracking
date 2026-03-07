@@ -735,7 +735,7 @@ def _maybe_update_table_pick_approach_pose(take_x, take_y, take_lift_z, now):
 
 def _table_pick_steer_worker():
     """Send low-rate arm steering updates for TABLE PICK on a background thread."""
-    global _table_pick_steer_target
+    global _table_pick_steer_target, _table_obj_center_hits
     last_sent = None
     while not _table_pick_steer_stop.is_set() and not brain.shutdown_event.is_set():
         now = time.time()
@@ -776,7 +776,11 @@ def _table_pick_steer_worker():
                 continue
         tx, ty, tz = target
 
-        if manual_pick_active and bool(getattr(config, "TABLE_PICK_MANUAL_HUNT_ENABLED", True)):
+        if (
+            manual_pick_active
+            and bool(getattr(config, "TABLE_PICK_MANUAL_HUNT_ENABLED", True))
+            and int(_table_obj_center_hits) <= 0
+        ):
             amp = max(0.0, min(0.11, float(getattr(config, "TABLE_PICK_MANUAL_HUNT_AMPLITUDE_Y", 0.07))))
             period = max(1.0, float(getattr(config, "TABLE_PICK_MANUAL_HUNT_PERIOD_SEC", 3.0)))
             phase = (now % period) / period
