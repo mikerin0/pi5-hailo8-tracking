@@ -2339,9 +2339,13 @@ if __name__ == "__main__":
     if startup_abort_tracking:
         print("Step 3/3 skipped: startup move failed safety checks; tracking remains paused")
         _startup_log("step 3 skipped: tracking paused after startup move rejection")
+        config.STARTUP_INITIAL_BUSY = 1
+        brain.tuner.shared_params["busy"] = 1
     else:
         _wait_for_space("Step 3/3: Start tracking")
         _startup_log("step 3 confirmed: start tracking")
+        config.STARTUP_INITIAL_BUSY = 0
+        brain.tuner.shared_params["busy"] = 0
 
     servo_integration.thermal_monitor.start()
     servo_integration.start_status_poller()

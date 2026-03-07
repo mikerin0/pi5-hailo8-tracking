@@ -1302,7 +1302,7 @@ def start_brain_ui():
     # Startup should only initialise UI/network state; motion must come from
     # explicit commands (resume, table pick, take item, etc.).
     _first_move_capped = False
-    tuner.shared_params["busy"] = 0
+    tuner.shared_params["busy"] = 1 if bool(getattr(config, "STARTUP_INITIAL_BUSY", 0)) else 0
     threading.Thread(target=tcp_listener, daemon=True).start()
     try:
         tuner.create_gui()

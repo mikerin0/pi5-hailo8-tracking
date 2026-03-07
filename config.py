@@ -273,6 +273,8 @@ STARTUP_COORD_USE_SAFE_STEPPED_IK = True
 # Interactive startup wizard: require operator confirmation between
 # power-up, absolute-start move, and tracking start.
 STARTUP_STEP_PROMPTS_ENABLED = True
+# Initial busy state applied when UI starts (1 keeps tracking paused).
+STARTUP_INITIAL_BUSY = 0
 
 # --- Resume motion behavior ---
 # On RESUME, move to a known absolute HOME pose slowly before tracking.
