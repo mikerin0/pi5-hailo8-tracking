@@ -174,6 +174,15 @@ gi.require_version('Gst', '1.0')
 from gi.repository import Gst
 Gst.init(None)
 
+_startup_t0 = time.monotonic()
+
+
+def _startup_log(message):
+    if not bool(getattr(config, "STARTUP_DEBUG_TIMESTAMPS", False)):
+        return
+    dt = time.monotonic() - _startup_t0
+    print(f"[STARTUP +{dt:7.3f}s] {message}")
+
 _HAILO_ELEMENTS = ("hailonet", "hailofilter", "hailooverlay", "hailotracker")
 
 def _clear_gst_registry():
@@ -2167,6 +2176,7 @@ def camera_loop():
 
 if __name__ == "__main__":
     print(f"--- od.py version {_VERSION} ---")
+    _startup_log("od.py main: startup begin")
     brain.servo_move_callback = servo_integration.note_servo_move
     brain.thermal_status_provider = servo_integration.get_thermal_status
     brain.thermal_park_callback = servo_integration.park_arm
@@ -2180,30 +2190,43 @@ if __name__ == "__main__":
     startup_slow_home = bool(getattr(config, "STARTUP_SLOW_HOME_ENABLED", True))
     startup_home_time_ms = max(1200, int(getattr(config, "STARTUP_SLOW_HOME_TIME_MS", 5000)))
     startup_settle_s = max(0.1, float(getattr(config, "STARTUP_SLOW_HOME_SETTLE_SEC", 0.4)))
+    _startup_log(
+        f"startup config: power_on={startup_power_on} slow_home={startup_slow_home} "
+        f"home_time_ms={startup_home_time_ms} settle_s={startup_settle_s:.2f}"
+    )
 
     if startup_slow_home:
+        _startup_log("startup path: startup_power_up_quiet")
         servo_integration.startup_power_up_quiet()
         print(f"Startup: slow move to HOME ({startup_home_time_ms} ms)")
         brain.tuner.shared_params["busy"] = 1
         try:
+            _startup_log("startup path: go_home begin")
             servo_integration.go_home(time_ms=startup_home_time_ms)
             time.sleep((startup_home_time_ms / 1000.0) + startup_settle_s)
+            _startup_log("startup path: go_home settle complete")
         except Exception as e:
             print(f"Startup slow-home failed: {e}")
+            _startup_log(f"startup path: go_home failed: {e}")
         finally:
             brain.tuner.shared_params["busy"] = 0
     elif startup_power_on:
+        _startup_log("startup path: immediate power_up_servos")
         servo_integration.power_up_servos()
     else:
         print("Startup safety: servo power remains OFF until an explicit motion command")
+        _startup_log("startup path: power remains off")
 
     servo_integration.thermal_monitor.start()
     servo_integration.start_status_poller()
     _start_table_pick_steer_worker()
     print("--- Servo thermal monitor started ---")
+    _startup_log("startup path: thermal/status/steer workers started")
     camera_thread = threading.Thread(target=camera_loop, daemon=True, name="CameraLoop")
     camera_thread.start()
+    _startup_log("startup path: camera_thread started")
     try:
+        _startup_log("startup path: entering brain UI")
         brain.start_brain_ui()
     except KeyboardInterrupt:
         brain.request_shutdown()

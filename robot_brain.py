@@ -44,8 +44,16 @@ vision_summary_provider = None
 table_model_update_callback = None
 table_pick_arm_callback = None
 _first_move_capped = False
+_startup_t0 = time.monotonic()
 TUNER_PARAMS_PATH = os.path.join(os.path.dirname(__file__), "tuner_params.json")
 WINDOW_STATE_PATH = os.path.join(os.path.dirname(__file__), "window_state.json")
+
+
+def _startup_log(message):
+    if not bool(getattr(config, "STARTUP_DEBUG_TIMESTAMPS", False)):
+        return
+    dt = time.monotonic() - _startup_t0
+    print(f"[STARTUP +{dt:7.3f}s] robot_brain: {message}")
 
 
 def _discover_table_model_presets():
@@ -375,6 +383,7 @@ def _ensure_servo_power_for_motion():
     if power_state is True:
         return
     try:
+        _startup_log("_ensure_servo_power_for_motion: invoking power-up callback")
         callback()
     except Exception as e:
         print(f"Servo power-up before motion failed: {e}")
@@ -385,6 +394,8 @@ def move_servo(id, pos, time_ms=800):
     if ARM_MOVEMENT_DISABLED:
         print(f"ARM_MOVEMENT_DISABLED: servo {id} pos {pos} suppressed")
         return
+    if (time.monotonic() - _startup_t0) < 25.0:
+        _startup_log(f"move_servo(id={id}, pos={int(pos)}, time_ms={int(time_ms)})")
     _ensure_servo_power_for_motion()
     cap = int(getattr(config, "SAFE_STARTUP_FIRST_MOVE_SPEED_CAP", 0))
     if cap > 0 and not _first_move_capped:

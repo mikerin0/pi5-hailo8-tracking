@@ -54,6 +54,14 @@ _status_cache = {
 _STATUS_POLL_INTERVAL_S = 1.0
 _status_poll_running = False
 _status_poll_thread = None
+_startup_t0 = time.monotonic()
+
+
+def _startup_log(message):
+    if not bool(getattr(config, "STARTUP_DEBUG_TIMESTAMPS", False)):
+        return
+    dt = time.monotonic() - _startup_t0
+    print(f"[STARTUP +{dt:7.3f}s] {message}")
 
 
 def _shelly_enabled():
@@ -169,22 +177,58 @@ def _set_servo_power(enabled):
     global _servo_power_on
     with _SERVO_POWER_LOCK:
         step_s = max(0.0, float(getattr(config, "SERVO_TORQUE_STEP_SEC", 0.03)))
+        _startup_log(f"_set_servo_power(enabled={bool(enabled)})")
 
         if bool(enabled):
             # If Shelly controls the arm rail, power it first and give the
             # controller time to boot before sending torque commands.
+            _startup_log("power-on: Shelly rail enable begin")
             shelly_state = _shelly_set_output(True)
+            _startup_log(f"power-on: Shelly rail state={shelly_state}")
             if _shelly_enabled():
                 boot_settle_s = max(0.0, float(getattr(config, "SHELLY_ARM_POWER_BOOT_SETTLE_SEC", 1.2)))
                 if boot_settle_s > 0.0:
+                    _startup_log(f"power-on: waiting controller boot settle {boot_settle_s:.2f}s")
                     time.sleep(boot_settle_s)
 
             # Clear any queued/running motion on the controller after rail-up.
             try:
                 controller.stop_all()
+                _startup_log("power-on: controller stop_all sent")
             except Exception:
+                _startup_log("power-on: controller stop_all failed")
                 pass
 
+            # Prevent snap-to-old-target by first setting commanded targets to
+            # each servo's present physical position before torque enable.
+            if bool(getattr(config, "STARTUP_SEED_CURRENT_POSE", True)):
+                try:
+                    current_positions = controller.read_positions(ALL_SERVO_IDS)
+                    _startup_log(f"power-on: read current positions {current_positions}")
+                except Exception:
+                    current_positions = {}
+                    _startup_log("power-on: read current positions failed")
+                seeded = {
+                    int(sid): int(pos)
+                    for sid, pos in (current_positions or {}).items()
+                    if pos is not None
+                }
+                if seeded:
+                    try:
+                        seed_time_ms = max(800, int(getattr(config, "STARTUP_SEED_TIME_MS", 1200)))
+                        _startup_log(f"power-on: seeding commanded pose {seeded} time_ms={seed_time_ms}")
+                        controller.move_servos(seeded, time_ms=seed_time_ms)
+                        for sid, pos in seeded.items():
+                            try:
+                                controller.note_commanded_position(int(sid), int(pos))
+                            except Exception:
+                                pass
+                        time.sleep(0.08)
+                    except Exception:
+                        _startup_log("power-on: seeding commanded pose failed")
+                        pass
+
+            _startup_log(f"power-on: torque enable begin step={step_s:.3f}s")
             for servo_id in ALL_SERVO_IDS:
                 try:
                     controller.set_torque(servo_id, True)
@@ -192,13 +236,16 @@ def _set_servo_power(enabled):
                     logger.warning("Set torque failed for servo %s: %s", servo_id, e)
                 if step_s > 0.0:
                     time.sleep(step_s)
+            _startup_log("power-on: torque enable complete")
 
             if shelly_state is None:
                 _servo_power_on = True if not _shelly_enabled() else None
             else:
                 _servo_power_on = bool(shelly_state)
+            _startup_log(f"power-on: _servo_power_on={_servo_power_on}")
             return
 
+        _startup_log(f"power-off: torque disable begin step={step_s:.3f}s")
         for servo_id in ALL_SERVO_IDS:
             try:
                 controller.set_torque(servo_id, False)
@@ -212,6 +259,7 @@ def _set_servo_power(enabled):
             _servo_power_on = False if not _shelly_enabled() else None
         else:
             _servo_power_on = bool(shelly_state)
+        _startup_log(f"power-off: _servo_power_on={_servo_power_on}")
 
 
 def power_down_servos():
@@ -224,15 +272,20 @@ def power_up_servos():
 
 def startup_power_up_quiet():
     """Power/torque up in a startup-safe way to reduce first-motion jerk."""
+    _startup_log("startup_power_up_quiet: begin")
     if bool(getattr(config, "STARTUP_CLEAR_MOTION_QUEUE", True)):
         try:
             controller.stop_all()
+            _startup_log("startup_power_up_quiet: pre-power stop_all sent")
         except Exception:
+            _startup_log("startup_power_up_quiet: pre-power stop_all failed")
             pass
     _set_servo_power(True)
     settle_s = max(0.0, float(getattr(config, "STARTUP_POWER_SETTLE_SEC", 0.8)))
     if settle_s > 0.0:
+        _startup_log(f"startup_power_up_quiet: post-power settle {settle_s:.2f}s")
         time.sleep(settle_s)
+    _startup_log("startup_power_up_quiet: complete")
 
 
 def is_servo_power_on():
@@ -288,8 +341,11 @@ def go_home(time_ms=None):
     """Move arm to the calibrated home position and notify the monitor."""
     if time_ms is None:
         time_ms = int(getattr(config, "HOME_SPEED", 2000))
-    move_to_home(controller, time_ms=max(1200, int(time_ms)))
+    move_time_ms = max(1200, int(time_ms))
+    _startup_log(f"go_home: begin time_ms={move_time_ms}")
+    move_to_home(controller, time_ms=move_time_ms)
     thermal_monitor.notify_move()
+    _startup_log("go_home: command sent")
 
 
 def relax_arm():

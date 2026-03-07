@@ -203,6 +203,8 @@ STARTUP_SLOW_HOME_SETTLE_SEC = 0.4
 # after torque/power enable to avoid snap/jerk from stale targets.
 STARTUP_CLEAR_MOTION_QUEUE = True
 STARTUP_POWER_SETTLE_SEC = 0.8
+# Emit detailed startup timing logs for diagnosing boot-time jerks.
+STARTUP_DEBUG_TIMESTAMPS = True
 
 # --- Pose gesture events to Crestron (outbound) ---
 # Uses yolov8 pose keypoints (wrists + shoulders). These are coarse gestures,
@@ -246,6 +248,10 @@ SHELLY_ARM_POWER_TIMEOUT_S = 2.0
 SHELLY_ARM_POWER_BOOT_SETTLE_SEC = 1.2
 # Optional inter-servo delay when enabling/disabling torque.
 SERVO_TORQUE_STEP_SEC = 0.03
+# On power-up, read current servo positions and seed those as motion targets
+# before enabling torque. This prevents snapping to stale prior targets.
+STARTUP_SEED_CURRENT_POSE = True
+STARTUP_SEED_TIME_MS = 1200
 
 # --- Resume motion behavior ---
 # On RESUME, move to a known absolute HOME pose slowly before tracking.
