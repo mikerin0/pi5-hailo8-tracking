@@ -1410,6 +1410,14 @@ class RobotTuner:
 
     def update_object_target_type(self, value):
         self.shared_params["table_object_target_type"] = str(value).strip().lower()
+        if self.shared_params.get("camera_mode", "HIGH_CAM") == "TABLE_CAM":
+            handler = camera_switch_handlers.get("TABLE_CAM")
+            if handler:
+                try:
+                    handler()
+                    print("TABLE_CAM refreshed for new pickup target type")
+                except Exception as e:
+                    print(f"TABLE_CAM refresh failed after target change: {e}")
 
     def update_object_target_label(self, value=None):
         if value is None and hasattr(self, "object_label_var"):

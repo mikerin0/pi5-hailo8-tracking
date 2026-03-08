@@ -983,6 +983,17 @@ def _table_object_model_callback(_pad, info, _user_data):
 
     _update_vision_summary(_extract_detection_labels(detections), mode="TABLE_CAM")
 
+    target_type = str(
+        brain.tuner.shared_params.get(
+            "table_object_target_type",
+            getattr(config, "TABLE_OBJECT_TARGET_TYPE", "any"),
+        )
+    ).strip().lower()
+    if target_type != "any":
+        _table_obj_hits = 0
+        _table_obj_center_hits = 0
+        return Gst.PadProbeReturn.OK
+
     pickup_enabled = bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False))
     if not pickup_enabled:
         _table_obj_hits = 0
