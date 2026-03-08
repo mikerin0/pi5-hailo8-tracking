@@ -205,6 +205,8 @@ HIGH_CAM_REACQUIRE_GRACE_SEC = 2.5
 
 # --- TABLE_CAM model-based object detection (Hailo) ---
 TABLE_OBJECT_MODEL_ENABLED = True
+# Run TABLE_CAM model for vision summary even when pickup is not armed.
+TABLE_OBJECT_SUMMARY_ENABLED = True
 TABLE_OBJECT_HEF_PATH = "/usr/local/hailo/resources/models/hailo8/yolov8n.hef"
 TABLE_OBJECT_SO_PATH = "/usr/local/hailo/resources/so/libyolo_hailortpp_postprocess.so"
 TABLE_OBJECT_MIN_CONFIDENCE = 0.35

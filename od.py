@@ -949,10 +949,6 @@ def _table_object_model_callback(_pad, info, _user_data):
     global _last_table_obj_trigger_time, _last_table_obj_block_log_time, _last_table_obj_align_log_time
     global _table_pick_manual_arm_time, _table_pick_manual_stable_since
 
-    if not bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False)):
-        _table_obj_hits = 0
-        _table_obj_center_hits = 0
-        return Gst.PadProbeReturn.OK
     if brain.tuner.shared_params.get("camera_mode", "HIGH_CAM") != "TABLE_CAM":
         _table_obj_hits = 0
         _table_obj_center_hits = 0
@@ -986,6 +982,12 @@ def _table_object_model_callback(_pad, info, _user_data):
         return Gst.PadProbeReturn.OK
 
     _update_vision_summary(_extract_detection_labels(detections), mode="TABLE_CAM")
+
+    pickup_enabled = bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False))
+    if not pickup_enabled:
+        _table_obj_hits = 0
+        _table_obj_center_hits = 0
+        return Gst.PadProbeReturn.OK
 
     target_label = str(
         brain.tuner.shared_params.get(
@@ -1811,7 +1813,9 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
     global _table_obj_hits, _last_table_obj_trigger_time, _last_table_obj_block_log_time
     global _table_obj_center_hits, _last_table_obj_align_log_time
 
-    if not bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False)):
+    pickup_enabled = bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False))
+    summary_enabled = bool(getattr(config, "TABLE_OBJECT_SUMMARY_ENABLED", True))
+    if not (pickup_enabled or summary_enabled):
         _table_obj_hits = 0
         return
     if brain.tuner.shared_params.get("camera_mode", "HIGH_CAM") != "TABLE_CAM":
@@ -1980,6 +1984,11 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
     brain.tuner.shared_params["take_z"] = take_z
     brain.tuner.shared_params["take_lift_z"] = take_lift_z
     _maybe_update_table_pick_approach_pose(take_x, take_y, take_lift_z, now)
+
+    if not pickup_enabled:
+        _table_obj_hits = 0
+        _table_obj_center_hits = 0
+        return
 
     if _table_obj_center_hits < center_frames_required:
         return
@@ -2281,7 +2290,10 @@ def camera_loop():
             )
             table_model_branch_enabled = (
                 mode == "TABLE_CAM"
-                and bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False))
+                and (
+                    bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False))
+                    or bool(getattr(config, "TABLE_OBJECT_SUMMARY_ENABLED", True))
+                )
                 and bool(getattr(config, "TABLE_OBJECT_MODEL_ENABLED", False))
                 and os.path.isfile(getattr(config, "TABLE_OBJECT_HEF_PATH", ""))
                 and os.path.isfile(getattr(config, "TABLE_OBJECT_SO_PATH", ""))
@@ -2301,7 +2313,10 @@ def camera_loop():
                 table_model_branch_enabled = False
             table_object_branch_enabled = (
                 mode == "TABLE_CAM"
-                and bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False))
+                and (
+                    bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False))
+                    or bool(getattr(config, "TABLE_OBJECT_SUMMARY_ENABLED", True))
+                )
                 and not table_model_branch_enabled
             )
 
