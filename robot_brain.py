@@ -639,6 +639,7 @@ def start_take_item_sequence(auto_pick=False):
 def start_table_pick_sequence():
     """Switch to TABLE_CAM and arm detection-driven tracking before pickup."""
     switch_camera("TABLE_CAM")
+    config.TABLE_OBJECT_PICKUP_ENABLED = True
     tuner.shared_params["busy"] = 0
     tuner.shared_params["table_pick_request_active"] = 1
     _set_pickup_status("Pickup: tracking target")

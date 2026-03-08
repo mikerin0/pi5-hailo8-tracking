@@ -2486,7 +2486,8 @@ if __name__ == "__main__":
     startup_force_move_time_ms = max(startup_coord_time_ms, int(getattr(config, "STARTUP_FORCE_MOVE_TIME_MS", 8000)))
     startup_seed_retry_sec = max(0.0, float(getattr(config, "STARTUP_SEED_RETRY_SEC", 6.0)))
     startup_seed_retry_interval = max(0.05, float(getattr(config, "STARTUP_SEED_RETRY_INTERVAL_SEC", 0.25)))
-    startup_abs_prime_enabled = bool(getattr(config, "STARTUP_ABS_SERVO_PRIME_ENABLED", True))
+    safe_startup_no_motion = bool(getattr(config, "SAFE_STARTUP_NO_MOTION", True))
+    startup_abs_prime_enabled = bool(getattr(config, "STARTUP_ABS_SERVO_PRIME_ENABLED", False)) and not safe_startup_no_motion
     startup_abs_time_ms = max(1200, int(getattr(config, "STARTUP_ABS_SERVO_TIME_MS", 8000)))
     startup_enable_tracking_on_step3 = bool(getattr(config, "STARTUP_ENABLE_TRACKING_ON_STEP3", False))
     startup_slow_home = bool(getattr(config, "STARTUP_SLOW_HOME_ENABLED", True))
