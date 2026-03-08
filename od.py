@@ -2498,6 +2498,18 @@ if __name__ == "__main__":
         f"startup config: power_on={startup_power_on} coord_move={startup_coord_enabled} "
         f"slow_home={startup_slow_home}"
     )
+
+    # Hard safety override: when SAFE_STARTUP_NO_MOTION is enabled, block all
+    # startup auto-motion paths regardless of stale tuner/config flags.
+    if safe_startup_no_motion:
+        startup_power_on = False
+        startup_coord_enabled = False
+        startup_slow_home = False
+        startup_abs_prime_enabled = False
+        startup_enable_tracking_on_step3 = False
+        config.STARTUP_INITIAL_BUSY = 1
+        brain.tuner.shared_params["busy"] = 1
+        _startup_log("startup hard no-motion override active")
     startup_abort_tracking = False
 
     _startup_log("step 1/3: power up board (auto)")

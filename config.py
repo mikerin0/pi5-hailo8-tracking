@@ -332,7 +332,7 @@ STARTUP_SEED_RETRY_INTERVAL_SEC = 0.25
 # power-up, absolute-start move, and tracking start.
 STARTUP_STEP_PROMPTS_ENABLED = False
 # Initial busy state applied when UI starts (1 keeps tracking paused).
-STARTUP_INITIAL_BUSY = 0
+STARTUP_INITIAL_BUSY = 1
 
 # Optional pre-step before IK/coordinate startup: move to known absolute
 # servo pulses first, then continue normal startup flow.
