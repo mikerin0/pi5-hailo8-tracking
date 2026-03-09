@@ -1,7 +1,7 @@
 # These imports must come first so that libgomp and GST_PLUGIN_PATH are
 # configured BEFORE any other package (hailo, robot_brain, gi) can trigger a
 # GStreamer initialisation internally.
-import os, sys, platform, glob as _glob, subprocess, json
+import os, sys, platform, glob as _glob, subprocess, json, shutil
 
 # libgsthailotools.so depends on libgomp.so.1 (OpenMP), which has a static TLS
 # block that must be mapped before the dynamic linker exhausts glibc's fixed
@@ -177,6 +177,8 @@ Gst.init(None)
 _startup_t0 = time.monotonic()
 VIDEO_WINDOW_STATE_PATH = os.path.join(os.path.dirname(__file__), "video_window_state.json")
 _video_window_state_lock = threading.Lock()
+MAIN_PREVIEW_WINDOW_KEY = "Hailo Main Preview"
+_main_preview_window_id = None
 
 
 def _startup_log(message):
@@ -219,6 +221,42 @@ def _load_video_window_states():
     return {}
 
 
+def _save_video_window_state_values(window_name, x, y, w, h):
+    with _video_window_state_lock:
+        states = _load_video_window_states()
+        if not isinstance(states, dict):
+            states = {}
+        states[str(window_name)] = {
+            "x": int(x),
+            "y": int(y),
+            "w": int(w),
+            "h": int(h),
+        }
+        try:
+            with open(VIDEO_WINDOW_STATE_PATH, "w", encoding="utf-8") as f:
+                json.dump(states, f, indent=2, sort_keys=True)
+        except Exception:
+            pass
+
+
+def _get_saved_video_window_state(window_name):
+    with _video_window_state_lock:
+        states = _load_video_window_states()
+    state = states.get(str(window_name), {}) if isinstance(states, dict) else {}
+    if not isinstance(state, dict):
+        return None
+    try:
+        x = int(state.get("x"))
+        y = int(state.get("y"))
+        w = int(state.get("w"))
+        h = int(state.get("h"))
+    except Exception:
+        return None
+    if w <= 0 or h <= 0:
+        return None
+    return {"x": x, "y": y, "w": w, "h": h}
+
+
 def _apply_saved_video_window_state(window_name, default_w=None, default_h=None):
     with _video_window_state_lock:
         states = _load_video_window_states()
@@ -250,22 +288,103 @@ def _save_video_window_state(window_name):
             return
     except Exception:
         return
+    _save_video_window_state_values(window_name, x, y, w, h)
 
-    with _video_window_state_lock:
-        states = _load_video_window_states()
-        if not isinstance(states, dict):
-            states = {}
-        states[str(window_name)] = {
-            "x": int(x),
-            "y": int(y),
-            "w": int(w),
-            "h": int(h),
-        }
+
+def _wmctrl_windows():
+    if not os.environ.get("DISPLAY"):
+        return []
+    if shutil.which("wmctrl") is None:
+        return []
+    try:
+        out = subprocess.run(
+            ["wmctrl", "-lG"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=1.5,
+        ).stdout
+    except Exception:
+        return []
+
+    rows = []
+    for line in out.splitlines():
+        parts = line.split(None, 7)
+        if len(parts) < 8:
+            continue
         try:
-            with open(VIDEO_WINDOW_STATE_PATH, "w", encoding="utf-8") as f:
-                json.dump(states, f, indent=2, sort_keys=True)
+            rows.append(
+                {
+                    "id": str(parts[0]).lower(),
+                    "x": int(parts[2]),
+                    "y": int(parts[3]),
+                    "w": int(parts[4]),
+                    "h": int(parts[5]),
+                    "title": str(parts[7]).strip(),
+                }
+            )
         except Exception:
-            pass
+            continue
+    return rows
+
+
+def _bind_main_preview_window(before_ids):
+    global _main_preview_window_id
+    if _main_preview_window_id:
+        return
+    baseline = {str(x).lower() for x in (before_ids or set())}
+    for _ in range(12):
+        windows = _wmctrl_windows()
+        candidates = [
+            w
+            for w in windows
+            if w.get("id") not in baseline and int(w.get("w", 0)) >= 200 and int(w.get("h", 0)) >= 150
+        ]
+        if candidates:
+            chosen = max(candidates, key=lambda w: int(w.get("w", 0)) * int(w.get("h", 0)))
+            _main_preview_window_id = str(chosen.get("id", "")).lower()
+            _apply_saved_main_preview_window_state()
+            return
+        time.sleep(0.2)
+
+
+def _apply_saved_main_preview_window_state():
+    if not _main_preview_window_id:
+        return
+    saved = _get_saved_video_window_state(MAIN_PREVIEW_WINDOW_KEY)
+    if not saved:
+        return
+    try:
+        geom = f"0,{int(saved['x'])},{int(saved['y'])},{int(saved['w'])},{int(saved['h'])}"
+        subprocess.run(
+            ["wmctrl", "-i", "-r", _main_preview_window_id, "-e", geom],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=1.5,
+        )
+    except Exception:
+        pass
+
+
+def _save_main_preview_window_state():
+    if not _main_preview_window_id:
+        return
+    for row in _wmctrl_windows():
+        if str(row.get("id", "")).lower() != _main_preview_window_id:
+            continue
+        w = int(row.get("w", 0))
+        h = int(row.get("h", 0))
+        if w <= 0 or h <= 0:
+            return
+        _save_video_window_state_values(
+            MAIN_PREVIEW_WINDOW_KEY,
+            int(row.get("x", 0)),
+            int(row.get("y", 0)),
+            w,
+            h,
+        )
+        return
 
 
 def _seed_brain_ik_from_servo_readback(retry_sec=0.0, retry_interval_sec=0.25):
@@ -2409,6 +2528,7 @@ def camera_loop():
 
         pipe = None
         try:
+            pre_window_ids = {row.get("id") for row in _wmctrl_windows()}
             src_segment = _build_camera_src_segment(mode, cam_path)
             # Capture at IMX708 native 16:9, downscale to the 640×640 square the
             # yolov8m_pose network expects.  hailotracker provides consistent IDs
@@ -2546,6 +2666,7 @@ def camera_loop():
 
             pipe.set_state(Gst.State.PLAYING)
             print("--- Hailo AI Hat Active: yolov8m_pose running ---")
+            _bind_main_preview_window(pre_window_ids)
 
             while not _restart_event.is_set() and not brain.shutdown_event.is_set():
                 live_mode = brain.tuner.shared_params.get("camera_mode", "HIGH_CAM")
@@ -2580,6 +2701,7 @@ def camera_loop():
             print(f"Pipeline Error: {e}")
             time.sleep(2)
         finally:
+            _save_main_preview_window_state()
             if pipe is not None:
                 _graceful_stop_pipeline(pipe)
         time.sleep(0.5)
