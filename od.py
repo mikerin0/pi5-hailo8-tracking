@@ -2544,6 +2544,14 @@ def camera_loop():
         _restart_event.clear()
 
         pipe = None
+        main_window_name = "Pi5 AI Vision"
+        main_window_ready = False
+        try:
+            cv2.namedWindow(main_window_name, cv2.WINDOW_NORMAL)
+            _apply_saved_video_window_state(main_window_name, config.FRAME_W, config.FRAME_H)
+            main_window_ready = True
+        except Exception:
+            main_window_ready = False
         try:
             pre_window_ids = {row.get("id") for row in _wmctrl_windows()}
             src_segment = _build_camera_src_segment(mode, cam_path)
@@ -2603,7 +2611,7 @@ def camera_loop():
                     f"hailotracker ! hailooverlay ! "
                     f"videoconvert ! tee name=t "
                     f"t. ! queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
-                    f"autovideosink sync=false "
+                    f"videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1 "
                     f"t. ! queue leaky=downstream max-size-buffers=1 ! "
                     f"video/x-raw,format=RGB,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
                     f"appsink name=finger_sink emit-signals=false sync=false drop=true max-buffers=1"
@@ -2616,7 +2624,7 @@ def camera_loop():
                     f"queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
                     f"hailonet hef-path={config.TABLE_OBJECT_HEF_PATH} force-writable=true ! "
                     f"hailofilter name=table_hailofilter so-path={config.TABLE_OBJECT_SO_PATH} ! "
-                    f"hailooverlay ! videoconvert ! autovideosink sync=false"
+                    f"hailooverlay ! videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1"
                 )
             elif table_object_branch_enabled:
                 launch_str = (
@@ -2625,7 +2633,7 @@ def camera_loop():
                     f"video/x-raw,format=RGB,width={config.FRAME_W},height={config.FRAME_H} ! "
                     f"tee name=t "
                     f"t. ! queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
-                    f"videoconvert ! autovideosink sync=false "
+                    f"videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1 "
                     f"t. ! queue leaky=downstream max-size-buffers=1 ! "
                     f"appsink name=table_obj_sink emit-signals=false sync=false drop=true max-buffers=1"
                 )
@@ -2639,13 +2647,13 @@ def camera_loop():
                     f"hailonet hef-path={HEF_PATH} force-writable=true ! "
                     f"hailofilter name=hailofilter so-path={SO_PATH} ! "
                     f"hailotracker ! hailooverlay ! "
-                    f"videoconvert ! autovideosink sync=false"
+                    f"videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1"
                 )
 
             if overlay_enabled:
                 launch_str = launch_str.replace(
-                    "videoconvert ! autovideosink sync=false",
-                    "cairooverlay name=release_overlay ! videoconvert ! autovideosink sync=false",
+                    "videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1",
+                    "cairooverlay name=release_overlay ! videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1",
                 )
 
             try:
@@ -2680,6 +2688,7 @@ def camera_loop():
 
             finger_sink = pipe.get_by_name("finger_sink") if finger_branch_enabled else None
             table_obj_sink = pipe.get_by_name("table_obj_sink") if table_object_branch_enabled else None
+            preview_sink = pipe.get_by_name("preview_sink")
 
             pipe.set_state(Gst.State.PLAYING)
             print("--- Hailo AI Hat Active: yolov8m_pose running ---")
@@ -2713,6 +2722,29 @@ def camera_loop():
                     sample = table_obj_sink.emit("try-pull-sample", int(0.03 * Gst.SECOND))
                     if sample is not None:
                         _maybe_pick_table_object_from_sample(sample, time.time())
+                if preview_sink is not None and main_window_ready:
+                    sample = preview_sink.emit("try-pull-sample", int(0.03 * Gst.SECOND))
+                    if sample is not None:
+                        try:
+                            buf = sample.get_buffer()
+                            caps = sample.get_caps()
+                            struct = caps.get_structure(0)
+                            w = int(struct.get_value("width"))
+                            h = int(struct.get_value("height"))
+                            ok, mapinfo = buf.map(Gst.MapFlags.READ)
+                            if ok:
+                                try:
+                                    frame_rgb = np.frombuffer(mapinfo.data, dtype=np.uint8).reshape((h, w, 3))
+                                    frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+                                    cv2.imshow(main_window_name, frame_bgr)
+                                    cv2.waitKey(1)
+                                finally:
+                                    try:
+                                        buf.unmap(mapinfo)
+                                    except Exception:
+                                        pass
+                        except Exception:
+                            pass
                 time.sleep(0.1)
 
         except Exception as e:
@@ -2722,6 +2754,12 @@ def camera_loop():
             _save_main_preview_window_state()
             if pipe is not None:
                 _graceful_stop_pipeline(pipe)
+            if main_window_ready:
+                _save_video_window_state(main_window_name)
+                try:
+                    cv2.destroyWindow(main_window_name)
+                except Exception:
+                    pass
         time.sleep(0.5)
 
     _stop_table_preview()
