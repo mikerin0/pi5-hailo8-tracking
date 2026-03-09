@@ -2503,6 +2503,15 @@ def camera_loop():
     _last_seen_time = time.time() + 5.0  # give Hailo 5 s to find a person at startup
     prev_mode = None
 
+    main_window_name = "Pi5 AI Vision"
+    main_window_ready = False
+    try:
+        cv2.namedWindow(main_window_name, cv2.WINDOW_NORMAL)
+        _apply_saved_video_window_state(main_window_name, config.FRAME_W, config.FRAME_H)
+        main_window_ready = True
+    except Exception:
+        main_window_ready = False
+
     global _table_obj_dualcam_disabled_warned
     while not brain.shutdown_event.is_set():
         mode = brain.tuner.shared_params.get("camera_mode", "HIGH_CAM")
@@ -2544,14 +2553,6 @@ def camera_loop():
         _restart_event.clear()
 
         pipe = None
-        main_window_name = "Pi5 AI Vision"
-        main_window_ready = False
-        try:
-            cv2.namedWindow(main_window_name, cv2.WINDOW_NORMAL)
-            _apply_saved_video_window_state(main_window_name, config.FRAME_W, config.FRAME_H)
-            main_window_ready = True
-        except Exception:
-            main_window_ready = False
         try:
             pre_window_ids = {row.get("id") for row in _wmctrl_windows()}
             src_segment = _build_camera_src_segment(mode, cam_path)
@@ -2759,13 +2760,14 @@ def camera_loop():
             _save_main_preview_window_state()
             if pipe is not None:
                 _graceful_stop_pipeline(pipe)
-            if main_window_ready:
-                _save_video_window_state(main_window_name)
-                try:
-                    cv2.destroyWindow(main_window_name)
-                except Exception:
-                    pass
         time.sleep(0.5)
+
+    if main_window_ready:
+        _save_video_window_state(main_window_name)
+        try:
+            cv2.destroyWindow(main_window_name)
+        except Exception:
+            pass
 
     _stop_table_preview()
     _stop_table_object_worker()
