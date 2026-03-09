@@ -44,6 +44,7 @@ servo_power_up_callback = None
 vision_summary_provider = None
 table_model_update_callback = None
 table_pick_arm_callback = None
+table_color_follow_callback = None
 _first_move_capped = False
 _startup_t0 = time.monotonic()
 TUNER_PARAMS_PATH = os.path.join(os.path.dirname(__file__), "tuner_params.json")
@@ -88,6 +89,9 @@ def _discover_table_model_presets():
         ("YOLOv8s (recommended)", "yolov8s.hef"),
         ("YOLOv8n (fast)", "yolov8n.hef"),
         ("YOLOv8m (accurate)", "yolov8m.hef"),
+        ("YOLOv8s-seg", "yolov8s_seg.hef"),
+        ("YOLOv8n-seg", "yolov8n_seg.hef"),
+        ("YOLOv8n 4-class VGA", "hailo_yolov8n_4_classes_vga.hef"),
     ]
     for label, filename in preferred:
         path = hef_by_name.get(filename)
@@ -546,6 +550,7 @@ def _take_item_sequence(auto_pick=False):
 
     prev_mode = tuner.shared_params.get("camera_mode", "HIGH_CAM")
     prev_busy = tuner.shared_params.get("busy", 0)
+    tuner.shared_params["table_follow_color_active"] = 0
     try:
         _set_pickup_status("Pickup: running")
         tuner.shared_params["busy"] = 1
@@ -627,6 +632,7 @@ def _take_item_sequence(auto_pick=False):
         _set_pickup_status("Pickup: error")
     finally:
         tuner.shared_params["table_pick_request_active"] = 0
+        tuner.shared_params["table_follow_color_active"] = 0
         switch_camera(prev_mode)
         tuner.shared_params["busy"] = prev_busy
         _take_item_lock.release()
@@ -641,6 +647,7 @@ def start_table_pick_sequence():
     switch_camera("TABLE_CAM")
     config.TABLE_OBJECT_PICKUP_ENABLED = True
     tuner.shared_params["busy"] = 0
+    tuner.shared_params["table_follow_color_active"] = 0
     tuner.shared_params["table_pick_request_active"] = 1
     _set_pickup_status("Pickup: tracking target")
     callback = table_pick_arm_callback
@@ -654,6 +661,26 @@ def start_table_pick_sequence():
     else:
         config.TABLE_OBJECT_PICKUP_ENABLED = True
         print("TABLE PICK armed: waiting for object alignment before pickup")
+
+
+def start_follow_selected_color_sequence():
+    """Switch to TABLE_CAM and continuously follow selected color object."""
+    switch_camera("TABLE_CAM")
+    config.TABLE_OBJECT_PICKUP_ENABLED = True
+    tuner.shared_params["busy"] = 0
+    tuner.shared_params["table_pick_request_active"] = 0
+    tuner.shared_params["table_follow_color_active"] = 1
+    _set_pickup_status("Pickup: following selected color object")
+    callback = table_color_follow_callback
+    if callback is not None:
+        try:
+            msg = callback()
+            if msg:
+                print(msg)
+        except Exception as e:
+            print(f"Table-color follow callback failed: {e}")
+    else:
+        print("TABLE follow armed: tracking selected color object")
 
 
 def release_item_manual():
@@ -838,6 +865,7 @@ class RobotTuner:
             "table_object_target_label": str(getattr(config, "TABLE_OBJECT_TARGET_LABEL", "")),
             "table_object_hef_path": str(getattr(config, "TABLE_OBJECT_HEF_PATH", "")),
             "table_object_so_path": str(getattr(config, "TABLE_OBJECT_SO_PATH", "")),
+            "table_follow_color_active": 0,
         }
         self.scale_widgets = {}
         self._syncing_scales = False
@@ -1230,6 +1258,8 @@ class RobotTuner:
               bg="purple", fg="white").pack(pady=6)
         tk.Button(left_col, text="TABLE PICK", command=start_table_pick_sequence,
               bg="darkgreen", fg="white").pack(pady=6)
+          tk.Button(left_col, text='FOLLOW "SELECTED COLOR" OBJECT', command=start_follow_selected_color_sequence,
+              bg="gold", fg="black").pack(pady=6)
         tk.Button(left_col, text="RELEASE ITEM", command=release_item_manual,
               bg="orange", fg="black").pack(pady=6)
 

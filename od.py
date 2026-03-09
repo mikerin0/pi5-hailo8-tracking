@@ -717,7 +717,9 @@ def _extract_detection_labels(detections):
 def _maybe_update_table_pick_approach_pose(take_x, take_y, take_lift_z, now):
     """Queue TABLE PICK approach updates without blocking camera callback thread."""
     global _last_table_pick_steer_time, _table_pick_steer_target, _last_table_pick_target_update
-    if not bool(brain.tuner.shared_params.get("table_pick_request_active", 0)):
+    table_pick_active = bool(brain.tuner.shared_params.get("table_pick_request_active", 0))
+    color_follow_active = bool(brain.tuner.shared_params.get("table_follow_color_active", 0))
+    if not (table_pick_active or color_follow_active):
         return
     if brain.tuner.shared_params.get("camera_mode", "HIGH_CAM") != "TABLE_CAM":
         return
@@ -741,7 +743,9 @@ def _table_pick_steer_worker():
     while not _table_pick_steer_stop.is_set() and not brain.shutdown_event.is_set():
         now = time.time()
         manual_pick_active = bool(brain.tuner.shared_params.get("table_pick_request_active", 0))
-        if not bool(brain.tuner.shared_params.get("table_pick_request_active", 0)):
+        color_follow_active = bool(brain.tuner.shared_params.get("table_follow_color_active", 0))
+        active = manual_pick_active or color_follow_active
+        if not active:
             with _table_pick_steer_lock:
                 _table_pick_steer_target = None
             last_sent = None
@@ -757,7 +761,7 @@ def _table_pick_steer_worker():
         with _table_pick_steer_lock:
             target = _table_pick_steer_target
         if target is None:
-            if bool(getattr(config, "TABLE_PICK_MANUAL_HUNT_ENABLED", True)):
+            if manual_pick_active and bool(getattr(config, "TABLE_PICK_MANUAL_HUNT_ENABLED", True)):
                 stale_after = max(0.2, float(getattr(config, "TABLE_PICK_STEER_PERIOD_SEC", 0.25)) * 2.0)
                 age = now - float(_last_table_pick_target_update)
                 if age >= stale_after:
@@ -851,6 +855,7 @@ def arm_table_pick_tracking():
     global _table_cam_enter_time, _table_pick_manual_arm_time, _table_pick_manual_stable_since
 
     config.TABLE_OBJECT_PICKUP_ENABLED = True
+    brain.tuner.shared_params["table_follow_color_active"] = 0
     _table_obj_hits = 0
     _table_obj_center_hits = 0
     _last_table_obj_trigger_time = 0.0
@@ -862,6 +867,28 @@ def arm_table_pick_tracking():
     _table_pick_manual_arm_time = time.time()
     _table_pick_manual_stable_since = 0.0
     return "TABLE PICK armed: tracking object for alignment before grab"
+
+
+def arm_table_color_follow():
+    """Arm TABLE_CAM continuous color-object follow without grabbing."""
+    global _table_obj_hits, _table_obj_center_hits
+    global _last_table_obj_trigger_time, _last_table_obj_block_log_time, _last_table_obj_align_log_time
+    global _table_cam_enter_time, _table_pick_manual_arm_time, _table_pick_manual_stable_since
+
+    config.TABLE_OBJECT_PICKUP_ENABLED = True
+    _table_obj_hits = 0
+    _table_obj_center_hits = 0
+    _last_table_obj_trigger_time = 0.0
+    _last_table_obj_block_log_time = 0.0
+    _last_table_obj_align_log_time = 0.0
+
+    arm_delay = max(0.0, float(getattr(config, "TABLE_OBJECT_ARM_DELAY_SEC", 4.0)))
+    _table_cam_enter_time = time.time() - arm_delay - 0.1
+    _table_pick_manual_arm_time = time.time()
+    _table_pick_manual_stable_since = 0.0
+    brain.tuner.shared_params["table_pick_request_active"] = 0
+    brain.tuner.shared_params["table_follow_color_active"] = 1
+    return "TABLE follow armed: tracking selected color object"
 
 
 def get_vision_summary_text():
@@ -1825,8 +1852,9 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
     global _table_obj_center_hits, _last_table_obj_align_log_time
 
     pickup_enabled = bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False))
+    color_follow_active = bool(brain.tuner.shared_params.get("table_follow_color_active", 0))
     summary_enabled = bool(getattr(config, "TABLE_OBJECT_SUMMARY_ENABLED", True))
-    if not (pickup_enabled or summary_enabled):
+    if not (pickup_enabled or summary_enabled or color_follow_active):
         _table_obj_hits = 0
         return
     if brain.tuner.shared_params.get("camera_mode", "HIGH_CAM") != "TABLE_CAM":
@@ -1835,7 +1863,7 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
         return
 
     arm_delay = max(0.0, float(getattr(config, "TABLE_OBJECT_ARM_DELAY_SEC", 4.0)))
-    if now - _table_cam_enter_time < arm_delay:
+    if (not color_follow_active) and (now - _table_cam_enter_time < arm_delay):
         if now - _last_table_obj_block_log_time > 1.5:
             print("TABLE_CAM auto-pick blocked: arm delay active")
             _last_table_obj_block_log_time = now
@@ -1851,7 +1879,7 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
         return
 
     cooldown = max(2.0, float(getattr(config, "TABLE_OBJECT_COOLDOWN_SEC", 20.0)))
-    if now - _last_table_obj_trigger_time < cooldown:
+    if (not color_follow_active) and (now - _last_table_obj_trigger_time < cooldown):
         if now - _last_table_obj_block_log_time > 2.0:
             print("DUAL_CAM auto-pick blocked: cooldown active")
             _last_table_obj_block_log_time = now
@@ -1995,6 +2023,9 @@ def _maybe_pick_table_object_from_frame(frame_bgr, now):
     brain.tuner.shared_params["take_z"] = take_z
     brain.tuner.shared_params["take_lift_z"] = take_lift_z
     _maybe_update_table_pick_approach_pose(take_x, take_y, take_lift_z, now)
+
+    if color_follow_active:
+        return
 
     if not pickup_enabled:
         _table_obj_hits = 0
@@ -2474,6 +2505,7 @@ if __name__ == "__main__":
     brain.vision_summary_provider = get_vision_summary_text
     brain.table_model_update_callback = update_table_model_paths
     brain.table_pick_arm_callback = arm_table_pick_tracking
+    brain.table_color_follow_callback = arm_table_color_follow
     startup_power_on = bool(getattr(config, "SAFE_STARTUP_POWER_ON", not bool(getattr(config, "SAFE_STARTUP_NO_MOTION", True))))
     startup_coord_enabled = bool(getattr(config, "STARTUP_COORD_MOVE_ENABLED", True))
     startup_coord_x = float(getattr(config, "STARTUP_COORD_X", getattr(config, "HOME_X", 0.06)))
