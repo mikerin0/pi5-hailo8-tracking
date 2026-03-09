@@ -1258,7 +1258,7 @@ class RobotTuner:
               bg="purple", fg="white").pack(pady=6)
         tk.Button(left_col, text="TABLE PICK", command=start_table_pick_sequence,
               bg="darkgreen", fg="white").pack(pady=6)
-          tk.Button(left_col, text='FOLLOW "SELECTED COLOR" OBJECT', command=start_follow_selected_color_sequence,
+        tk.Button(left_col, text='FOLLOW "SELECTED COLOR" OBJECT', command=start_follow_selected_color_sequence,
               bg="gold", fg="black").pack(pady=6)
         tk.Button(left_col, text="RELEASE ITEM", command=release_item_manual,
               bg="orange", fg="black").pack(pady=6)
