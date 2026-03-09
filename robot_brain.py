@@ -267,6 +267,44 @@ my_arm = ikpy.chain.Chain(name='hiwonder', links=[
     ikpy.link.URDFLink(name="wrist", bounds=(-0.6, 0.6), origin_translation=[0, 0, L4], origin_orientation=[0, 0, 0], rotation=[0, -1, 0]),
 ], active_links_mask=[False, True, True, True, True])
 
+
+def _sanitize_ik_initial_guess(guess=None):
+    """Clamp IK initial guess to active joint bounds expected by ikpy."""
+    src = list(guess if guess is not None else last_angles)
+    if len(src) != len(my_arm.links):
+        src = [0.0, 0.0, 0.2, 0.5, 0.1]
+
+    cleaned = []
+    for idx, value in enumerate(src):
+        try:
+            angle = float(value)
+        except Exception:
+            angle = 0.0
+        link = my_arm.links[idx]
+        bounds = getattr(link, "bounds", None)
+        if bounds is not None and len(bounds) == 2:
+            low, high = bounds
+            try:
+                angle = max(float(low), min(float(high), angle))
+            except Exception:
+                pass
+        cleaned.append(angle)
+    return cleaned
+
+
+def _solve_ik_with_safe_guess(target_xyz):
+    """Solve IK with clamped initial guess and fallback default seed."""
+    seed = _sanitize_ik_initial_guess(last_angles)
+    try:
+        return my_arm.inverse_kinematics(target_xyz, initial_position=seed)
+    except Exception as e:
+        msg = str(e)
+        if "outside of provided bounds" not in msg.lower():
+            raise
+        fallback_seed = _sanitize_ik_initial_guess([0.0, 0.0, 0.2, 0.5, 0.1])
+        print("IK seed out of bounds; retrying with fallback seed")
+        return my_arm.inverse_kinematics(target_xyz, initial_position=fallback_seed)
+
 # --- 3. COMMUNICATION HELPERS ---
 
 def tcp_listener():
@@ -563,6 +601,8 @@ def _take_item_sequence(auto_pick=False):
         take_lift_z = max(take_z + 0.05, min(0.45, float(p.get("take_lift_z", 0.36))))
         take_wait_s = max(1.0, min(8.0, float(p.get("take_wait_s", 3.0))))
         auto_take_wait_s = max(0.1, min(1.5, float(p.get("auto_take_wait_s", 0.3))))
+        arch_extra_z = max(0.0, float(getattr(config, "TABLE_PICK_ARCH_EXTRA_Z", 0.06)))
+        arch_max_z = max(0.20, float(getattr(config, "TABLE_PICK_ARCH_MAX_Z", 0.45)))
 
         if auto_pick:
             z_offset = float(getattr(config, "TABLE_PICK_Z_OFFSET_M", -0.06))
@@ -570,14 +610,20 @@ def _take_item_sequence(auto_pick=False):
             take_z = max(float(getattr(config, "TABLE_PICK_MIN_AUTO_TAKE_Z", 0.24)), take_z)
             take_lift_z = max(take_z + 0.05, min(0.45, take_lift_z + z_offset))
 
+        arch_z = max(take_lift_z, min(arch_max_z, take_lift_z + arch_extra_z))
+
         if not _is_gripper_open_enough(1500, tolerance=20):
             move_servo(1, 1500, 900)
         # Approach from above first to avoid tipping the base by dipping too low.
         if auto_pick:
+            reach_for_coordinate(take_x, take_y, arch_z, speed=650)
+            time.sleep(0.25)
             reach_for_coordinate(take_x, take_y, take_lift_z, speed=700)
             time.sleep(0.4)
             reach_for_coordinate(take_x, take_y, take_z, speed=550)
         else:
+            reach_for_coordinate(take_x, take_y, arch_z, speed=800)
+            time.sleep(0.30)
             reach_for_coordinate(take_x, take_y, take_lift_z, speed=900)
             time.sleep(0.6)
             reach_for_coordinate(take_x, take_y, take_z, speed=800)
@@ -713,7 +759,7 @@ def reach_for_coordinate(x, y, z, speed=800):
         if cap > 0 and not _first_move_capped:
             speed = max(speed, cap)
             _first_move_capped = True
-        angles = my_arm.inverse_kinematics([x, y, z], initial_position=last_angles)
+        angles = _solve_ik_with_safe_guess([x, y, z])
         if not np.all(np.isfinite(angles)):
             print(f"IK rejected (non-finite solution) for target x={x:.3f} y={y:.3f} z={z:.3f}")
             return
@@ -760,7 +806,7 @@ def reach_for_manual_coordinate(x, y, z, speed=900, respect_config_speed=True):
             yi = y_start + (y_end - y_start) * t
             zi = z_start + (z_end - z_start) * t
 
-            angles = my_arm.inverse_kinematics([xi, yi, zi], initial_position=last_angles)
+            angles = _solve_ik_with_safe_guess([xi, yi, zi])
             if not np.all(np.isfinite(angles)):
                 print(f"IK rejected (non-finite solution) for step target x={xi:.3f} y={yi:.3f} z={zi:.3f}")
                 return False
@@ -1208,7 +1254,7 @@ class RobotTuner:
     def create_gui(self):
         self.root = tk.Tk()
         self.root.title("Robot Master - Pi Server Mode")
-        self.root.geometry("1180x860")
+        self.root.geometry("1460x860")
         self._apply_window_state()
         self.root.protocol("WM_DELETE_WINDOW", self._on_window_close)
 
@@ -1217,9 +1263,11 @@ class RobotTuner:
         left_col = tk.Frame(columns)
         right_col = tk.Frame(columns)
         status_col = tk.Frame(columns)
+        model_col = tk.Frame(columns)
         left_col.grid(row=0, column=0, sticky="nw", padx=(0, 10))
         right_col.grid(row=0, column=1, sticky="nw")
         status_col.grid(row=0, column=2, sticky="nw", padx=(10, 0))
+        model_col.grid(row=0, column=3, sticky="nw", padx=(10, 0))
 
         # --- Camera Mode Frame (left column) ---
         tk.Label(left_col, text="--- CAMERA MODE ---", font=("Arial", 12, "bold")).pack(pady=5)
@@ -1355,51 +1403,53 @@ class RobotTuner:
         self.pickup_status_var = tk.StringVar(value="Pickup: idle")
         tk.Label(status_col, textvariable=self.pickup_status_var, wraplength=260, justify="left").pack(pady=(0, 8))
 
-        tk.Label(status_col, text="Pickup Target", font=("Arial", 10, "bold")).pack(pady=(8, 2))
+        tk.Label(model_col, text="--- TABLE OBJECT CONTROLS ---", font=("Arial", 12, "bold")).pack(pady=12)
+
+        tk.Label(model_col, text="Pickup Target", font=("Arial", 10, "bold")).pack(pady=(4, 2))
         self.object_target_var = tk.StringVar(value=self.shared_params.get("table_object_target_type", "any"))
         target_opts = ["any", "red", "green", "blue", "yellow", "orange", "white", "black"]
-        tk.OptionMenu(status_col, self.object_target_var, *target_opts,
+        tk.OptionMenu(model_col, self.object_target_var, *target_opts,
                   command=self.update_object_target_type).pack(pady=(0, 6), fill="x")
 
-        tk.Label(status_col, text="Model Label (optional)", font=("Arial", 10, "bold")).pack(pady=(2, 2))
+        tk.Label(model_col, text="Model Label (optional)", font=("Arial", 10, "bold")).pack(pady=(2, 2))
         self.object_label_var = tk.StringVar(value=self.shared_params.get("table_object_target_label", ""))
-        label_entry = tk.Entry(status_col, textvariable=self.object_label_var)
+        label_entry = tk.Entry(model_col, textvariable=self.object_label_var)
         label_entry.pack(pady=(0, 2), fill="x")
         label_entry.bind("<Return>", lambda _e: self.update_object_target_label())
-        tk.Button(status_col, text="SET LABEL", width=12,
+        tk.Button(model_col, text="SET LABEL", width=12,
               command=self.update_object_target_label).pack(pady=(0, 8))
 
-        tk.Label(status_col, text="AI Model (TABLE_CAM)", font=("Arial", 10, "bold")).pack(pady=(2, 2))
+        tk.Label(model_col, text="AI Model (TABLE_CAM)", font=("Arial", 10, "bold")).pack(pady=(2, 2))
         preset_names = list(self.table_model_presets.keys())
         default_preset = "YOLOv8s (recommended)" if "YOLOv8s (recommended)" in self.table_model_presets else (
             "Current AI model" if "Current AI model" in self.table_model_presets else preset_names[0]
         )
         self.table_model_preset_var = tk.StringVar(value=default_preset)
         self.table_model_option_menu = tk.OptionMenu(
-            status_col,
+            model_col,
             self.table_model_preset_var,
             *preset_names,
             command=self._apply_table_model_preset,
         )
         self.table_model_option_menu.pack(pady=(0, 6), fill="x")
-        tk.Button(status_col, text="REFRESH MODELS", width=18,
+        tk.Button(model_col, text="REFRESH MODELS", width=18,
                   command=self._refresh_table_model_presets).pack(pady=(0, 6))
 
-        tk.Label(status_col, text="Table HEF Path", font=("Arial", 10, "bold")).pack(pady=(2, 2))
+        tk.Label(model_col, text="Table HEF Path", font=("Arial", 10, "bold")).pack(pady=(2, 2))
         self.table_hef_var = tk.StringVar(value=self.shared_params.get("table_object_hef_path", ""))
-        tk.Entry(status_col, textvariable=self.table_hef_var).pack(pady=(0, 4), fill="x")
+        tk.Entry(model_col, textvariable=self.table_hef_var).pack(pady=(0, 4), fill="x")
 
-        tk.Label(status_col, text="Table Postproc .so", font=("Arial", 10, "bold")).pack(pady=(2, 2))
+        tk.Label(model_col, text="Table Postproc .so", font=("Arial", 10, "bold")).pack(pady=(2, 2))
         self.table_so_var = tk.StringVar(value=self.shared_params.get("table_object_so_path", ""))
-        tk.Entry(status_col, textvariable=self.table_so_var).pack(pady=(0, 4), fill="x")
+        tk.Entry(model_col, textvariable=self.table_so_var).pack(pady=(0, 4), fill="x")
 
         self._apply_table_model_preset(default_preset)
 
-        tk.Button(status_col, text="APPLY AI MODEL", width=18,
+        tk.Button(model_col, text="APPLY AI MODEL", width=18,
               bg="khaki", command=self._apply_table_model_clicked).pack(pady=(2, 4))
         self.table_model_status_var = tk.StringVar(value="Table model: ready")
-        tk.Label(status_col, textvariable=self.table_model_status_var,
-              wraplength=260, justify="left").pack(pady=(0, 8))
+        tk.Label(model_col, textvariable=self.table_model_status_var,
+             wraplength=260, justify="left").pack(pady=(0, 8))
 
         thermal_btn_frame = tk.Frame(status_col)
         thermal_btn_frame.pack(pady=6)

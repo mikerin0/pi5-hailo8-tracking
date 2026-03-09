@@ -234,7 +234,11 @@ def _seed_brain_ik_from_servo_readback(retry_sec=0.0, retry_interval_sec=0.25):
                     a2 = (float(p5) - 1500.0) / 637.0
                     a3 = (float(p4) - 1500.0) / 637.0
                     a4 = (float(p3) - 1500.0) / 637.0
-                    brain.last_angles = [0.0, a1, a2, a3, a4]
+                    seeded = [0.0, a1, a2, a3, a4]
+                    sanitizer = getattr(brain, "_sanitize_ik_initial_guess", None)
+                    if callable(sanitizer):
+                        seeded = sanitizer(seeded)
+                    brain.last_angles = seeded
                     _startup_log(f"IK seed: last_angles set from readback {readback} (attempt {attempt})")
                     return True
                 _startup_log(f"IK seed: incomplete readback attempt {attempt}: {readback}")
@@ -266,7 +270,11 @@ def _seed_brain_ik_from_last_commanded():
         a2 = (float(p5) - 1500.0) / 637.0
         a3 = (float(p4) - 1500.0) / 637.0
         a4 = (float(p3) - 1500.0) / 637.0
-        brain.last_angles = [0.0, a1, a2, a3, a4]
+        seeded = [0.0, a1, a2, a3, a4]
+        sanitizer = getattr(brain, "_sanitize_ik_initial_guess", None)
+        if callable(sanitizer):
+            seeded = sanitizer(seeded)
+        brain.last_angles = seeded
         _startup_log(f"IK seed (commanded): last_angles set from {commanded}")
         return True
     except Exception as e:

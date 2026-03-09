@@ -167,6 +167,10 @@ TABLE_OBJECT_TARGET_TYPE = "any"
 TABLE_OBJECT_ARM_DELAY_SEC = 4.0
 # Extra Z offset applied only to autonomous TABLE PICK (meters).
 TABLE_PICK_Z_OFFSET_M = 0.00
+# Extra arch height added above lift pose during pickup approach.
+TABLE_PICK_ARCH_EXTRA_Z = 0.06
+# Maximum arch height used during pickup approach.
+TABLE_PICK_ARCH_MAX_Z = 0.45
 # If servo 1 closes beyond this pulse during TABLE PICK, treat as a miss.
 TABLE_PICK_MISS_SERVO1_POS = 2140
 # When TABLE PICK is manually armed, ignore strict model class label filtering
