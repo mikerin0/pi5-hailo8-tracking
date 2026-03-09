@@ -298,7 +298,7 @@ def _wmctrl_windows():
         return []
     try:
         out = subprocess.run(
-            ["wmctrl", "-lG"],
+            ["wmctrl", "-lpG"],
             capture_output=True,
             text=True,
             check=False,
@@ -316,10 +316,11 @@ def _wmctrl_windows():
             rows.append(
                 {
                     "id": str(parts[0]).lower(),
-                    "x": int(parts[2]),
-                    "y": int(parts[3]),
-                    "w": int(parts[4]),
-                    "h": int(parts[5]),
+                    "pid": int(parts[2]),
+                    "x": int(parts[3]),
+                    "y": int(parts[4]),
+                    "w": int(parts[5]),
+                    "h": int(parts[6]),
                     "title": str(parts[7]).strip(),
                 }
             )
@@ -333,12 +334,16 @@ def _bind_main_preview_window(before_ids):
     if _main_preview_window_id:
         return
     baseline = {str(x).lower() for x in (before_ids or set())}
+    my_pid = int(os.getpid())
     for _ in range(12):
         windows = _wmctrl_windows()
         candidates = [
             w
             for w in windows
-            if w.get("id") not in baseline and int(w.get("w", 0)) >= 200 and int(w.get("h", 0)) >= 150
+            if w.get("id") not in baseline
+            and int(w.get("pid", -1)) == my_pid
+            and int(w.get("w", 0)) >= 200
+            and int(w.get("h", 0)) >= 150
         ]
         if candidates:
             chosen = max(candidates, key=lambda w: int(w.get("w", 0)) * int(w.get("h", 0)))
@@ -365,6 +370,18 @@ def _apply_saved_main_preview_window_state():
         )
     except Exception:
         pass
+
+
+def _reapply_main_preview_window_state_delayed():
+    if not _main_preview_window_id:
+        return
+
+    def _worker():
+        for delay_s in (0.35, 0.8, 1.4):
+            time.sleep(delay_s)
+            _apply_saved_main_preview_window_state()
+
+    threading.Thread(target=_worker, daemon=True).start()
 
 
 def _save_main_preview_window_state():
@@ -2667,6 +2684,7 @@ def camera_loop():
             pipe.set_state(Gst.State.PLAYING)
             print("--- Hailo AI Hat Active: yolov8m_pose running ---")
             _bind_main_preview_window(pre_window_ids)
+            _reapply_main_preview_window_state_delayed()
 
             while not _restart_event.is_set() and not brain.shutdown_event.is_set():
                 live_mode = brain.tuner.shared_params.get("camera_mode", "HIGH_CAM")
