@@ -1025,6 +1025,9 @@ class RobotTuner:
         else:
             self.root.geometry("1460x860")
 
+        self._position_upper_right()
+
+    def _position_upper_right(self):
         try:
             self.root.update_idletasks()
             width = max(100, int(self.root.winfo_width() or self.root.winfo_reqwidth()))
@@ -1477,6 +1480,8 @@ class RobotTuner:
 
         tk.Button(btn_frame, text="LIGHTS ON", bg="yellow", width=12, command=lambda: send_to_crestron("LIGHT_ON")).pack(side="left", padx=5)
         tk.Button(btn_frame, text="LIGHTS OFF", bg="black", fg="white", width=12, command=lambda: send_to_crestron("LIGHT_OFF")).pack(side="left", padx=5)
+        self.root.after(120, self._position_upper_right)
+        self.root.after(400, self._position_upper_right)
         self._update_thermal_status()
 
     def toggle_manual_mode(self):
