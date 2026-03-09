@@ -1010,6 +1010,11 @@ def _table_object_model_callback(_pad, info, _user_data):
 
     _update_vision_summary(_extract_detection_labels(detections), mode="TABLE_CAM")
 
+    if bool(brain.tuner.shared_params.get("table_follow_color_active", 0)):
+        _table_obj_hits = 0
+        _table_obj_center_hits = 0
+        return Gst.PadProbeReturn.OK
+
     target_type = str(
         brain.tuner.shared_params.get(
             "table_object_target_type",
@@ -2352,6 +2357,8 @@ def camera_loop():
             # If a color target is explicitly selected, prefer color/blob pickup
             # path so non-COCO objects (e.g., plain colored blocks) are still pickable.
             if selected_target_type != "any":
+                table_model_branch_enabled = False
+            if bool(brain.tuner.shared_params.get("table_follow_color_active", 0)):
                 table_model_branch_enabled = False
             table_object_branch_enabled = (
                 mode == "TABLE_CAM"

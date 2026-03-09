@@ -643,24 +643,24 @@ def start_take_item_sequence(auto_pick=False):
 
 
 def start_table_pick_sequence():
-    """Switch to TABLE_CAM and arm detection-driven tracking before pickup."""
+    """Switch to TABLE_CAM and track selected object without auto-grab."""
     switch_camera("TABLE_CAM")
     config.TABLE_OBJECT_PICKUP_ENABLED = True
     tuner.shared_params["busy"] = 0
     tuner.shared_params["table_follow_color_active"] = 0
-    tuner.shared_params["table_pick_request_active"] = 1
-    _set_pickup_status("Pickup: tracking target")
-    callback = table_pick_arm_callback
+    tuner.shared_params["table_pick_request_active"] = 0
+    tuner.shared_params["table_follow_color_active"] = 1
+    _set_pickup_status("Pickup: tracking selected target")
+    callback = table_color_follow_callback
     if callback is not None:
         try:
             msg = callback()
             if msg:
                 print(msg)
         except Exception as e:
-            print(f"Table-pick arm callback failed: {e}")
+            print(f"Table-track callback failed: {e}")
     else:
-        config.TABLE_OBJECT_PICKUP_ENABLED = True
-        print("TABLE PICK armed: waiting for object alignment before pickup")
+        print("TABLE PICK armed: tracking selected target (manual grab)")
 
 
 def start_follow_selected_color_sequence():
@@ -681,6 +681,14 @@ def start_follow_selected_color_sequence():
             print(f"Table-color follow callback failed: {e}")
     else:
         print("TABLE follow armed: tracking selected color object")
+
+
+def start_grab_tracked_object_sequence():
+    """Grab using the latest tracked TABLE_CAM target."""
+    tuner.shared_params["table_pick_request_active"] = 0
+    tuner.shared_params["table_follow_color_active"] = 0
+    _set_pickup_status("Pickup: grabbing tracked object")
+    start_take_item_sequence(auto_pick=True)
 
 
 def release_item_manual():
@@ -1253,15 +1261,13 @@ class RobotTuner:
             s.set(self.shared_params[k]); s.pack()
             self.scale_widgets[k] = s
 
-        tk.Button(left_col, text="HOME ARM", command=go_home, bg="gray", fg="white").pack(pady=10)
-        tk.Button(left_col, text="TAKE ITEM", command=start_take_item_sequence,
-              bg="purple", fg="white").pack(pady=6)
-        tk.Button(left_col, text="TABLE PICK", command=start_table_pick_sequence,
-              bg="darkgreen", fg="white").pack(pady=6)
-        tk.Button(left_col, text='FOLLOW "SELECTED COLOR" OBJECT', command=start_follow_selected_color_sequence,
-              bg="gold", fg="black").pack(pady=6)
-        tk.Button(left_col, text="RELEASE ITEM", command=release_item_manual,
-              bg="orange", fg="black").pack(pady=6)
+        if True:
+            tk.Button(left_col, text="HOME ARM", command=go_home, bg="gray", fg="white").pack(pady=10)
+            tk.Button(left_col, text="TAKE ITEM", command=start_take_item_sequence, bg="purple", fg="white").pack(pady=6)
+            tk.Button(left_col, text="TABLE PICK", command=start_table_pick_sequence, bg="darkgreen", fg="white").pack(pady=6)
+            tk.Button(left_col, text='FOLLOW "SELECTED COLOR" OBJECT', command=start_follow_selected_color_sequence, bg="gold", fg="black").pack(pady=6)
+            tk.Button(left_col, text="GRAB TRACKED OBJECT", command=start_grab_tracked_object_sequence, bg="khaki", fg="black").pack(pady=6)
+            tk.Button(left_col, text="RELEASE ITEM", command=release_item_manual, bg="orange", fg="black").pack(pady=6)
 
         # --- Handoff Tune Frame (left column) ---
         tk.Label(left_col, text="--- TAKE ITEM TUNE ---", font=("Arial", 12, "bold")).pack(pady=8)
