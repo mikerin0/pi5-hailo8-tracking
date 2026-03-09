@@ -1331,7 +1331,7 @@ class RobotTuner:
                          length=320, command=lambda v, k=k: self.update_tune(k, v))
             s.set(self.shared_params[k]); s.pack()
 
-        tk.Button(left_col, text="EXIT PROGRAM", command=self._park_and_shutdown_clicked,
+        tk.Button(right_col, text="EXIT PROGRAM", command=self._park_and_shutdown_clicked,
                   bg="red", fg="white").pack(pady=10)
 
         # --- Tracking Math (right column) ---
