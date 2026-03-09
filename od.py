@@ -2604,27 +2604,30 @@ def camera_loop():
             if finger_branch_enabled:
                 launch_str = (
                     src_segment +
-                    f"videoconvert ! videoscale ! "
+                    f"videoconvert ! tee name=t "
+                    f"t. ! queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
+                    f"videoscale ! video/x-raw,format=RGB,width={config.FRAME_W},height={config.FRAME_H} ! "
+                    f"videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1 "
+                    f"t. ! queue leaky=downstream max-size-buffers=1 ! "
                     f"video/x-raw,format=RGB,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
                     f"hailonet hef-path={HEF_PATH} force-writable=true ! "
                     f"hailofilter name=hailofilter so-path={SO_PATH} ! "
                     f"hailotracker ! hailooverlay ! "
-                    f"videoconvert ! tee name=t "
-                    f"t. ! queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
-                    f"videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1 "
-                    f"t. ! queue leaky=downstream max-size-buffers=1 ! "
-                    f"video/x-raw,format=RGB,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
+                    f"videoconvert ! "
                     f"appsink name=finger_sink emit-signals=false sync=false drop=true max-buffers=1"
                 )
             elif table_model_branch_enabled:
                 launch_str = (
                     src_segment +
-                    f"videoconvert ! videoscale ! "
-                    f"video/x-raw,format=RGB,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
-                    f"queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
+                    f"videoconvert ! tee name=t "
+                    f"t. ! queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
+                    f"videoscale ! video/x-raw,format=RGB,width={config.FRAME_W},height={config.FRAME_H} ! "
+                    f"videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1 "
+                    f"t. ! queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
+                    f"videoscale ! video/x-raw,format=RGB,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
                     f"hailonet hef-path={config.TABLE_OBJECT_HEF_PATH} force-writable=true ! "
                     f"hailofilter name=table_hailofilter so-path={config.TABLE_OBJECT_SO_PATH} ! "
-                    f"hailooverlay ! videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1"
+                    f"hailooverlay ! videoconvert ! fakesink sync=false"
                 )
             elif table_object_branch_enabled:
                 launch_str = (
@@ -2640,14 +2643,16 @@ def camera_loop():
             else:
                 launch_str = (
                     src_segment +
-                    f"videoconvert ! videoscale ! "
-                    f"video/x-raw,format=RGB,"
-                    f"width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
-                    f"queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
+                    f"videoconvert ! tee name=t "
+                    f"t. ! queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
+                    f"videoscale ! video/x-raw,format=RGB,width={config.FRAME_W},height={config.FRAME_H} ! "
+                    f"videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1 "
+                    f"t. ! queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
+                    f"videoscale ! video/x-raw,format=RGB,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
                     f"hailonet hef-path={HEF_PATH} force-writable=true ! "
                     f"hailofilter name=hailofilter so-path={SO_PATH} ! "
                     f"hailotracker ! hailooverlay ! "
-                    f"videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1"
+                    f"videoconvert ! fakesink sync=false"
                 )
 
             if overlay_enabled:
