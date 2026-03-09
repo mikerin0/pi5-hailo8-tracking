@@ -1,7 +1,7 @@
 # These imports must come first so that libgomp and GST_PLUGIN_PATH are
 # configured BEFORE any other package (hailo, robot_brain, gi) can trigger a
 # GStreamer initialisation internally.
-import os, sys, platform, glob as _glob, subprocess
+import os, sys, platform, glob as _glob, subprocess, json
 
 # libgsthailotools.so depends on libgomp.so.1 (OpenMP), which has a static TLS
 # block that must be mapped before the dynamic linker exhausts glibc's fixed
@@ -175,6 +175,8 @@ from gi.repository import Gst
 Gst.init(None)
 
 _startup_t0 = time.monotonic()
+VIDEO_WINDOW_STATE_PATH = os.path.join(os.path.dirname(__file__), "video_window_state.json")
+_video_window_state_lock = threading.Lock()
 
 
 def _startup_log(message):
@@ -202,6 +204,68 @@ def _wait_for_space(step_label):
         if reply == " ":
             return
         print("Input ignored. Press SPACE then Enter to continue.")
+
+
+def _load_video_window_states():
+    if not os.path.isfile(VIDEO_WINDOW_STATE_PATH):
+        return {}
+    try:
+        with open(VIDEO_WINDOW_STATE_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+    return {}
+
+
+def _apply_saved_video_window_state(window_name, default_w=None, default_h=None):
+    with _video_window_state_lock:
+        states = _load_video_window_states()
+    state = states.get(str(window_name), {}) if isinstance(states, dict) else {}
+
+    saved_w = state.get("w") if isinstance(state, dict) else None
+    saved_h = state.get("h") if isinstance(state, dict) else None
+    target_w = saved_w if isinstance(saved_w, int) and saved_w > 0 else default_w
+    target_h = saved_h if isinstance(saved_h, int) and saved_h > 0 else default_h
+    if target_w and target_h:
+        try:
+            cv2.resizeWindow(window_name, int(target_w), int(target_h))
+        except Exception:
+            pass
+
+    saved_x = state.get("x") if isinstance(state, dict) else None
+    saved_y = state.get("y") if isinstance(state, dict) else None
+    if isinstance(saved_x, int) and isinstance(saved_y, int):
+        try:
+            cv2.moveWindow(window_name, int(saved_x), int(saved_y))
+        except Exception:
+            pass
+
+
+def _save_video_window_state(window_name):
+    try:
+        x, y, w, h = cv2.getWindowImageRect(window_name)
+        if int(w) <= 0 or int(h) <= 0:
+            return
+    except Exception:
+        return
+
+    with _video_window_state_lock:
+        states = _load_video_window_states()
+        if not isinstance(states, dict):
+            states = {}
+        states[str(window_name)] = {
+            "x": int(x),
+            "y": int(y),
+            "w": int(w),
+            "h": int(h),
+        }
+        try:
+            with open(VIDEO_WINDOW_STATE_PATH, "w", encoding="utf-8") as f:
+                json.dump(states, f, indent=2, sort_keys=True)
+        except Exception:
+            pass
 
 
 def _seed_brain_ik_from_servo_readback(retry_sec=0.0, retry_interval_sec=0.25):
@@ -1807,7 +1871,15 @@ def _cpu_fallback_loop():
         return
     sink = pipe.get_by_name("sink")
     pipe.set_state(Gst.State.PLAYING)
+    window_name = "Pi5 AI Vision"
     print("--- CPU Fallback Active: Pi5 AI Vision window (press Q to quit) ---")
+    window_ready = False
+    try:
+        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+        _apply_saved_video_window_state(window_name, config.FRAME_W, config.FRAME_H)
+        window_ready = True
+    except Exception:
+        window_ready = False
     try:
         while True:
             if brain.shutdown_event.is_set():
@@ -1841,14 +1913,20 @@ def _cpu_fallback_loop():
                 label = f"Faces: {len(faces)}  |  Hailo: UNAVAILABLE (CPU mode)"
                 cv2.putText(frame, label, (10, 25),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 80, 255), 2)
-                cv2.imshow("Pi5 AI Vision", frame)
+                if window_ready:
+                    cv2.imshow(window_name, frame)
             finally:
                 buf.unmap(mapinfo)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            if window_ready and (cv2.waitKey(1) & 0xFF == ord('q')):
                 break
     finally:
         pipe.set_state(Gst.State.NULL)
-        cv2.destroyAllWindows()
+        if window_ready:
+            _save_video_window_state(window_name)
+            try:
+                cv2.destroyWindow(window_name)
+            except Exception:
+                pass
 
 
 _restart_event = threading.Event()
@@ -2091,7 +2169,7 @@ def _table_object_worker():
     window_ready = False
     try:
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(window_name, config.FRAME_W, config.FRAME_H)
+        _apply_saved_video_window_state(window_name, config.FRAME_W, config.FRAME_H)
         window_ready = True
     except Exception:
         window_ready = False
@@ -2135,6 +2213,7 @@ def _table_object_worker():
     finally:
         _graceful_stop_pipeline(pipe)
         if window_ready:
+            _save_video_window_state(window_name)
             try:
                 cv2.destroyWindow(window_name)
             except Exception:

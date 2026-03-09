@@ -1025,21 +1025,6 @@ class RobotTuner:
         else:
             self.root.geometry("1460x860")
 
-        self._position_upper_right()
-
-    def _position_upper_right(self):
-        try:
-            self.root.update_idletasks()
-            width = max(100, int(self.root.winfo_width() or self.root.winfo_reqwidth()))
-            height = max(100, int(self.root.winfo_height() or self.root.winfo_reqheight()))
-            screen_w = max(width, int(self.root.winfo_screenwidth()))
-            margin = 16
-            x = max(0, screen_w - width - margin)
-            y = margin
-            self.root.geometry(f"{width}x{height}+{x}+{y}")
-        except Exception:
-            pass
-
     def _on_window_close(self):
         self._save_window_state(silent=True)
         shutdown_program()
