@@ -1658,7 +1658,19 @@ def _maybe_send_finger_gesture_events_from_sample(sample, now):
     if result and result.multi_hand_landmarks:
         if getattr(result, "multi_handedness", None):
             try:
-                handedness_label = result.multi_handedness[0].classification[0].label
+                raw_label = result.multi_handedness[0].classification[0].label
+                # MediaPipe Hands assumes a mirrored/selfie-view image. Our camera feed is
+                # unmirrored, so the reported handedness is spatially reversed. Flip it so
+                # that the thumb-direction check in _classify_finger_count_gesture is correct.
+                if bool(getattr(config, "FINGER_GESTURE_FLIP_HANDEDNESS", True)):
+                    if raw_label == "Right":
+                        handedness_label = "Left"
+                    elif raw_label == "Left":
+                        handedness_label = "Right"
+                    else:
+                        handedness_label = raw_label
+                else:
+                    handedness_label = raw_label
             except Exception:
                 handedness_label = None
         state = _classify_finger_count_gesture(result.multi_hand_landmarks[0], handedness_label)
@@ -1677,11 +1689,9 @@ def _maybe_send_finger_gesture_events_from_sample(sample, now):
         if event_name and _finger_event_allowed(event_name, now):
             brain.send_to_crestron(event_name)
             if bool(getattr(config, "FINGER_GESTURE_DEBUG", False)):
-                hand_text = str(handedness_label or "?")
-                print(f"Finger gesture: {state} -> {event_name} (hand={hand_text})")
-            _finger_state_streak[state] = 0
-
-
+                    flip = bool(getattr(config, "FINGER_GESTURE_FLIP_HANDEDNESS", True))
+                    raw_h = result.multi_handedness[0].classification[0].label if (result and getattr(result, "multi_handedness", None)) else "?"
+                    print(f"Finger gesture: {state} -> {event_name} (hand={handedness_label}, raw={raw_h}, flip={flip})")
 def _maybe_send_pose_gesture_events(points, now):
     """Send coarse hand-raise gesture events to Crestron using pose keypoints."""
     global _suppress_single_until, _pose_latched, _pose_neutral_streak

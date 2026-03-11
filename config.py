@@ -293,6 +293,10 @@ FINGER_GESTURE_FRAMES_REQUIRED = 2
 FINGER_GESTURE_Y_MARGIN = 0.02
 # Horizontal thumb extension threshold for handedness-aware thumb-up checks.
 FINGER_GESTURE_THUMB_X_MARGIN = 0.02
+# MediaPipe Hands reports handedness for a mirrored/selfie-view image.
+# Set True (default) when the camera feed is NOT mirrored (normal surveillance view).
+# Set False only if your preview already shows a mirrored image.
+FINGER_GESTURE_FLIP_HANDEDNESS = True
 # Map normalized finger gestures to outbound Crestron event names.
 # Set a value to "" to disable that gesture event.
 FINGER_GESTURE_EVENT_MAP = {
