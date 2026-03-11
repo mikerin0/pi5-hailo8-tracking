@@ -372,6 +372,31 @@ def _apply_saved_main_preview_window_state():
         pass
 
 
+def _ensure_main_preview_window_visible():
+    if not _main_preview_window_id:
+        return
+    try:
+        subprocess.run(
+            ["wmctrl", "-i", "-r", _main_preview_window_id, "-b", "remove,hidden,shaded"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=1.5,
+        )
+    except Exception:
+        pass
+    try:
+        subprocess.run(
+            ["wmctrl", "-i", "-R", _main_preview_window_id],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=1.5,
+        )
+    except Exception:
+        pass
+
+
 def _reapply_main_preview_window_state_delayed():
     if not _main_preview_window_id:
         return
@@ -380,6 +405,7 @@ def _reapply_main_preview_window_state_delayed():
         for delay_s in (0.35, 0.8, 1.4):
             time.sleep(delay_s)
             _apply_saved_main_preview_window_state()
+            _ensure_main_preview_window_visible()
 
     threading.Thread(target=_worker, daemon=True).start()
 
@@ -2699,6 +2725,7 @@ def camera_loop():
             pipe.set_state(Gst.State.PLAYING)
             print("--- Hailo AI Hat Active: yolov8m_pose running ---")
             _bind_main_preview_window(pre_window_ids)
+            _ensure_main_preview_window_visible()
             _reapply_main_preview_window_state_delayed()
 
             while not _restart_event.is_set() and not brain.shutdown_event.is_set():
