@@ -879,7 +879,7 @@ _last_pose_debug_log_time = 0.0
 _last_pose_debug_state = None
 _mp_hands = None
 _last_finger_event_times = {}
-_finger_state_streak = {"ONE": 0, "TWO": 0}
+_finger_state_streak = {}
 _table_obj_hits = 0
 _last_table_obj_trigger_time = 0.0
 _last_table_obj_block_log_time = 0.0
@@ -1558,29 +1558,76 @@ def _get_hands_detector():
     return _mp_hands
 
 
-def _classify_finger_count_gesture(hand_landmarks):
-    """Return 'ONE', 'TWO', or None using simple fingertip-vs-PIP geometry."""
+def _get_finger_gesture_event_map():
+    default_map = {
+        "FIST": "HAND_CLOSED",
+        "ONE": "ONE_FINGER_UP",
+        "TWO": "TWO_FINGERS_UP",
+        "THREE": "THREE_FINGERS_UP",
+        "FOUR": "FOUR_FINGERS_UP",
+        "FIVE": "HAND_OPEN",
+        "THUMBS_UP": "THUMBS_UP",
+    }
+    raw = getattr(config, "FINGER_GESTURE_EVENT_MAP", default_map)
+    if not isinstance(raw, dict):
+        return default_map
+
+    merged = dict(default_map)
+    for key, value in raw.items():
+        gesture = str(key or "").strip().upper()
+        if gesture not in merged:
+            continue
+        event_name = str(value or "").strip().upper()
+        merged[gesture] = event_name
+    return merged
+
+
+def _classify_finger_count_gesture(hand_landmarks, handedness_label=None):
+    """Return a normalized finger gesture label (FIST/ONE/TWO/THREE/FOUR/FIVE/THUMBS_UP) or None."""
     lm = hand_landmarks.landmark
     y_margin = float(getattr(config, "FINGER_GESTURE_Y_MARGIN", 0.02))
+    thumb_x_margin = float(getattr(config, "FINGER_GESTURE_THUMB_X_MARGIN", 0.02))
 
     index_up = lm[8].y < (lm[6].y - y_margin)
     middle_up = lm[12].y < (lm[10].y - y_margin)
     ring_up = lm[16].y < (lm[14].y - y_margin)
     pinky_up = lm[20].y < (lm[18].y - y_margin)
+    handed = str(handedness_label or "").strip().lower()
+    if handed == "right":
+        thumb_up = lm[4].x < (lm[3].x - thumb_x_margin)
+    elif handed == "left":
+        thumb_up = lm[4].x > (lm[3].x + thumb_x_margin)
+    else:
+        thumb_up = abs(lm[4].x - lm[3].x) > thumb_x_margin
 
     # "Down" uses a softer threshold to reduce false negatives when fingers are curled.
+    index_down = lm[8].y > (lm[6].y + y_margin * 0.5)
+    middle_down = lm[12].y > (lm[10].y + y_margin * 0.5)
     ring_down = lm[16].y > (lm[14].y + y_margin * 0.5)
     pinky_down = lm[20].y > (lm[18].y + y_margin * 0.5)
+    thumb_up_vertical = lm[4].y < (lm[2].y - y_margin * 0.5)
 
-    if index_up and not middle_up and ring_down and pinky_down:
+    if thumb_up_vertical and index_down and middle_down and ring_down and pinky_down:
+        return "THUMBS_UP"
+
+    raised_count = int(bool(thumb_up)) + int(bool(index_up)) + int(bool(middle_up)) + int(bool(ring_up)) + int(bool(pinky_up))
+    if raised_count <= 0:
+        return "FIST"
+    if raised_count == 1 and index_up and not middle_up and ring_down and pinky_down:
         return "ONE"
-    if index_up and middle_up and ring_down and pinky_down:
+    if raised_count == 2 and index_up and middle_up and ring_down and pinky_down:
         return "TWO"
+    if raised_count == 3:
+        return "THREE"
+    if raised_count == 4:
+        return "FOUR"
+    if raised_count >= 5:
+        return "FIVE"
     return None
 
 
 def _maybe_send_finger_gesture_events_from_sample(sample, now):
-    """Run MediaPipe Hands on side-branch sample and emit one/two-finger events."""
+    """Run MediaPipe Hands on side-branch sample and emit configured finger gesture events."""
     if not bool(getattr(config, "FINGER_GESTURE_EVENTS_ENABLED", True)):
         return
     if brain.tuner.shared_params.get("camera_mode", "HIGH_CAM") != "HIGH_CAM":
@@ -1607,28 +1654,32 @@ def _maybe_send_finger_gesture_events_from_sample(sample, now):
         buf.unmap(mapinfo)
 
     state = None
+    handedness_label = None
     if result and result.multi_hand_landmarks:
-        state = _classify_finger_count_gesture(result.multi_hand_landmarks[0])
+        if getattr(result, "multi_handedness", None):
+            try:
+                handedness_label = result.multi_handedness[0].classification[0].label
+            except Exception:
+                handedness_label = None
+        state = _classify_finger_count_gesture(result.multi_hand_landmarks[0], handedness_label)
 
-    for key in ("ONE", "TWO"):
+    event_map = _get_finger_gesture_event_map()
+    gestures = tuple(event_map.keys())
+    for key in gestures:
         if state == key:
-            _finger_state_streak[key] += 1
+            _finger_state_streak[key] = int(_finger_state_streak.get(key, 0)) + 1
         else:
             _finger_state_streak[key] = 0
 
     frames_required = max(1, int(getattr(config, "FINGER_GESTURE_FRAMES_REQUIRED", 3)))
-    if state == "ONE" and _finger_state_streak["ONE"] >= frames_required:
-        if _finger_event_allowed("ONE_FINGER_UP", now):
-            brain.send_to_crestron("ONE_FINGER_UP")
+    if state and int(_finger_state_streak.get(state, 0)) >= frames_required:
+        event_name = str(event_map.get(state, "")).strip().upper()
+        if event_name and _finger_event_allowed(event_name, now):
+            brain.send_to_crestron(event_name)
             if bool(getattr(config, "FINGER_GESTURE_DEBUG", False)):
-                print("Finger gesture: ONE_FINGER_UP")
-            _finger_state_streak["ONE"] = 0
-    elif state == "TWO" and _finger_state_streak["TWO"] >= frames_required:
-        if _finger_event_allowed("TWO_FINGERS_UP", now):
-            brain.send_to_crestron("TWO_FINGERS_UP")
-            if bool(getattr(config, "FINGER_GESTURE_DEBUG", False)):
-                print("Finger gesture: TWO_FINGERS_UP")
-            _finger_state_streak["TWO"] = 0
+                hand_text = str(handedness_label or "?")
+                print(f"Finger gesture: {state} -> {event_name} (hand={hand_text})")
+            _finger_state_streak[state] = 0
 
 
 def _maybe_send_pose_gesture_events(points, now):

@@ -457,8 +457,13 @@ the primary Hailo pipeline uses `libcamerasrc`.
 | `LEFT_HAND_UP` | Left wrist raised above left shoulder (HIGH_CAM) |
 | `RIGHT_HAND_UP` | Right wrist raised above right shoulder (HIGH_CAM) |
 | `BOTH_HANDS_UP` | Both wrists raised above shoulders (HIGH_CAM) |
+| `HAND_CLOSED` | Fist / zero fingers (HIGH_CAM) |
 | `ONE_FINGER_UP` | Index finger only raised (HIGH_CAM) |
 | `TWO_FINGERS_UP` | Index + middle fingers raised (HIGH_CAM) |
+| `THREE_FINGERS_UP` | Three fingers raised (HIGH_CAM) |
+| `FOUR_FINGERS_UP` | Four fingers raised (HIGH_CAM) |
+| `HAND_OPEN` | Five fingers raised / open palm (HIGH_CAM) |
+| `THUMBS_UP` | Thumb-up gesture (HIGH_CAM) |
 | `ITEM_RELEASED` | Auto-release triggered near claw (TABLE_CAM) |
 
 Gesture-event sensitivity/debounce can be tuned in [config.py](config.py) via:
@@ -469,7 +474,8 @@ Gesture-event sensitivity/debounce can be tuned in [config.py](config.py) via:
 Finger-count events are tuned via:
 `FINGER_GESTURE_EVENTS_ENABLED`, `FINGER_GESTURE_MIN_DET_CONF`,
 `FINGER_GESTURE_MIN_TRACK_CONF`, `FINGER_GESTURE_COOLDOWN_SEC`,
-`FINGER_GESTURE_FRAMES_REQUIRED`, and `FINGER_GESTURE_Y_MARGIN`.
+`FINGER_GESTURE_FRAMES_REQUIRED`, `FINGER_GESTURE_Y_MARGIN`,
+`FINGER_GESTURE_THUMB_X_MARGIN`, and `FINGER_GESTURE_EVENT_MAP`.
 
 `FINGER_GESTURE_EVENTS_ENABLED` is disabled by default to keep the main Hailo
 video pipeline stable; enable it only after confirming your Pi can sustain it.

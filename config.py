@@ -291,6 +291,19 @@ FINGER_GESTURE_COOLDOWN_SEC = 1.0
 FINGER_GESTURE_FRAMES_REQUIRED = 2
 # Vertical margin for counting a finger as raised (tip.y < pip.y - margin)
 FINGER_GESTURE_Y_MARGIN = 0.02
+# Horizontal thumb extension threshold for handedness-aware thumb-up checks.
+FINGER_GESTURE_THUMB_X_MARGIN = 0.02
+# Map normalized finger gestures to outbound Crestron event names.
+# Set a value to "" to disable that gesture event.
+FINGER_GESTURE_EVENT_MAP = {
+    "FIST": "HAND_CLOSED",
+    "ONE": "ONE_FINGER_UP",
+    "TWO": "TWO_FINGERS_UP",
+    "THREE": "THREE_FINGERS_UP",
+    "FOUR": "FOUR_FINGERS_UP",
+    "FIVE": "HAND_OPEN",
+    "THUMBS_UP": "THUMBS_UP",
+}
 FINGER_GESTURE_DEBUG = False
 
 # --- Shelly smart plug power control for servo/controller supply ---
