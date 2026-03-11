@@ -285,14 +285,16 @@ POSE_GESTURE_DEBUG_LOG_INTERVAL_SEC = 0.5
 # NOTE: keep disabled by default for runtime stability on Pi5 + Hailo pipeline.
 # Enable only after validating performance on your setup.
 FINGER_GESTURE_EVENTS_ENABLED = True
-FINGER_GESTURE_MIN_DET_CONF = 0.45
-FINGER_GESTURE_MIN_TRACK_CONF = 0.45
+FINGER_GESTURE_MIN_DET_CONF = 0.40
+FINGER_GESTURE_MIN_TRACK_CONF = 0.40
 FINGER_GESTURE_COOLDOWN_SEC = 1.0
-FINGER_GESTURE_FRAMES_REQUIRED = 2
+FINGER_GESTURE_FRAMES_REQUIRED = 3
 # Vertical margin for counting a finger as raised (tip.y < pip.y - margin)
 FINGER_GESTURE_Y_MARGIN = 0.02
 # Horizontal thumb extension threshold for handedness-aware thumb-up checks.
 FINGER_GESTURE_THUMB_X_MARGIN = 0.02
+# Minimum MediaPipe handedness confidence; lower labels are ignored for thumb logic.
+FINGER_GESTURE_MIN_HANDEDNESS_SCORE = 0.50
 # MediaPipe Hands reports handedness for a mirrored/selfie-view image.
 # Set True (default) when the camera feed is NOT mirrored (normal surveillance view).
 # Set False only if your preview already shows a mirrored image.

@@ -1629,18 +1629,18 @@ def _classify_finger_count_gesture(hand_landmarks, handedness_label=None):
     if thumb_up_vertical and index_down and middle_down and ring_down and pinky_down:
         return "THUMBS_UP"
 
-    raised_count = int(bool(thumb_up)) + int(bool(index_up)) + int(bool(middle_up)) + int(bool(ring_up)) + int(bool(pinky_up))
-    if raised_count <= 0:
+    non_thumb_count = int(bool(index_up)) + int(bool(middle_up)) + int(bool(ring_up)) + int(bool(pinky_up))
+    if non_thumb_count <= 0 and not thumb_up:
         return "FIST"
-    if raised_count == 1 and index_up and not middle_up and ring_down and pinky_down:
+    if non_thumb_count == 1 and index_up and not middle_up and ring_down and pinky_down:
         return "ONE"
-    if raised_count == 2 and index_up and middle_up and ring_down and pinky_down:
+    if non_thumb_count == 2 and index_up and middle_up and ring_down and pinky_down:
         return "TWO"
-    if raised_count == 3:
+    if non_thumb_count == 3:
         return "THREE"
-    if raised_count == 4:
+    if non_thumb_count == 4 and not thumb_up:
         return "FOUR"
-    if raised_count >= 5:
+    if non_thumb_count == 4 and thumb_up:
         return "FIVE"
     return None
 
@@ -1674,14 +1674,23 @@ def _maybe_send_finger_gesture_events_from_sample(sample, now):
 
     state = None
     handedness_label = None
+    raw_handedness_label = None
     if result and result.multi_hand_landmarks:
         if getattr(result, "multi_handedness", None):
             try:
-                raw_label = result.multi_handedness[0].classification[0].label
+                cls = result.multi_handedness[0].classification[0]
+                raw_label = cls.label
+                raw_handedness_label = raw_label
+                raw_score = float(getattr(cls, "score", 1.0))
+                min_handedness_score = max(0.0, min(1.0, float(getattr(config, "FINGER_GESTURE_MIN_HANDEDNESS_SCORE", 0.50))))
+                if raw_score < min_handedness_score:
+                    raw_label = None
                 # MediaPipe Hands assumes a mirrored/selfie-view image. Our camera feed is
                 # unmirrored, so the reported handedness is spatially reversed. Flip it so
                 # that the thumb-direction check in _classify_finger_count_gesture is correct.
-                if bool(getattr(config, "FINGER_GESTURE_FLIP_HANDEDNESS", True)):
+                if raw_label is None:
+                    handedness_label = None
+                elif bool(getattr(config, "FINGER_GESTURE_FLIP_HANDEDNESS", True)):
                     if raw_label == "Right":
                         handedness_label = "Left"
                     elif raw_label == "Left":
@@ -1708,9 +1717,12 @@ def _maybe_send_finger_gesture_events_from_sample(sample, now):
         if event_name and _finger_event_allowed(event_name, now):
             brain.send_to_crestron(event_name)
             if bool(getattr(config, "FINGER_GESTURE_DEBUG", False)):
-                    flip = bool(getattr(config, "FINGER_GESTURE_FLIP_HANDEDNESS", True))
-                    raw_h = result.multi_handedness[0].classification[0].label if (result and getattr(result, "multi_handedness", None)) else "?"
-                    print(f"Finger gesture: {state} -> {event_name} (hand={handedness_label}, raw={raw_h}, flip={flip})")
+                flip = bool(getattr(config, "FINGER_GESTURE_FLIP_HANDEDNESS", True))
+                raw_h = str(raw_handedness_label or "?")
+                print(f"Finger gesture: {state} -> {event_name} (hand={handedness_label}, raw={raw_h}, flip={flip})")
+            _finger_state_streak[state] = 0
+
+
 def _maybe_send_pose_gesture_events(points, now):
     """Send coarse hand-raise gesture events to Crestron using pose keypoints."""
     global _suppress_single_until, _pose_latched, _pose_neutral_streak
@@ -2709,22 +2721,21 @@ def camera_loop():
             )
 
             if finger_branch_enabled:
-                # Inference → hailooverlay, then tee to preview (scaled to widescreen)
-                # and finger_sink (kept at MODEL_INPUT_SIZE for MediaPipe).
+                # Keep finger gestures on a clean raw branch (no overlay artifacts),
+                # while preview stays annotated from the Hailo branch.
                 launch_str = (
                     src_segment +
-                    f"videoconvert ! "
+                    f"videoconvert ! tee name=t "
+                    f"t. ! queue leaky=downstream max-size-buffers=1 ! "
+                    f"videoconvert ! videoscale ! video/x-raw,format=RGB,width={config.FRAME_W},height={config.FRAME_H} ! "
+                    f"appsink name=finger_sink emit-signals=false sync=false drop=true max-buffers=1 "
+                    f"t. ! queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
                     f"videoscale ! video/x-raw,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
                     f"hailonet hef-path={HEF_PATH} force-writable=true ! "
                     f"hailofilter name=hailofilter so-path={SO_PATH} ! "
                     f"hailotracker ! hailooverlay ! "
-                    f"videoconvert ! tee name=t "
-                    f"t. ! queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
                     f"videoconvert ! videoscale ! video/x-raw,format=RGB,width={config.FRAME_W},height={config.FRAME_H} ! "
-                    f"videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1 "
-                    f"t. ! queue leaky=downstream max-size-buffers=1 ! "
-                    f"videoconvert ! video/x-raw,format=RGB,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
-                    f"appsink name=finger_sink emit-signals=false sync=false drop=true max-buffers=1"
+                    f"videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1"
                 )
             elif table_model_branch_enabled:
                 launch_str = (
