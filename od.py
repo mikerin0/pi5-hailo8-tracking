@@ -2680,18 +2680,21 @@ def camera_loop():
             )
 
             if finger_branch_enabled:
+                # Inference → hailooverlay, then tee to preview (scaled to widescreen)
+                # and finger_sink (kept at MODEL_INPUT_SIZE for MediaPipe).
                 launch_str = (
                     src_segment +
-                    f"videoconvert ! tee name=t "
-                    f"t. ! queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
-                    f"videoscale ! video/x-raw,format=RGB,width={config.FRAME_W},height={config.FRAME_H} ! "
-                    f"videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1 "
-                    f"t. ! queue leaky=downstream max-size-buffers=1 ! "
-                    f"video/x-raw,format=RGB,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
+                    f"videoconvert ! "
+                    f"videoscale ! video/x-raw,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
                     f"hailonet hef-path={HEF_PATH} force-writable=true ! "
                     f"hailofilter name=hailofilter so-path={SO_PATH} ! "
                     f"hailotracker ! hailooverlay ! "
-                    f"videoconvert ! "
+                    f"videoconvert ! tee name=t "
+                    f"t. ! queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
+                    f"videoconvert ! videoscale ! video/x-raw,format=RGB,width={config.FRAME_W},height={config.FRAME_H} ! "
+                    f"videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1 "
+                    f"t. ! queue leaky=downstream max-size-buffers=1 ! "
+                    f"videoconvert ! video/x-raw,format=RGB,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
                     f"appsink name=finger_sink emit-signals=false sync=false drop=true max-buffers=1"
                 )
             elif table_model_branch_enabled:
@@ -2719,18 +2722,17 @@ def camera_loop():
                     f"appsink name=table_obj_sink emit-signals=false sync=false drop=true max-buffers=1"
                 )
             else:
+                # Route inference → hailooverlay → scale to widescreen → preview_sink
+                # so skeleton/detection marks are visible in the display window.
                 launch_str = (
                     src_segment +
-                    f"videoconvert ! tee name=t "
-                    f"t. ! queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
-                    f"videoscale ! video/x-raw,format=RGB,width={config.FRAME_W},height={config.FRAME_H} ! "
-                    f"videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1 "
-                    f"t. ! queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
-                    f"videoscale ! video/x-raw,format=RGB,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
+                    f"videoconvert ! "
+                    f"videoscale ! video/x-raw,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
                     f"hailonet hef-path={HEF_PATH} force-writable=true ! "
                     f"hailofilter name=hailofilter so-path={SO_PATH} ! "
                     f"hailotracker ! hailooverlay ! "
-                    f"videoconvert ! fakesink sync=false"
+                    f"videoconvert ! videoscale ! video/x-raw,format=RGB,width={config.FRAME_W},height={config.FRAME_H} ! "
+                    f"videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1"
                 )
 
             if overlay_enabled:

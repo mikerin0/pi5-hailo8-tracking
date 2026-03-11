@@ -284,7 +284,7 @@ POSE_GESTURE_DEBUG_LOG_INTERVAL_SEC = 0.5
 # --- MediaPipe finger-count gesture events (outbound, HIGH_CAM) ---
 # NOTE: keep disabled by default for runtime stability on Pi5 + Hailo pipeline.
 # Enable only after validating performance on your setup.
-FINGER_GESTURE_EVENTS_ENABLED = False
+FINGER_GESTURE_EVENTS_ENABLED = True
 FINGER_GESTURE_MIN_DET_CONF = 0.45
 FINGER_GESTURE_MIN_TRACK_CONF = 0.45
 FINGER_GESTURE_COOLDOWN_SEC = 1.0
@@ -304,7 +304,7 @@ FINGER_GESTURE_EVENT_MAP = {
     "FIVE": "HAND_OPEN",
     "THUMBS_UP": "THUMBS_UP",
 }
-FINGER_GESTURE_DEBUG = False
+FINGER_GESTURE_DEBUG = True
 
 # --- Shelly smart plug power control for servo/controller supply ---
 # Uses Shelly Gen2 RPC API, e.g. /rpc/Switch.Set?id=0&on=true
