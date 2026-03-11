@@ -166,6 +166,8 @@ import time, threading, gi, hailo, numpy as np, cv2, robot_brain as brain
 import config
 import servo_arm_integration as servo_integration
 try:
+    # Suppress the benign MediaPipe "NORM_RECT without IMAGE_DIMENSIONS" glog warning.
+    os.environ.setdefault("GLOG_minloglevel", "2")
     import mediapipe as mp
 except Exception:
     mp = None
@@ -1080,6 +1082,23 @@ def update_table_model_paths(hef_path, so_path):
 
     _restart_event.set()
     return True, "Table model updated; restarting camera pipeline"
+
+
+def update_high_cam_model_paths(hef_path, so_path):
+    """Update HIGH_CAM pose model paths at runtime and request pipeline restart."""
+    global HEF_PATH, SO_PATH
+    hef = os.path.abspath(str(hef_path or "").strip())
+    so = os.path.abspath(str(so_path or "").strip())
+    if not hef or not os.path.isfile(hef):
+        return False, f"Invalid HEF path: {hef or '(empty)'}"
+    if not so or not os.path.isfile(so):
+        return False, f"Invalid postprocess .so path: {so or '(empty)'}"
+    HEF_PATH = hef
+    SO_PATH = so
+    config.HEF_PATH = hef
+    config.SO_PATH = so
+    _restart_event.set()
+    return True, f"HIGH_CAM model updated to {os.path.basename(hef)}; restarting pipeline"
 
 
 def arm_table_pick_tracking():
@@ -2873,6 +2892,7 @@ if __name__ == "__main__":
     brain.servo_power_up_callback = servo_integration.power_up_servos
     brain.vision_summary_provider = get_vision_summary_text
     brain.table_model_update_callback = update_table_model_paths
+    brain.high_cam_model_update_callback = update_high_cam_model_paths
     brain.table_pick_arm_callback = arm_table_pick_tracking
     brain.table_color_follow_callback = arm_table_color_follow
     startup_power_on = bool(getattr(config, "SAFE_STARTUP_POWER_ON", not bool(getattr(config, "SAFE_STARTUP_NO_MOTION", True))))

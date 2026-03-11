@@ -43,6 +43,7 @@ servo_power_provider = None
 servo_power_up_callback = None
 vision_summary_provider = None
 table_model_update_callback = None
+high_cam_model_update_callback = None
 table_pick_arm_callback = None
 table_color_follow_callback = None
 _first_move_capped = False
@@ -56,6 +57,52 @@ def _startup_log(message):
         return
     dt = time.monotonic() - _startup_t0
     print(f"[STARTUP +{dt:7.3f}s] robot_brain: {message}")
+
+
+def _discover_high_cam_model_presets():
+    so_default = str(getattr(config, "SO_PATH", "")).strip()
+    presets = {
+        "Current pose model": (
+            str(getattr(config, "HEF_PATH", "")),
+            so_default,
+        ),
+    }
+    model_roots = [
+        "/usr/local/hailo/resources/models",
+        "/usr/local/hailo/resources/models/hailo8",
+    ]
+    hef_by_name = {}
+    for root in model_roots:
+        if not os.path.isdir(root):
+            continue
+        try:
+            for dirpath, _dirnames, filenames in os.walk(root):
+                for filename in filenames:
+                    if not filename.lower().endswith(".hef"):
+                        continue
+                    full_path = os.path.join(dirpath, filename)
+                    if filename not in hef_by_name:
+                        hef_by_name[filename] = full_path
+        except Exception:
+            continue
+
+    preferred = [
+        ("YOLOv8m-pose (accurate, default)", "yolov8m_pose.hef"),
+        ("YOLOv8s-pose (balanced)", "yolov8s_pose.hef"),
+        ("YOLOv8n-pose (fast)", "yolov8n_pose.hef"),
+    ]
+    for label, filename in preferred:
+        path = hef_by_name.get(filename)
+        if path:
+            presets[label] = (path, so_default)
+
+    for filename in sorted(hef_by_name.keys()):
+        if "pose" in filename.lower():
+            if filename not in {v[0].split("/")[-1] for v in presets.values()}:
+                presets[filename] = (hef_by_name[filename], so_default)
+
+    presets["Custom path"] = ("", "")
+    return presets
 
 
 def _discover_table_model_presets():
@@ -925,6 +972,7 @@ class RobotTuner:
         self._syncing_scales = False
         self.manual_mode = False 
         self.needs_camera_restart = False
+        self.high_cam_model_presets = _discover_high_cam_model_presets()
         self.table_model_presets = _discover_table_model_presets()
         self._window_geometry = None
         self._window_state = None
@@ -1169,6 +1217,61 @@ class RobotTuner:
             self.vision_summary_var.set(summary)
         say(summary)
 
+    def _apply_high_cam_model_clicked(self):
+        callback = high_cam_model_update_callback
+        hef_path = str(getattr(self, "high_cam_hef_var", None) and self.high_cam_hef_var.get() or "").strip()
+        so_path = str(getattr(self, "high_cam_so_var", None) and self.high_cam_so_var.get() or "").strip()
+        if callback is None:
+            msg = "HIGH_CAM model update unavailable"
+            print(msg)
+            if hasattr(self, "high_cam_model_status_var"):
+                self.high_cam_model_status_var.set(msg)
+            return
+        try:
+            ok, msg = callback(hef_path, so_path)
+        except Exception as e:
+            ok, msg = False, f"HIGH_CAM model update failed: {e}"
+        print(msg)
+        if hasattr(self, "high_cam_model_status_var"):
+            self.high_cam_model_status_var.set(msg)
+        if ok:
+            say("High cam model updated")
+
+    def _apply_high_cam_model_preset(self, preset_name):
+        name = str(preset_name or "").strip()
+        hef_path, so_path = self.high_cam_model_presets.get(name, ("", ""))
+        if hasattr(self, "high_cam_hef_var"):
+            self.high_cam_hef_var.set(str(hef_path or ""))
+        if hasattr(self, "high_cam_so_var"):
+            self.high_cam_so_var.set(str(so_path or ""))
+        if hasattr(self, "high_cam_model_status_var"):
+            self.high_cam_model_status_var.set(f"Pose model selected: {name}")
+
+    def _refresh_high_cam_model_presets(self):
+        previous = ""
+        if hasattr(self, "high_cam_model_preset_var"):
+            previous = str(self.high_cam_model_preset_var.get() or "")
+        self.high_cam_model_presets = _discover_high_cam_model_presets()
+        names = list(self.high_cam_model_presets.keys())
+        if not names:
+            return
+        if previous not in self.high_cam_model_presets:
+            previous = next(
+                (k for k in ("YOLOv8m-pose (accurate, default)", "Current pose model") if k in self.high_cam_model_presets),
+                names[0],
+            )
+        if hasattr(self, "high_cam_model_option_menu"):
+            menu = self.high_cam_model_option_menu["menu"]
+            menu.delete(0, "end")
+            for name in names:
+                menu.add_command(
+                    label=name,
+                    command=tk._setit(self.high_cam_model_preset_var, name, self._apply_high_cam_model_preset),
+                )
+        if hasattr(self, "high_cam_model_preset_var"):
+            self.high_cam_model_preset_var.set(previous)
+        self._apply_high_cam_model_preset(previous)
+
     def _apply_table_model_clicked(self):
         callback = table_model_update_callback
         hef_path = ""
@@ -1402,6 +1505,36 @@ class RobotTuner:
         tk.Label(status_col, textvariable=self.vision_summary_var, wraplength=260, justify="left").pack(pady=(0, 8))
         self.pickup_status_var = tk.StringVar(value="Pickup: idle")
         tk.Label(status_col, textvariable=self.pickup_status_var, wraplength=260, justify="left").pack(pady=(0, 8))
+
+        # --- HIGH CAM Model Frame (model column) ---
+        tk.Label(model_col, text="--- HIGH CAM POSE MODEL ---", font=("Arial", 12, "bold")).pack(pady=(4, 4))
+        high_cam_preset_names = list(self.high_cam_model_presets.keys())
+        default_high_cam = next(
+            (k for k in ("YOLOv8m-pose (accurate, default)", "Current pose model") if k in self.high_cam_model_presets),
+            high_cam_preset_names[0] if high_cam_preset_names else "Current pose model",
+        )
+        self.high_cam_model_preset_var = tk.StringVar(value=default_high_cam)
+        self.high_cam_model_option_menu = tk.OptionMenu(
+            model_col,
+            self.high_cam_model_preset_var,
+            *high_cam_preset_names,
+            command=self._apply_high_cam_model_preset,
+        )
+        self.high_cam_model_option_menu.pack(pady=(0, 4), fill="x")
+        tk.Button(model_col, text="REFRESH MODELS", width=18,
+                  command=self._refresh_high_cam_model_presets).pack(pady=(0, 4))
+        tk.Label(model_col, text="Pose HEF Path", font=("Arial", 10, "bold")).pack(pady=(2, 2))
+        self.high_cam_hef_var = tk.StringVar(value=str(getattr(config, "HEF_PATH", "")))
+        tk.Entry(model_col, textvariable=self.high_cam_hef_var).pack(pady=(0, 4), fill="x")
+        tk.Label(model_col, text="Pose Postproc .so", font=("Arial", 10, "bold")).pack(pady=(2, 2))
+        self.high_cam_so_var = tk.StringVar(value=str(getattr(config, "SO_PATH", "")))
+        tk.Entry(model_col, textvariable=self.high_cam_so_var).pack(pady=(0, 4), fill="x")
+        self._apply_high_cam_model_preset(default_high_cam)
+        tk.Button(model_col, text="APPLY POSE MODEL", width=18,
+                  bg="lightcyan", command=self._apply_high_cam_model_clicked).pack(pady=(2, 4))
+        self.high_cam_model_status_var = tk.StringVar(value="Pose model: ready")
+        tk.Label(model_col, textvariable=self.high_cam_model_status_var,
+                 wraplength=260, justify="left").pack(pady=(0, 8))
 
         tk.Label(model_col, text="--- TABLE OBJECT CONTROLS ---", font=("Arial", 12, "bold")).pack(pady=12)
 
