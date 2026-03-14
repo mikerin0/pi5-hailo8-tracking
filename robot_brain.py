@@ -976,6 +976,8 @@ class RobotTuner:
         self.table_model_presets = _discover_table_model_presets()
         self._window_geometry = None
         self._window_state = None
+        self._slider_window_geometry = None
+        self._slider_window_state = None
         self._resume_ready = False
         self._load_tuner_params(silent=True)
         self._load_window_state(silent=True)
@@ -1031,8 +1033,21 @@ class RobotTuner:
                 data = json.load(f)
             if not isinstance(data, dict):
                 return
-            self._window_geometry = data.get("geometry")
-            self._window_state = data.get("state")
+
+            controls = data.get("controls") if isinstance(data.get("controls"), dict) else None
+            sliders = data.get("sliders") if isinstance(data.get("sliders"), dict) else None
+
+            if controls is not None:
+                self._window_geometry = controls.get("geometry")
+                self._window_state = controls.get("state")
+            else:
+                self._window_geometry = data.get("geometry")
+                self._window_state = data.get("state")
+
+            if sliders is not None:
+                self._slider_window_geometry = sliders.get("geometry")
+                self._slider_window_state = sliders.get("state")
+
             if not silent:
                 print(f"Loaded window state: {WINDOW_STATE_PATH}")
         except Exception as e:
@@ -1043,9 +1058,43 @@ class RobotTuner:
         if not hasattr(self, "root") or self.root is None:
             return
         try:
+            controls_geometry = None
+            controls_state = None
+            sliders_geometry = None
+            sliders_state = None
+
+            try:
+                controls_geometry = self.root.geometry()
+            except Exception:
+                controls_geometry = None
+            try:
+                controls_state = self.root.state()
+            except Exception:
+                controls_state = None
+
+            if hasattr(self, "slider_window") and self.slider_window is not None:
+                try:
+                    sliders_geometry = self.slider_window.geometry()
+                except Exception:
+                    sliders_geometry = None
+                try:
+                    sliders_state = self.slider_window.state()
+                except Exception:
+                    sliders_state = None
+
             data = {
-                "geometry": self.root.geometry(),
-                "state": self.root.state(),
+                # Backward-compatible root keys:
+                "geometry": controls_geometry,
+                "state": controls_state,
+                # Explicit per-window keys:
+                "controls": {
+                    "geometry": controls_geometry,
+                    "state": controls_state,
+                },
+                "sliders": {
+                    "geometry": sliders_geometry,
+                    "state": sliders_state,
+                },
             }
             with open(WINDOW_STATE_PATH, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, sort_keys=True)
@@ -1071,7 +1120,28 @@ class RobotTuner:
             except Exception:
                 pass
         else:
-            self.root.geometry("1460x860")
+            self.root.geometry("980x860")
+
+    def _apply_slider_window_state(self):
+        if not hasattr(self, "slider_window") or self.slider_window is None:
+            return
+        try:
+            self.slider_window.attributes("-fullscreen", False)
+        except Exception:
+            pass
+        try:
+            self.slider_window.state("normal")
+        except Exception:
+            pass
+
+        if self._slider_window_geometry:
+            try:
+                self.slider_window.geometry(str(self._slider_window_geometry))
+                return
+            except Exception:
+                pass
+
+        self.slider_window.geometry("760x860")
 
     def _on_window_close(self):
         self._save_window_state(silent=True)
@@ -1354,27 +1424,65 @@ class RobotTuner:
                     pass
         self._syncing_scales = False
 
+    def _create_scrollable_body(self, parent):
+        outer = tk.Frame(parent)
+        outer.pack(fill="both", expand=True)
+        canvas = tk.Canvas(outer, highlightthickness=0)
+        v_scroll = tk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=v_scroll.set)
+        v_scroll.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        body = tk.Frame(canvas)
+        win_id = canvas.create_window((0, 0), window=body, anchor="nw")
+
+        def _on_body_config(_event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        def _on_canvas_config(event):
+            canvas.itemconfigure(win_id, width=event.width)
+
+        body.bind("<Configure>", _on_body_config)
+        canvas.bind("<Configure>", _on_canvas_config)
+        return body
+
     def create_gui(self):
         self.root = tk.Tk()
-        self.root.title("Robot Master - Pi Server Mode")
-        self.root.geometry("1460x860")
+        self.root.title("Robot Controls - Pi Server Mode")
+        self.root.geometry("980x860")
         self._apply_window_state()
         self.root.protocol("WM_DELETE_WINDOW", self._on_window_close)
 
-        columns = tk.Frame(self.root)
-        columns.pack(fill="both", expand=True, padx=10, pady=8)
-        left_col = tk.Frame(columns)
-        right_col = tk.Frame(columns)
-        status_col = tk.Frame(columns)
-        model_col = tk.Frame(columns)
-        left_col.grid(row=0, column=0, sticky="nw", padx=(0, 10))
-        right_col.grid(row=0, column=1, sticky="nw")
-        status_col.grid(row=0, column=2, sticky="nw", padx=(10, 0))
-        model_col.grid(row=0, column=3, sticky="nw", padx=(10, 0))
+        self.slider_window = tk.Toplevel(self.root)
+        self.slider_window.title("Robot Sliders - Pi Server Mode")
+        self.slider_window.geometry("760x860")
+        self.slider_window.protocol("WM_DELETE_WINDOW", self._on_window_close)
+        self._apply_slider_window_state()
 
-        # --- Camera Mode Frame (left column) ---
-        tk.Label(left_col, text="--- CAMERA MODE ---", font=("Arial", 12, "bold")).pack(pady=5)
-        cam_frame = tk.Frame(left_col)
+        controls_body = self._create_scrollable_body(self.root)
+        sliders_body = self._create_scrollable_body(self.slider_window)
+
+        controls_cols = tk.Frame(controls_body)
+        controls_cols.pack(fill="both", expand=True, padx=10, pady=8)
+        action_col = tk.Frame(controls_cols)
+        status_col = tk.Frame(controls_cols)
+        model_col = tk.Frame(controls_cols)
+        action_col.grid(row=0, column=0, sticky="nw", padx=(0, 10))
+        status_col.grid(row=0, column=1, sticky="nw", padx=(0, 10))
+        model_col.grid(row=0, column=2, sticky="nw")
+
+        slider_cols = tk.Frame(sliders_body)
+        slider_cols.pack(fill="both", expand=True, padx=10, pady=8)
+        slider_left = tk.Frame(slider_cols)
+        slider_right = tk.Frame(slider_cols)
+        slider_left.grid(row=0, column=0, sticky="nw", padx=(0, 10))
+        slider_right.grid(row=0, column=1, sticky="nw")
+
+        tk.Button(action_col, text="EXIT PROGRAM", command=self._park_and_shutdown_clicked,
+                  bg="red", fg="white", width=18).pack(pady=(0, 10))
+
+        # --- Camera Mode Frame (controls window) ---
+        tk.Label(action_col, text="--- CAMERA MODE ---", font=("Arial", 12, "bold")).pack(pady=5)
+        cam_frame = tk.Frame(action_col)
         cam_frame.pack()
         tk.Button(cam_frame, text="HIGH CAM\n(Face Tracking)", bg="blue", fg="white",
                   width=12, command=lambda: switch_camera("HIGH_CAM")).pack(side="left", padx=4)
@@ -1386,18 +1494,30 @@ class RobotTuner:
         dual_btn_state = "normal" if dual_allowed else "disabled"
         tk.Button(cam_frame, text="DUAL CAM\n(Track+Preview)", bg=dual_btn_bg, fg=dual_btn_fg,
               state=dual_btn_state, width=12, command=lambda: switch_camera("DUAL_CAM")).pack(side="left", padx=4)
-        self.cam_mode_label = tk.Label(left_col, text="Mode: HIGH CAM", font=("Arial", 10))
+        self.cam_mode_label = tk.Label(action_col, text="Mode: HIGH CAM", font=("Arial", 10))
         self.cam_mode_label.pack(pady=3)
         dual_text = "DUAL_CAM enabled" if dual_allowed else "DUAL_CAM disabled for stability"
         dual_color = "darkgreen" if dual_allowed else "red"
-        tk.Label(left_col, text=dual_text, fg=dual_color, font=("Arial", 10, "bold")).pack(pady=(0, 6))
+        tk.Label(action_col, text=dual_text, fg=dual_color, font=("Arial", 10, "bold")).pack(pady=(0, 6))
 
-        # --- Calibration Jog (left column) ---
-        tk.Label(left_col, text="--- CALIBRATION JOG ---", font=("Arial", 12, "bold")).pack(pady=5)
+        # --- Action buttons (controls window) ---
+        tk.Label(action_col, text="--- ACTIONS ---", font=("Arial", 12, "bold")).pack(pady=6)
+        tk.Button(action_col, text="HOME ARM", command=go_home, bg="gray", fg="white").pack(pady=6)
+        tk.Button(action_col, text="TAKE ITEM", command=start_take_item_sequence, bg="purple", fg="white").pack(pady=6)
+        tk.Button(action_col, text="TABLE PICK", command=start_table_pick_sequence, bg="darkgreen", fg="white").pack(pady=6)
+        tk.Button(action_col, text='FOLLOW "SELECTED COLOR" OBJECT', command=start_follow_selected_color_sequence, bg="gold", fg="black").pack(pady=6)
+        tk.Button(action_col, text="GRAB TRACKED OBJECT", command=start_grab_tracked_object_sequence, bg="khaki", fg="black").pack(pady=6)
+        tk.Button(action_col, text="RELEASE ITEM", command=release_item_manual, bg="orange", fg="black").pack(pady=6)
+
+        # --- Calibration + sliders window ---
+        tk.Button(slider_left, text="EXIT PROGRAM", command=self._park_and_shutdown_clicked,
+                  bg="red", fg="white", width=18).pack(pady=(0, 10))
+
+        tk.Label(slider_left, text="--- CALIBRATION JOG ---", font=("Arial", 12, "bold")).pack(pady=5)
         self.manual_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(left_col, text="ENABLE MANUAL SLIDERS (AI LOCKED)", variable=self.manual_var, command=self.toggle_manual_mode, font=("Arial", 10, "bold"), fg="blue").pack(pady=10)
+        tk.Checkbutton(slider_left, text="ENABLE MANUAL SLIDERS (AI LOCKED)", variable=self.manual_var, command=self.toggle_manual_mode, font=("Arial", 10, "bold"), fg="blue").pack(pady=10)
 
-        preset_frame = tk.Frame(left_col)
+        preset_frame = tk.Frame(slider_left)
         preset_frame.pack(pady=4)
         tk.Button(preset_frame, text="LOAD TUNE", width=12, command=lambda: self._load_tuner_params(silent=False)).pack(side="left", padx=5)
         tk.Button(preset_frame, text="SAVE TUNE", width=12, command=self._save_tuner_params).pack(side="left", padx=5)
@@ -1407,21 +1527,13 @@ class RobotTuner:
               ("Swing Y", "tune_y", float(getattr(config, "MANUAL_Y_MIN", -0.12)), float(getattr(config, "MANUAL_Y_MAX", 0.12)), 0.001),
               ("Height Z", "tune_z", float(getattr(config, "MANUAL_Z_MIN", 0.12)), float(getattr(config, "MANUAL_Z_MAX", 0.40)), 0.001),
         ]:
-            tk.Label(left_col, text=lbl).pack()
-            s = tk.Scale(left_col, from_=mn, to=mx, resolution=res, orient='horizontal', length=320, command=lambda v, k=k: self.update_tune(k, v))
+            tk.Label(slider_left, text=lbl).pack()
+            s = tk.Scale(slider_left, from_=mn, to=mx, resolution=res, orient='horizontal', length=320, command=lambda v, k=k: self.update_tune(k, v))
             s.set(self.shared_params[k]); s.pack()
             self.scale_widgets[k] = s
 
-        if True:
-            tk.Button(left_col, text="HOME ARM", command=go_home, bg="gray", fg="white").pack(pady=10)
-            tk.Button(left_col, text="TAKE ITEM", command=start_take_item_sequence, bg="purple", fg="white").pack(pady=6)
-            tk.Button(left_col, text="TABLE PICK", command=start_table_pick_sequence, bg="darkgreen", fg="white").pack(pady=6)
-            tk.Button(left_col, text='FOLLOW "SELECTED COLOR" OBJECT', command=start_follow_selected_color_sequence, bg="gold", fg="black").pack(pady=6)
-            tk.Button(left_col, text="GRAB TRACKED OBJECT", command=start_grab_tracked_object_sequence, bg="khaki", fg="black").pack(pady=6)
-            tk.Button(left_col, text="RELEASE ITEM", command=release_item_manual, bg="orange", fg="black").pack(pady=6)
-
-        # --- Handoff Tune Frame (left column) ---
-        tk.Label(left_col, text="--- TAKE ITEM TUNE ---", font=("Arial", 12, "bold")).pack(pady=8)
+        # --- Handoff Tune Frame (sliders window) ---
+        tk.Label(slider_left, text="--- TAKE ITEM TUNE ---", font=("Arial", 12, "bold")).pack(pady=8)
         for lbl, k, mn, mx in [
             ("Take X", "take_x", 0.12, 0.28),
             ("Take Y", "take_y", -0.12, 0.12),
@@ -1429,50 +1541,47 @@ class RobotTuner:
             ("Lift Z", "take_lift_z", 0.28, 0.45),
             ("Wait (s)", "take_wait_s", 1.0, 8.0),
         ]:
-            tk.Label(left_col, text=lbl).pack()
-            s = tk.Scale(left_col, from_=mn, to=mx, resolution=0.01, orient='horizontal',
+            tk.Label(slider_left, text=lbl).pack()
+            s = tk.Scale(slider_left, from_=mn, to=mx, resolution=0.01, orient='horizontal',
                          length=320, command=lambda v, k=k: self.update_tune(k, v))
             s.set(self.shared_params[k]); s.pack()
 
-        tk.Button(right_col, text="EXIT PROGRAM", command=self._park_and_shutdown_clicked,
-                  bg="red", fg="white").pack(pady=10)
-
-        # --- Tracking Math (right column) ---
-        tk.Label(right_col, text="--- TRACKING MATH ---", font=("Arial", 12, "bold")).pack(pady=8)
+        # --- Tracking Math (sliders window) ---
+        tk.Label(slider_right, text="--- TRACKING MATH ---", font=("Arial", 12, "bold")).pack(pady=8)
         for lbl, k, mn, mx, res in [
             ("Y Gain", "ry_m", 0.10, 0.80, 0.01),
             ("Z Gain", "rz_m", 0.10, 0.80, 0.01),
             ("Z Offset", "z_off", -0.20, 0.20, 0.005),
         ]:
-            tk.Label(right_col, text=lbl).pack()
-            s = tk.Scale(right_col, from_=mn, to=mx, resolution=res, orient='horizontal',
+            tk.Label(slider_right, text=lbl).pack()
+            s = tk.Scale(slider_right, from_=mn, to=mx, resolution=res, orient='horizontal',
                          length=320, command=lambda v, k=k: self.update_tune(k, v))
             s.set(self.shared_params[k]); s.pack()
             self.scale_widgets[k] = s
 
-        # --- Tracking Response (right column) ---
-        tk.Label(right_col, text="--- TRACKING RESPONSE ---", font=("Arial", 12, "bold")).pack(pady=8)
+        # --- Tracking Response (sliders window) ---
+        tk.Label(slider_right, text="--- TRACKING RESPONSE ---", font=("Arial", 12, "bold")).pack(pady=8)
         for lbl, k, mn, mx, res in [
             ("Speed", "speed", 400.0, 1800.0, 10.0),
             ("Smoothing", "smooth", 0.05, 0.60, 0.01),
         ]:
-            tk.Label(right_col, text=lbl).pack()
-            s = tk.Scale(right_col, from_=mn, to=mx, resolution=res, orient='horizontal',
+            tk.Label(slider_right, text=lbl).pack()
+            s = tk.Scale(slider_right, from_=mn, to=mx, resolution=res, orient='horizontal',
                          length=320, command=lambda v, k=k: self.update_tune(k, v))
             s.set(self.shared_params[k]); s.pack()
             self.scale_widgets[k] = s
 
-        # --- Gesture Debug (right column) ---
-        tk.Label(right_col, text="--- GESTURE DEBUG ---", font=("Arial", 12, "bold")).pack(pady=8)
-        tk.Label(right_col, text="Debug Log (0/1)").pack()
-        s = tk.Scale(right_col, from_=0.0, to=1.0, resolution=1.0, orient='horizontal',
+        # --- Gesture Debug (sliders window) ---
+        tk.Label(slider_right, text="--- GESTURE DEBUG ---", font=("Arial", 12, "bold")).pack(pady=8)
+        tk.Label(slider_right, text="Debug Log (0/1)").pack()
+        s = tk.Scale(slider_right, from_=0.0, to=1.0, resolution=1.0, orient='horizontal',
                  length=320, command=lambda v, k="pose_gesture_debug": self.update_tune(k, v))
         s.set(self.shared_params["pose_gesture_debug"])
         s.pack()
         self.scale_widgets["pose_gesture_debug"] = s
 
-        # --- Auto Release Tune Frame (right column) ---
-        tk.Label(right_col, text="--- AUTO RELEASE TUNE ---", font=("Arial", 12, "bold")).pack(pady=8)
+        # --- Auto Release Tune Frame (sliders window) ---
+        tk.Label(slider_right, text="--- AUTO RELEASE TUNE ---", font=("Arial", 12, "bold")).pack(pady=8)
         for lbl, k, mn, mx, res in [
             ("Enabled (0/1)", "table_release_enabled", 0.0, 1.0, 1.0),
             ("Claw X (norm)", "table_claw_x", 0.0, 1.0, 0.01),
@@ -1480,8 +1589,8 @@ class RobotTuner:
             ("Radius (norm)", "table_release_radius", 0.03, 0.35, 0.01),
             ("Cooldown (s)", "table_release_cooldown", 0.5, 6.0, 0.1),
         ]:
-            tk.Label(right_col, text=lbl).pack()
-            s = tk.Scale(right_col, from_=mn, to=mx, resolution=res, orient='horizontal',
+            tk.Label(slider_right, text=lbl).pack()
+            s = tk.Scale(slider_right, from_=mn, to=mx, resolution=res, orient='horizontal',
                          length=320, command=lambda v, k=k: self.update_tune(k, v))
             s.set(self.shared_params[k]); s.pack()
             self.scale_widgets[k] = s
@@ -1598,6 +1707,9 @@ class RobotTuner:
 
         tk.Button(btn_frame, text="LIGHTS ON", bg="yellow", width=12, command=lambda: send_to_crestron("LIGHT_ON")).pack(side="left", padx=5)
         tk.Button(btn_frame, text="LIGHTS OFF", bg="black", fg="white", width=12, command=lambda: send_to_crestron("LIGHT_OFF")).pack(side="left", padx=5)
+
+        tk.Button(status_col, text="EXIT PROGRAM", command=self._park_and_shutdown_clicked,
+              bg="red", fg="white", width=18).pack(pady=(12, 4))
         self._update_thermal_status()
 
     def toggle_manual_mode(self):
