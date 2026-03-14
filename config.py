@@ -386,6 +386,20 @@ USB_MIC_SERVO_US_PER_DEG = 8.33
 USB_MIC_WAKE_ACK_MOVE_MS = 320
 USB_MIC_WAKE_ACK_HOLD_S = 0.10
 USB_MIC_WAKE_ACK_COOLDOWN_S = 0.9
+
+# --- TTS voice selection (Piper) ---
+# Preferred order for spoken responses. Put a male Cockney/UK model first,
+# then other UK male voices, then your current US fallback.
+TTS_PIPER_BIN = "/home/arm/piper/piper/piper"
+TTS_MODEL_CANDIDATES = [
+    "/home/arm/piper/en_GB-alba-medium.onnx",
+    "/home/arm/piper/en_GB-cockney-medium.onnx",
+    "/home/arm/piper/en_GB-cockney-low.onnx",
+    "/home/arm/piper/en_GB-alan-medium.onnx",
+    "/home/arm/piper/en_GB-alan-low.onnx",
+    "/home/arm/piper/en_US-lessac-medium.onnx",
+]
+
 STARTUP_SEED_RETRY_SEC = 6.0
 STARTUP_SEED_RETRY_INTERVAL_SEC = 0.25
 # Interactive startup wizard: require operator confirmation between

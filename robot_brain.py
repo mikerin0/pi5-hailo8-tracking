@@ -59,6 +59,9 @@ _wake_ack_lock = threading.Lock()
 _wake_ack_last_t = 0.0
 _voice_wake_until = 0.0
 _voice_cmd_queue = queue.Queue()
+_tts_queue = queue.Queue(maxsize=24)
+_tts_worker_started = False
+_tts_worker_lock = threading.Lock()
 TUNER_PARAMS_PATH = os.path.join(os.path.dirname(__file__), "tuner_params.json")
 WINDOW_STATE_PATH = os.path.join(os.path.dirname(__file__), "window_state.json")
 
@@ -1165,27 +1168,80 @@ def reach_for_manual_coordinate(x, y, z, speed=900, respect_config_speed=True):
         print(f"IK Error: {e}")
         return False
 
+def _pick_tts_model_path():
+    model_candidates = getattr(config, "TTS_MODEL_CANDIDATES", None)
+    if not isinstance(model_candidates, (list, tuple)) or not model_candidates:
+        model_candidates = ["/home/arm/piper/en_US-lessac-medium.onnx"]
+    for candidate in model_candidates:
+        try:
+            candidate_path = str(candidate)
+        except Exception:
+            continue
+        if os.path.exists(candidate_path):
+            return candidate_path
+    return None
+
+
+def _tts_worker_loop():
+    while not shutdown_event.is_set():
+        try:
+            text = _tts_queue.get(timeout=0.5)
+        except queue.Empty:
+            continue
+
+        try:
+            piper_bin = str(getattr(config, "TTS_PIPER_BIN", "/home/arm/piper/piper/piper"))
+            model_path = _pick_tts_model_path()
+            if not os.path.exists(piper_bin) or not model_path:
+                print(f"Speech (TTS unavailable): {text}")
+                continue
+
+            raw_audio = subprocess.check_output(
+                [piper_bin, "--model", model_path, "--output-raw"],
+                input=(str(text) + "\n").encode("utf-8"),
+                stderr=subprocess.DEVNULL,
+                timeout=20,
+            )
+            subprocess.run(
+                ["pw-play", "--rate", "22050", "--channels", "1", "--format", "s16", "-"],
+                input=raw_audio,
+                stderr=subprocess.DEVNULL,
+                check=False,
+                timeout=20,
+            )
+        except subprocess.TimeoutExpired:
+            print("Speech Error: TTS timed out")
+        except Exception as e:
+            print(f"Speech Error: {e}")
+
+
+def _ensure_tts_worker_started():
+    global _tts_worker_started
+    with _tts_worker_lock:
+        if _tts_worker_started:
+            return
+        threading.Thread(target=_tts_worker_loop, daemon=True, name="TTSWorker").start()
+        _tts_worker_started = True
+
+
 def say(text):
-    """Non-blocking Piper TTS speech via PipeWire audio output."""
-    PIPER_BIN = "/home/arm/piper/piper/piper"
-    MODEL_PATH = "/home/arm/piper/en_US-lessac-medium.onnx"
-    if not os.path.exists(PIPER_BIN) or not os.path.exists(MODEL_PATH):
-        print(f"Speech (TTS unavailable): {text}")
+    """Queue text for non-blocking serialized Piper TTS playback."""
+    _ensure_tts_worker_started()
+    msg = str(text or "").strip()
+    if not msg:
         return
     try:
-        piper_proc = subprocess.Popen(
-            [PIPER_BIN, "--model", MODEL_PATH, "--output-raw"],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
-        )
-        play_proc = subprocess.Popen(  # noqa: F841
-            ["pw-play", "--rate", "22050", "--channels", "1", "--format", "s16", "-"],
-            stdin=piper_proc.stdout, stderr=subprocess.DEVNULL
-        )
-        piper_proc.stdout.close()
-        piper_proc.stdin.write((text + "\n").encode())
-        piper_proc.stdin.close()
-    except Exception as e:
-        print(f"Speech Error: {e}")
+        _tts_queue.put_nowait(msg)
+    except queue.Full:
+        # Drop oldest utterance when queue is saturated to keep speech responsive.
+        try:
+            _tts_queue.get_nowait()
+        except Exception:
+            pass
+        try:
+            _tts_queue.put_nowait(msg)
+        except Exception:
+            pass
 
 # --- 5. THE TUNER DASHBOARD ---
 
