@@ -186,6 +186,7 @@ _startup_t0 = time.monotonic()
 VIDEO_WINDOW_STATE_PATH = os.path.join(os.path.dirname(__file__), "video_window_state.json")
 _video_window_state_lock = threading.Lock()
 MAIN_PREVIEW_WINDOW_KEY = "Hailo Main Preview"
+CAMERA_LOOP_WINDOW_NAME = "Pi5 AI Vision"
 _main_preview_window_id = None
 
 
@@ -441,12 +442,17 @@ def _save_main_preview_window_state():
             return
         if w < 320 or h < 180:
             return
+        x = int(row.get("x", 0))
+        y = int(row.get("y", 0))
         _save_video_window_state_values(
             MAIN_PREVIEW_WINDOW_KEY,
-            int(row.get("x", 0)),
-            int(row.get("y", 0)),
-            w,
-            h,
+            x, y, w, h,
+        )
+        # Also save under the OpenCV window name so _apply_saved_video_window_state
+        # finds correct screen coordinates on restart.
+        _save_video_window_state_values(
+            CAMERA_LOOP_WINDOW_NAME,
+            x, y, w, h,
         )
         return
 
@@ -2932,7 +2938,9 @@ def camera_loop():
         time.sleep(0.5)
 
     if main_window_ready:
-        _save_video_window_state(main_window_name)
+        # Use wmctrl-based save (real screen coords) rather than cv2.getWindowImageRect
+        # which only returns image-relative (always x=0, y=0) coordinates.
+        _save_main_preview_window_state()
         try:
             cv2.destroyWindow(main_window_name)
         except Exception:

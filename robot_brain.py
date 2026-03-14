@@ -481,9 +481,9 @@ def _voice_text_to_command(text):
         phrase = normalized[len(wake_prefix):].strip()
         if not phrase:
             return None
-        # Wake word + command found: nod synchronously so serial port is free
-        # before the command dispatch begins.
-        _trigger_wake_phrase_ack_motion(blocking=True)
+        # Wake word + command: fire nod in background; the command worker
+        # waits for the nod lock to clear before dispatching.
+        _trigger_wake_phrase_ack_motion(blocking=False)
 
     if "table pick" in phrase or "table take" in phrase:
         return "TABLE_PICK"
@@ -1906,15 +1906,21 @@ class RobotTuner:
 tuner = RobotTuner()
 
 def _voice_command_worker():
-    """Dedicated thread that drains the voice command queue and executes commands.
-    Completely isolated from the mic listener and nod threads so there is no
-    serial port contention."""
+    """Drain the voice command queue. Waits for any in-progress wake-phrase
+    nod to release the serial port before dispatching each command."""
     while not shutdown_event.is_set():
         try:
             cmd = _voice_cmd_queue.get(timeout=0.5)
         except queue.Empty:
             continue
         try:
+            # Wait up to 2 s for the nod motion to finish before using serial.
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                if _wake_ack_lock.acquire(blocking=False):
+                    _wake_ack_lock.release()
+                    break
+                time.sleep(0.05)
             _run_external_command(cmd, source="USB Mic")
         except Exception as e:
             print(f"Voice command worker error: {e}")

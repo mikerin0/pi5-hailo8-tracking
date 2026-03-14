@@ -252,7 +252,7 @@ SAFE_STARTUP_POWER_ON = False
 
 # Optional startup choreography: move slowly to HOME before tracking starts.
 # This helps avoid aggressive first motion when the arm is in an unknown pose.
-STARTUP_SLOW_HOME_ENABLED = False
+STARTUP_SLOW_HOME_ENABLED = True
 STARTUP_SLOW_HOME_TIME_MS = 5000
 STARTUP_SLOW_HOME_SETTLE_SEC = 0.4
 STARTUP_SLOW_HOME_STAGED = True
