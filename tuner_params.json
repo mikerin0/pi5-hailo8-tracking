@@ -1,5 +1,5 @@
 {
-  "busy": 0,
+  "busy": 1,
   "camera_mode": "HIGH_CAM",
   "left_hand_x": 0.5,
   "left_hand_y": 0.5,
@@ -31,5 +31,6 @@
   "tune_x": 0.2,
   "tune_y": -0.003,
   "tune_z": 0.389,
+  "usb_mic_gain": 1.0,
   "z_off": 0.0
 }

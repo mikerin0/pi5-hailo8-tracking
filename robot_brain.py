@@ -372,9 +372,11 @@ def _run_external_command(cmd, source="external"):
     if cmd == "HOME":
         go_home()
     elif cmd == "OPEN":
+        print(f"Gripper open: sending to servo 1 (pos=1500, est={_gripper_pos_est})")
         move_servo(1, 1500, 900)
         set_holding_item(False)
     elif cmd == "CLOSE":
+        print(f"Gripper close: sending to servo 1 (pos=2300, est={_gripper_pos_est})")
         move_servo(1, 2300, 900)
         set_holding_item(True)
         block_auto_release(getattr(config, "TABLE_HANDOFF_MIN_HOLD_SEC", 1.5))
@@ -733,6 +735,7 @@ def move_servo(id, pos, time_ms=800):
         pos = max(1500, min(2326, pos))
         with _gripper_motion_lock:
             closing = pos > _gripper_pos_est
+            print(f"move_servo(1): pos={pos} est={_gripper_pos_est} closing={closing} sw_ready={_gripper_switch_ready} sw_pressed={_gripper_switch_pressed()}")
             if closing and _gripper_switch_pressed():
                 print("Gripper close blocked: microswitch already active")
                 _send_servo_packet(1, _gripper_pos_est, 120)

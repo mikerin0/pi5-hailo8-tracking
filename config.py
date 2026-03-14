@@ -360,8 +360,8 @@ STARTUP_ALLOW_FORCE_MOVE_WITHOUT_SEED = True
 STARTUP_FORCE_MOVE_TIME_MS = 8000
 
 # --- Voice command input source ---
-# Disable Crestron/Alexa inbound command listener and use local USB mic instead.
-CRESTRON_SERVER_ENABLED = False
+# Run USB mic listener alongside Crestron TCP server (both can be active).
+CRESTRON_SERVER_ENABLED = True
 USB_MIC_VOICE_COMMANDS_ENABLED = True
 # SpeechRecognition microphone device index (None = default input device).
 USB_MIC_DEVICE_INDEX = None
