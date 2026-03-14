@@ -1,4 +1,4 @@
-import json, os, serial, time, subprocess, tkinter as tk, threading, socket
+import json, os, serial, time, subprocess, tkinter as tk, threading, socket, queue
 import audioop
 import numpy as np 
 import ikpy.chain
@@ -57,6 +57,7 @@ _first_move_capped = False
 _startup_t0 = time.monotonic()
 _wake_ack_lock = threading.Lock()
 _wake_ack_last_t = 0.0
+_voice_cmd_queue = queue.Queue()
 TUNER_PARAMS_PATH = os.path.join(os.path.dirname(__file__), "tuner_params.json")
 WINDOW_STATE_PATH = os.path.join(os.path.dirname(__file__), "window_state.json")
 
@@ -577,7 +578,7 @@ def usb_mic_voice_listener():
                 print(f"USB mic heard: {spoken}")
                 cmd = _voice_text_to_command(spoken)
                 if cmd is not None:
-                    _run_external_command(cmd, source="USB Mic")
+                    _voice_cmd_queue.put(cmd)
     except Exception as e:
         print(f"USB mic voice listener stopped: {e}")
 
@@ -1904,6 +1905,21 @@ class RobotTuner:
 
 tuner = RobotTuner()
 
+def _voice_command_worker():
+    """Dedicated thread that drains the voice command queue and executes commands.
+    Completely isolated from the mic listener and nod threads so there is no
+    serial port contention."""
+    while not shutdown_event.is_set():
+        try:
+            cmd = _voice_cmd_queue.get(timeout=0.5)
+        except queue.Empty:
+            continue
+        try:
+            _run_external_command(cmd, source="USB Mic")
+        except Exception as e:
+            print(f"Voice command worker error: {e}")
+
+
 def start_brain_ui():
     global _first_move_capped
     # Start the Server thread immediately
@@ -1919,6 +1935,7 @@ def start_brain_ui():
         print("Crestron/Alexa TCP listener disabled by config")
 
     if bool(getattr(config, "USB_MIC_VOICE_COMMANDS_ENABLED", True)):
+        threading.Thread(target=_voice_command_worker, daemon=True).start()
         threading.Thread(target=usb_mic_voice_listener, daemon=True).start()
     else:
         print("USB microphone voice commands disabled by config")
