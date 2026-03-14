@@ -444,6 +444,18 @@ def request_shutdown():
 
 
 def shutdown_program():
+    try:
+        if 'tuner' in globals() and tuner is not None:
+            try:
+                tuner._save_tuner_params(silent=True)
+            except Exception:
+                pass
+            try:
+                tuner._save_window_state(silent=True)
+            except Exception:
+                pass
+    except Exception:
+        pass
     request_shutdown()
     try:
         tuner.root.after(0, tuner.root.destroy)
@@ -1145,6 +1157,7 @@ class RobotTuner:
         self.slider_window.geometry("760x860")
 
     def _on_window_close(self):
+        self._save_tuner_params(silent=True)
         self._save_window_state(silent=True)
         shutdown_program()
 
@@ -1196,6 +1209,7 @@ class RobotTuner:
             )
 
     def _park_and_shutdown_clicked(self):
+        self._save_tuner_params(silent=True)
         self._save_window_state(silent=True)
         shutdown_program()
 
@@ -1331,13 +1345,15 @@ class RobotTuner:
             self.table_model_preset_var.set(previous)
         self._apply_table_model_preset(previous)
 
-    def _save_tuner_params(self):
+    def _save_tuner_params(self, silent=False):
         try:
             with open(TUNER_PARAMS_PATH, "w", encoding="utf-8") as f:
                 json.dump(self.shared_params, f, indent=2, sort_keys=True)
-            print(f"Saved tuner preset: {TUNER_PARAMS_PATH}")
+            if not silent:
+                print(f"Saved tuner preset: {TUNER_PARAMS_PATH}")
         except Exception as e:
-            print(f"Failed to save tuner preset: {e}")
+            if not silent:
+                print(f"Failed to save tuner preset: {e}")
 
     def _sync_scale_widgets(self):
         self._syncing_scales = True
