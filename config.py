@@ -358,6 +358,18 @@ STARTUP_COORD_USE_SAFE_STEPPED_IK = True
 # slow coordinate move (higher risk than seeded move, but avoids total block).
 STARTUP_ALLOW_FORCE_MOVE_WITHOUT_SEED = True
 STARTUP_FORCE_MOVE_TIME_MS = 8000
+
+# --- Voice command input source ---
+# Disable Crestron/Alexa inbound command listener and use local USB mic instead.
+CRESTRON_SERVER_ENABLED = False
+USB_MIC_VOICE_COMMANDS_ENABLED = True
+# SpeechRecognition microphone device index (None = default input device).
+USB_MIC_DEVICE_INDEX = None
+# Listening/recognition tuning for USB microphone commands.
+USB_MIC_CALIBRATE_SEC = 0.8
+USB_MIC_LISTEN_TIMEOUT_S = 1.0
+USB_MIC_PHRASE_TIME_LIMIT_S = 3.0
+USB_MIC_PAUSE_THRESHOLD_S = 0.6
 STARTUP_SEED_RETRY_SEC = 6.0
 STARTUP_SEED_RETRY_INTERVAL_SEC = 0.25
 # Interactive startup wizard: require operator confirmation between

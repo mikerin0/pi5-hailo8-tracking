@@ -3,6 +3,10 @@ import numpy as np
 import ikpy.chain
 import ikpy.link
 import config
+try:
+    import speech_recognition as sr
+except Exception:
+    sr = None
 
 # --- SAFETY FLAG ---
 # Set to True to disable ALL servo movement (prevents hardware damage).
@@ -356,6 +360,145 @@ def _solve_ik_with_safe_guess(target_xyz):
 
 # --- 3. COMMUNICATION HELPERS ---
 
+def _run_external_command(cmd, source="external"):
+    cmd = str(cmd or "").strip().upper().replace(" ", "_")
+    if not cmd:
+        return False
+
+    print(f"Incoming from {source}: {cmd}")
+    if cmd == "HOME":
+        go_home()
+    elif cmd == "OPEN":
+        move_servo(1, 1500, 900)
+        set_holding_item(False)
+    elif cmd == "CLOSE":
+        move_servo(1, 2300, 900)
+        set_holding_item(True)
+        block_auto_release(getattr(config, "TABLE_HANDOFF_MIN_HOLD_SEC", 1.5))
+    elif cmd == "HAND_OPEN":
+        print("Hand open received – gripper open")
+        move_servo(1, 1500, 900)
+        set_holding_item(False)
+    elif cmd == "HAND_CLOSED":
+        print("Hand closed received – gripper close")
+        move_servo(1, 2300, 900)
+        set_holding_item(True)
+        block_auto_release(getattr(config, "TABLE_HANDOFF_MIN_HOLD_SEC", 1.5))
+    elif cmd in ("TABLE_PICK", "TABLE_TAKE"):
+        print("Table-pick sequence requested")
+        start_table_pick_sequence()
+    elif cmd in ("TAKE_ITEM", "TAKE", "HANDOFF"):
+        print("Take-item sequence requested")
+        start_take_item_sequence()
+    elif cmd in ("EXIT", "SHUTDOWN", "STOP"):
+        print("Shutdown requested")
+        shutdown_program()
+    elif cmd in ("HIGH_CAM", "TABLE_CAM", "DUAL_CAM"):
+        switch_camera(cmd)
+    elif cmd == "FLAGPOLE":
+        tuner.shared_params["busy"] = 1
+        reach_for_coordinate(0.05, 0.0, 0.46, speed=500)
+        say("Flagpole Mode. Manual lock engaged.")
+    elif cmd == "RESUME":
+        tuner.shared_params["busy"] = 1
+        tuner.shared_params["busy"] = 0
+        say("Resuming tracking")
+    else:
+        print(f"Unknown {source} command: {cmd}")
+        return False
+
+    return True
+
+
+def _voice_text_to_command(text):
+    phrase = str(text or "").strip().lower()
+    if not phrase:
+        return None
+
+    if "table pick" in phrase or "table take" in phrase:
+        return "TABLE_PICK"
+    if "take item" in phrase or "handoff" in phrase or phrase == "take":
+        return "TAKE_ITEM"
+    if "high cam" in phrase or "high camera" in phrase or "face tracking" in phrase:
+        return "HIGH_CAM"
+    if "table cam" in phrase or "table camera" in phrase:
+        return "TABLE_CAM"
+    if "dual cam" in phrase or "dual camera" in phrase:
+        return "DUAL_CAM"
+    if "flagpole" in phrase:
+        return "FLAGPOLE"
+    if "resume" in phrase or "track again" in phrase:
+        return "RESUME"
+    if "open" in phrase and "hand" not in phrase:
+        return "OPEN"
+    if "close" in phrase and "hand" not in phrase:
+        return "CLOSE"
+    if "hand open" in phrase:
+        return "HAND_OPEN"
+    if "hand close" in phrase or "hand closed" in phrase:
+        return "HAND_CLOSED"
+    if "home" in phrase:
+        return "HOME"
+    if phrase in ("exit", "shutdown", "stop"):
+        return "EXIT"
+
+    return None
+
+
+def usb_mic_voice_listener():
+    if sr is None:
+        print("USB mic voice commands disabled: SpeechRecognition package not installed")
+        return
+
+    mic_index = getattr(config, "USB_MIC_DEVICE_INDEX", None)
+    recognizer = sr.Recognizer()
+    recognizer.dynamic_energy_threshold = True
+    recognizer.pause_threshold = float(getattr(config, "USB_MIC_PAUSE_THRESHOLD_S", 0.6))
+
+    print("--- USB Mic Voice Commands: listener starting ---")
+    try:
+        with sr.Microphone(device_index=mic_index) as source:
+            calibrate_sec = max(0.0, float(getattr(config, "USB_MIC_CALIBRATE_SEC", 0.8)))
+            if calibrate_sec > 0.0:
+                recognizer.adjust_for_ambient_noise(source, duration=calibrate_sec)
+            while not shutdown_event.is_set():
+                try:
+                    audio = recognizer.listen(
+                        source,
+                        timeout=max(0.2, float(getattr(config, "USB_MIC_LISTEN_TIMEOUT_S", 1.0))),
+                        phrase_time_limit=max(1.0, float(getattr(config, "USB_MIC_PHRASE_TIME_LIMIT_S", 3.0))),
+                    )
+                except sr.WaitTimeoutError:
+                    continue
+                except Exception as e:
+                    print(f"USB mic listen error: {e}")
+                    time.sleep(0.4)
+                    continue
+
+                text = ""
+                try:
+                    text = recognizer.recognize_google(audio)
+                except sr.UnknownValueError:
+                    continue
+                except sr.RequestError as e:
+                    print(f"USB mic recognition unavailable: {e}")
+                    time.sleep(1.0)
+                    continue
+                except Exception as e:
+                    print(f"USB mic recognition error: {e}")
+                    continue
+
+                spoken = str(text).strip()
+                if not spoken:
+                    continue
+                print(f"USB mic heard: {spoken}")
+                cmd = _voice_text_to_command(spoken)
+                if cmd is not None:
+                    _run_external_command(cmd, source="USB Mic")
+    except Exception as e:
+        print(f"USB mic voice listener stopped: {e}")
+
+
 def tcp_listener():
     """Pi acts as SERVER. Waiting for Crestron Client to connect."""
     global crestron_conn
@@ -379,46 +522,7 @@ def tcp_listener():
                         except socket.timeout:
                             continue
                         if not data: break # Disconnect
-                        cmd = data.replace(" ", "_")
-
-                        print(f"Incoming from Crestron: {data}")
-                        # Handle commands received FROM Crestron (e.g., Alexa)
-                        if cmd == "HOME": go_home()
-                        elif cmd == "OPEN":
-                            move_servo(1, 1500, 900)
-                            set_holding_item(False)
-                        elif cmd == "CLOSE":
-                            move_servo(1, 2300, 900)
-                            set_holding_item(True)
-                            block_auto_release(getattr(config, "TABLE_HANDOFF_MIN_HOLD_SEC", 1.5))
-                        elif cmd == "HAND_OPEN":
-                            print("Hand open received – gripper open")
-                            move_servo(1, 1500, 900)
-                            set_holding_item(False)
-                        elif cmd == "HAND_CLOSED":
-                            print("Hand closed received – gripper close")
-                            move_servo(1, 2300, 900)
-                            set_holding_item(True)
-                            block_auto_release(getattr(config, "TABLE_HANDOFF_MIN_HOLD_SEC", 1.5))
-                        elif cmd in ("TABLE_PICK", "TABLE_TAKE"):
-                            print("Table-pick sequence requested")
-                            start_table_pick_sequence()
-                        elif cmd in ("TAKE_ITEM", "TAKE", "HANDOFF"):
-                            print("Take-item sequence requested")
-                            start_take_item_sequence()
-                        elif cmd in ("EXIT", "SHUTDOWN", "STOP"):
-                            print("Shutdown requested")
-                            shutdown_program()
-                        elif cmd in ("HIGH_CAM", "TABLE_CAM", "DUAL_CAM"):
-                            switch_camera(cmd)
-                        elif cmd == "FLAGPOLE":
-                            tuner.shared_params["busy"] = 1
-                            reach_for_coordinate(0.05, 0.0, 0.46, speed=500)
-                            say("Flagpole Mode. Manual lock engaged.")
-                        elif cmd == "RESUME":
-                            tuner.shared_params["busy"] = 1
-                            tuner.shared_params["busy"] = 0
-                            say("Resuming tracking")
+                        _run_external_command(data, source="Crestron")
             except socket.timeout:
                 continue
             except Exception as e:
@@ -1708,7 +1812,15 @@ def start_brain_ui():
     # explicit commands (resume, table pick, take item, etc.).
     _first_move_capped = False
     tuner.shared_params["busy"] = 1 if bool(getattr(config, "STARTUP_INITIAL_BUSY", 0)) else 0
-    threading.Thread(target=tcp_listener, daemon=True).start()
+    if bool(getattr(config, "CRESTRON_SERVER_ENABLED", False)):
+        threading.Thread(target=tcp_listener, daemon=True).start()
+    else:
+        print("Crestron/Alexa TCP listener disabled by config")
+
+    if bool(getattr(config, "USB_MIC_VOICE_COMMANDS_ENABLED", True)):
+        threading.Thread(target=usb_mic_voice_listener, daemon=True).start()
+    else:
+        print("USB microphone voice commands disabled by config")
     try:
         tuner.create_gui()
         tuner.root.mainloop()

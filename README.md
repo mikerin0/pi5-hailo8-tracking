@@ -152,6 +152,13 @@ source ~/hailo-venv/bin/activate
 pip install -r requirements.txt
 ```
 
+If you want to use a USB microphone for voice commands, also install PyAudio once:
+
+```bash
+sudo apt install -y portaudio19-dev
+pip install pyaudio
+```
+
 > **Why `numpy<2`?**  
 > The Hailo SDK Python bindings (`hailo`) and `ikpy` are compiled against the
 > NumPy 1.x C ABI.  NumPy 2.0 changed that ABI; running either package with
@@ -252,7 +259,7 @@ buttons in the GUI to switch camera modes at any time.
 |---------|-------------|
 | Arm moves to home | Click **HOME ARM** in the GUI |
 | Take item handoff | Click **TAKE ITEM**; robot switches to table cam, opens gripper, waits ~4s, closes and lifts |
-| Exit / stop app | Click **EXIT PROGRAM** in the GUI (or send `EXIT` over Crestron) |
+| Exit / stop app | Click **EXIT PROGRAM** in the GUI (or say "exit") |
 | Manual arm control | Enable manual sliders, drag the **Reach X / Swing Y / Height Z** sliders |
 | Face tracking | Click **HIGH CAM** – the arm should follow your face smoothly |
 | Hand open event | Show an open flat hand to the Pi Camera – terminal prints `HAND_OPEN` |
@@ -436,6 +443,8 @@ the primary Hailo pipeline uses `libcamerasrc`.
 
 ### Crestron commands (sent **to** the Pi)
 
+> This listener is now disabled by default in `config.py` (`CRESTRON_SERVER_ENABLED=False`) when using USB mic control.
+
 | Command | Effect |
 |---------|--------|
 | `HOME` | Move arm to home position |
@@ -446,6 +455,21 @@ the primary Hailo pipeline uses `libcamerasrc`.
 | `DUAL_CAM` | Enable simultaneous tracking + table preview |
 | `HAND_OPEN` | Open gripper (mirroring gesture) |
 | `HAND_CLOSED` | Close gripper (mirroring gesture) |
+
+### USB microphone voice commands (local)
+
+When `USB_MIC_VOICE_COMMANDS_ENABLED=True` in `config.py`, you can speak commands such as:
+
+- `home`
+- `open` / `close`
+- `high cam` / `table cam` / `dual cam`
+- `table pick`
+- `take item`
+- `resume`
+- `flagpole`
+- `exit`
+
+The listener runs locally on the Pi and does not require Crestron/Alexa inbound commands.
 
 ### Events pushed **from** the Pi to Crestron
 

@@ -11,3 +11,4 @@ numpy<2
 ikpy
 pyserial
 mediapipe
+SpeechRecognition
