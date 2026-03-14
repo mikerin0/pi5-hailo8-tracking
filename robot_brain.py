@@ -57,6 +57,7 @@ _first_move_capped = False
 _startup_t0 = time.monotonic()
 _wake_ack_lock = threading.Lock()
 _wake_ack_last_t = 0.0
+_voice_wake_until = 0.0
 _voice_cmd_queue = queue.Queue()
 TUNER_PARAMS_PATH = os.path.join(os.path.dirname(__file__), "tuner_params.json")
 WINDOW_STATE_PATH = os.path.join(os.path.dirname(__file__), "window_state.json")
@@ -462,54 +463,88 @@ def _trigger_wake_phrase_ack_motion(blocking=False):
 
 
 def _voice_text_to_command(text):
+    global _voice_wake_until
     phrase = str(text or "").strip().lower()
     if not phrase:
         return None
 
+    # Normalize frequent speech-to-text mishears for command words.
+    phrase = (
+        phrase.replace(" clothes ", " close ")
+              .replace(" clothe ", " close ")
+              .replace(" cloze ", " close ")
+    )
+    if phrase.startswith("clothes "):
+        phrase = "close " + phrase[len("clothes "):]
+    if phrase == "clothes":
+        phrase = "close"
+
     require_wake = bool(getattr(config, "USB_MIC_REQUIRE_WAKE_PHRASE", True))
     wake_phrase = str(getattr(config, "USB_MIC_WAKE_PHRASE", "robot") or "").strip().lower()
+    wake_window_s = max(0.0, float(getattr(config, "USB_MIC_WAKE_WINDOW_S", 5.0)))
+    now = time.monotonic()
     if require_wake and wake_phrase:
         # Accept either "robot <command>" or "robot, <command>" forms.
         if phrase == wake_phrase:
             # Lone wake word – nod in background, no command
             _trigger_wake_phrase_ack_motion(blocking=False)
+            _voice_wake_until = now + wake_window_s
             return None
         normalized = phrase.replace(",", " ").replace(".", " ").strip()
         wake_prefix = f"{wake_phrase} "
-        if not normalized.startswith(wake_prefix):
-            return None
-        phrase = normalized[len(wake_prefix):].strip()
-        if not phrase:
-            return None
-        # Wake word + command: fire nod in background; the command worker
-        # waits for the nod lock to clear before dispatching.
-        _trigger_wake_phrase_ack_motion(blocking=False)
+        if normalized.startswith(wake_prefix):
+            phrase = normalized[len(wake_prefix):].strip()
+            if not phrase:
+                return None
+            # Wake word + command: fire nod in background; command worker waits
+            # for nod lock to clear before dispatching.
+            _trigger_wake_phrase_ack_motion(blocking=False)
+            _voice_wake_until = now + wake_window_s
+        else:
+            # Two-step mode: allow command-only utterance if wake word was heard
+            # within the configured wake window.
+            if now > _voice_wake_until:
+                return None
+            phrase = normalized
 
     if "table pick" in phrase or "table take" in phrase:
+        _voice_wake_until = 0.0
         return "TABLE_PICK"
     if "take item" in phrase or "handoff" in phrase or phrase == "take":
+        _voice_wake_until = 0.0
         return "TAKE_ITEM"
     if "high cam" in phrase or "high camera" in phrase or "face tracking" in phrase:
+        _voice_wake_until = 0.0
         return "HIGH_CAM"
     if "table cam" in phrase or "table camera" in phrase:
+        _voice_wake_until = 0.0
         return "TABLE_CAM"
     if "dual cam" in phrase or "dual camera" in phrase:
+        _voice_wake_until = 0.0
         return "DUAL_CAM"
     if "flagpole" in phrase:
+        _voice_wake_until = 0.0
         return "FLAGPOLE"
     if "resume" in phrase or "track again" in phrase:
+        _voice_wake_until = 0.0
         return "RESUME"
     if "open" in phrase and "hand" not in phrase:
+        _voice_wake_until = 0.0
         return "OPEN"
     if "close" in phrase and "hand" not in phrase:
+        _voice_wake_until = 0.0
         return "CLOSE"
     if "hand open" in phrase:
+        _voice_wake_until = 0.0
         return "HAND_OPEN"
     if "hand close" in phrase or "hand closed" in phrase:
+        _voice_wake_until = 0.0
         return "HAND_CLOSED"
     if "home" in phrase:
+        _voice_wake_until = 0.0
         return "HOME"
     if phrase in ("exit", "shutdown", "stop"):
+        _voice_wake_until = 0.0
         return "EXIT"
 
     return None

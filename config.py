@@ -374,6 +374,9 @@ USB_MIC_GAIN = 1.0
 # Require a wake phrase prefix before executing a spoken command.
 USB_MIC_REQUIRE_WAKE_PHRASE = True
 USB_MIC_WAKE_PHRASE = "robot"
+# After saying only the wake phrase, commands are accepted for this many
+# seconds without repeating the wake word.
+USB_MIC_WAKE_WINDOW_S = 5.0
 # Wake phrase acknowledgement: tilt servo 2 briefly then return.
 USB_MIC_WAKE_ACK_ENABLED = True
 USB_MIC_WAKE_ACK_TILT_DEG = 45.0
