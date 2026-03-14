@@ -415,7 +415,11 @@ def _run_external_command(cmd, source="external"):
     return True
 
 
-def _trigger_wake_phrase_ack_motion():
+def _trigger_wake_phrase_ack_motion(blocking=False):
+    """Tilt servo 2 briefly to acknowledge wake phrase.
+    blocking=True: run synchronously (used when a command follows on the same serial port).
+    blocking=False: fire-and-forget background thread (used for lone wake-word nod).
+    """
     global _wake_ack_last_t
     if not bool(getattr(config, "USB_MIC_WAKE_ACK_ENABLED", True)):
         return
@@ -441,15 +445,19 @@ def _trigger_wake_phrase_ack_motion():
             hold_s = max(0.0, float(getattr(config, "USB_MIC_WAKE_ACK_HOLD_S", 0.10)))
             if target != base:
                 move_servo(2, target, move_ms)
-                if hold_s > 0:
-                    time.sleep(hold_s)
+                # Wait for physical motion to complete before returning
+                time.sleep((move_ms / 1000.0) + max(0.0, hold_s))
                 move_servo(2, base, move_ms)
+                time.sleep(move_ms / 1000.0)
         except Exception as e:
             print(f"Wake-phrase ack motion error: {e}")
         finally:
             _wake_ack_lock.release()
 
-    threading.Thread(target=_worker, daemon=True).start()
+    if blocking:
+        _worker()
+    else:
+        threading.Thread(target=_worker, daemon=True).start()
 
 
 def _voice_text_to_command(text):
@@ -459,11 +467,11 @@ def _voice_text_to_command(text):
 
     require_wake = bool(getattr(config, "USB_MIC_REQUIRE_WAKE_PHRASE", True))
     wake_phrase = str(getattr(config, "USB_MIC_WAKE_PHRASE", "robot") or "").strip().lower()
-    wake_matched = False
     if require_wake and wake_phrase:
         # Accept either "robot <command>" or "robot, <command>" forms.
         if phrase == wake_phrase:
-            _trigger_wake_phrase_ack_motion()
+            # Lone wake word – nod in background, no command
+            _trigger_wake_phrase_ack_motion(blocking=False)
             return None
         normalized = phrase.replace(",", " ").replace(".", " ").strip()
         wake_prefix = f"{wake_phrase} "
@@ -472,10 +480,9 @@ def _voice_text_to_command(text):
         phrase = normalized[len(wake_prefix):].strip()
         if not phrase:
             return None
-        wake_matched = True
-
-    if wake_matched:
-        _trigger_wake_phrase_ack_motion()
+        # Wake word + command found: nod synchronously so serial port is free
+        # before the command dispatch begins.
+        _trigger_wake_phrase_ack_motion(blocking=True)
 
     if "table pick" in phrase or "table take" in phrase:
         return "TABLE_PICK"
