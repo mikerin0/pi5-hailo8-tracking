@@ -417,8 +417,6 @@ def tcp_listener():
                             say("Flagpole Mode. Manual lock engaged.")
                         elif cmd == "RESUME":
                             tuner.shared_params["busy"] = 1
-                            if thermal_resume_callback:
-                                thermal_resume_callback()
                             tuner.shared_params["busy"] = 0
                             say("Resuming tracking")
             except socket.timeout:
@@ -1168,152 +1166,10 @@ class RobotTuner:
                     self.servo_power_var.set("Servo Power: ON" if bool(power_state) else "Servo Power: OFF")
             except Exception as e:
                 self.servo_power_var.set(f"Servo Power error: {e}")
-
-        provider = thermal_status_provider
-        timeout_state_provider = thermal_timeout_state_provider
-        if provider is None:
-            self.thermal_status_var.set("Thermal monitor: unavailable")
-            self.servo5_load_var.set("Servo 5 Load: n/a")
-            self.shelly_power_var.set("Shelly Power: n/a")
-            if hasattr(self, "motion_timeout_var"):
-                self.motion_timeout_var.set("Motion Timeout: unavailable")
-        else:
-            try:
-                status = provider() or {}
-                parked = bool(status.get("parked", False))
-                idle_secs = float(status.get("idle_secs", 0.0))
-                timeout_enabled = bool(status.get("timeout_enabled", True))
-                timeout_s = float(status.get("idle_timeout_s", float(getattr(config, "THERMAL_IDLE_TIMEOUT_S", 300.0))))
-                servo5_dev = status.get("servo5_deviation", None)
-                shelly_apower = status.get("shelly_apower_w", None)
-                high_counts = status.get("high_load_counts", {}) or {}
-                high_servos = [str(sid) for sid, cnt in high_counts.items() if int(cnt) >= 3]
-                high_text = ",".join(high_servos) if high_servos else "none"
-                self.thermal_status_var.set(
-                    f"Parked: {parked} | Idle: {idle_secs:.1f}s | High load servos: {high_text}"
-                )
-                if hasattr(self, "motion_timeout_var"):
-                    self.motion_timeout_var.set(
-                        f"Motion Timeout: {'ON' if timeout_enabled else 'OFF'} ({int(timeout_s)}s)"
-                    )
-                if servo5_dev is None:
-                    self.servo5_load_var.set("Servo 5 Load: n/a")
-                else:
-                    self.servo5_load_var.set(f"Servo 5 Load: {int(servo5_dev)}")
-                if shelly_apower is None:
-                    self.shelly_power_var.set("Shelly Power: n/a")
-                else:
-                    self.shelly_power_var.set(f"Shelly Power: {float(shelly_apower):.1f} W")
-
-                if timeout_state_provider is not None:
-                    try:
-                        tstate = timeout_state_provider() or {}
-                        if hasattr(self, "motion_timeout_var"):
-                            t_enabled = bool(tstate.get("enabled", timeout_enabled))
-                            t_secs = float(tstate.get("idle_timeout_s", timeout_s))
-                            self.motion_timeout_var.set(
-                                f"Motion Timeout: {'ON' if t_enabled else 'OFF'} ({int(t_secs)}s)"
-                            )
-                    except Exception:
-                        pass
-            except Exception as e:
-                self.thermal_status_var.set(f"Thermal monitor error: {e}")
-                self.servo5_load_var.set("Servo 5 Load: error")
-                self.shelly_power_var.set("Shelly Power: error")
-                if hasattr(self, "motion_timeout_var"):
-                    self.motion_timeout_var.set("Motion Timeout: error")
         if hasattr(self, "root") and self.root is not None:
             self.root.after(1000, self._update_thermal_status)
 
-    def _toggle_motion_timeout_clicked(self):
-        callback = thermal_timeout_toggle_callback
-        if callback is None:
-            print("Motion-timeout toggle unavailable")
-            return
-        try:
-            state = callback() or {}
-            enabled = bool(state.get("enabled", False))
-            secs = int(float(state.get("idle_timeout_s", float(getattr(config, "THERMAL_IDLE_TIMEOUT_S", 300.0)))))
-            msg = f"Motion timeout {'enabled' if enabled else 'disabled'} ({secs}s)"
-            print(msg)
-            if hasattr(self, "motion_timeout_var"):
-                self.motion_timeout_var.set(
-                    f"Motion Timeout: {'ON' if enabled else 'OFF'} ({secs}s)"
-                )
-        except Exception as e:
-            print(f"Motion-timeout toggle failed: {e}")
-
-    def _run_thermal_action(self, action_name, callback):
-        if callback is None:
-            print(f"Thermal {action_name.lower()} unavailable")
-            return
-
-        print(f"Thermal {action_name.lower()} requested")
-
-        def _worker():
-            try:
-                callback()
-                print(f"Thermal {action_name.lower()} completed")
-            except Exception as e:
-                print(f"Thermal {action_name.lower()} failed: {e}")
-
-        threading.Thread(target=_worker, daemon=True).start()
-
-    def _park_arm_clicked(self):
-        self.shared_params["busy"] = 1
-        self._resume_ready = False
-        self._run_thermal_action("Park", thermal_park_callback)
-
-    def _resume_arm_clicked(self):
-        two_step = bool(getattr(config, "RESUME_TWO_STEP_ENABLE", True))
-        auto_enable = bool(getattr(config, "RESUME_AUTO_ENABLE_TRACKING", True))
-
-        if two_step and self._resume_ready:
-            self.shared_params["busy"] = 0
-            self._resume_ready = False
-            print("Resume step 2/2: tracking enabled")
-            return
-
-        self.shared_params["busy"] = 1
-        self.manual_mode = False
-        if hasattr(self, "manual_var"):
-            self.manual_var.set(False)
-        if thermal_resume_callback is None:
-            print("Thermal resume unavailable")
-            return
-
-        print("Thermal resume requested")
-
-        def _worker():
-            try:
-                thermal_resume_callback()
-                if two_step:
-                    self.shared_params["busy"] = 1
-                    self._resume_ready = True
-                    print("Resume step 1/2 complete: arm powered/held. Press RESUME again to start tracking")
-                else:
-                    self._resume_ready = False
-                    self.shared_params["busy"] = 0 if auto_enable else 1
-                    if auto_enable:
-                        print("Thermal resume completed")
-                    else:
-                        print("Thermal resume completed: tracking remains paused")
-            except Exception as e:
-                self._resume_ready = False
-                print(f"Thermal resume failed: {e}")
-
-        threading.Thread(target=_worker, daemon=True).start()
-
     def _park_and_shutdown_clicked(self):
-        try:
-            if thermal_park_callback:
-                self.shared_params["busy"] = 1
-                thermal_park_callback()
-                print("Thermal park requested before shutdown")
-            else:
-                print("Thermal park unavailable before shutdown")
-        except Exception as e:
-            print(f"Thermal park before shutdown failed: {e}")
         self._save_window_state(silent=True)
         shutdown_program()
 
@@ -1638,18 +1494,13 @@ class RobotTuner:
             s.set(self.shared_params[k]); s.pack()
             self.scale_widgets[k] = s
 
-        # --- Thermal Monitor Frame (status column) ---
-        tk.Label(status_col, text="--- THERMAL STATUS ---", font=("Arial", 12, "bold")).pack(pady=12)
+        # --- System Status Frame (status column) ---
+        tk.Label(status_col, text="--- SYSTEM STATUS ---", font=("Arial", 12, "bold")).pack(pady=12)
         self.tracking_status_var = tk.StringVar(value="Tracking: initializing...")
         tk.Label(status_col, textvariable=self.tracking_status_var, justify="left").pack(pady=2)
         self.servo_power_var = tk.StringVar(value="Servo Power: initializing...")
         tk.Label(status_col, textvariable=self.servo_power_var, justify="left").pack(pady=2)
-        self.servo5_load_var = tk.StringVar(value="Servo 5 Load: initializing...")
-        tk.Label(status_col, textvariable=self.servo5_load_var, justify="left").pack(pady=2)
-        self.shelly_power_var = tk.StringVar(value="Shelly Power: initializing...")
-        tk.Label(status_col, textvariable=self.shelly_power_var, justify="left").pack(pady=2)
-        self.thermal_status_var = tk.StringVar(value="Thermal monitor: initializing...")
-        tk.Label(status_col, textvariable=self.thermal_status_var, wraplength=260, justify="left").pack(pady=4)
+        tk.Label(status_col, text="Thermal monitoring removed", justify="left").pack(pady=2)
 
         tk.Button(status_col, text="WHAT DO YOU SEE", width=18,
               bg="lightblue", command=self._what_do_you_see_clicked).pack(pady=(4, 4))
@@ -1735,17 +1586,6 @@ class RobotTuner:
         self.table_model_status_var = tk.StringVar(value="Table model: ready")
         tk.Label(model_col, textvariable=self.table_model_status_var,
              wraplength=260, justify="left").pack(pady=(0, 8))
-
-        thermal_btn_frame = tk.Frame(status_col)
-        thermal_btn_frame.pack(pady=6)
-        tk.Button(thermal_btn_frame, text="PARK ARM", width=12,
-              bg="orange", command=self._park_arm_clicked).pack(side="left", padx=5)
-        tk.Button(thermal_btn_frame, text="RESUME", width=12,
-              bg="lightgreen", command=self._resume_arm_clicked).pack(side="left", padx=5)
-        tk.Button(thermal_btn_frame, text="TOGGLE TIMEOUT", width=14,
-              bg="lightyellow", command=self._toggle_motion_timeout_clicked).pack(side="left", padx=5)
-        self.motion_timeout_var = tk.StringVar(value=f"Motion Timeout: ON ({int(float(getattr(config, 'THERMAL_IDLE_TIMEOUT_S', 300.0)))}s)")
-        tk.Label(status_col, textvariable=self.motion_timeout_var, justify="left").pack(pady=(2, 8))
 
         # --- Crestron Lights Frame (status column) ---
         tk.Label(status_col, text="--- CRESTRON LIGHTS ---", font=("Arial", 12, "bold")).pack(pady=15)

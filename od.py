@@ -1511,27 +1511,8 @@ def _table_object_model_callback(_pad, info, _user_data):
 
 
 def _person_lost_park_async():
-    global _person_lost_park_in_progress
-    if _person_lost_park_in_progress:
-        return
-    park_cb = getattr(brain, "thermal_park_callback", None)
-    if not callable(park_cb):
-        print("WARNING: person-lost park callback unavailable")
-        return
-
-    _person_lost_park_in_progress = True
-
-    def _worker():
-        global _person_lost_park_in_progress
-        try:
-            park_cb()
-            print("Person-lost safety park complete")
-        except Exception as e:
-            print(f"Person-lost safety park failed: {e}")
-        finally:
-            _person_lost_park_in_progress = False
-
-    threading.Thread(target=_worker, daemon=True).start()
+    # Thermal auto-park removed by configuration/request.
+    return
 
 
 def _point_confidence(point):
@@ -2903,19 +2884,6 @@ if __name__ == "__main__":
     print(f"--- od.py version {_VERSION} ---")
     _startup_log("od.py main: startup begin")
     brain.servo_move_callback = servo_integration.note_servo_move
-    brain.thermal_status_provider = servo_integration.get_thermal_status
-    brain.thermal_park_callback = servo_integration.park_arm
-    brain.thermal_resume_callback = servo_integration.resume_arm
-    brain.thermal_timeout_toggle_callback = getattr(
-        servo_integration,
-        "toggle_motion_timeout_enabled",
-        None,
-    )
-    brain.thermal_timeout_state_provider = getattr(
-        servo_integration,
-        "get_motion_timeout_state",
-        None,
-    )
     brain.servo_power_provider = servo_integration.is_servo_power_on
     brain.servo_power_up_callback = servo_integration.power_up_servos
     brain.vision_summary_provider = get_vision_summary_text
@@ -3115,11 +3083,8 @@ if __name__ == "__main__":
             config.STARTUP_INITIAL_BUSY = 1
             brain.tuner.shared_params["busy"] = 1
 
-    servo_integration.thermal_monitor.start()
-    servo_integration.start_status_poller()
     _start_table_pick_steer_worker()
-    print("--- Servo thermal monitor started ---")
-    _startup_log("startup path: thermal/status/steer workers started")
+    _startup_log("startup path: steer worker started")
     camera_thread = threading.Thread(target=camera_loop, daemon=True, name="CameraLoop")
     camera_thread.start()
     _startup_log("startup path: camera_thread started")
@@ -3136,6 +3101,3 @@ if __name__ == "__main__":
         brain.request_shutdown()
         camera_thread.join(timeout=3.0)
         _stop_table_pick_steer_worker()
-        servo_integration.stop_status_poller()
-        servo_integration.thermal_monitor.stop()
-        print("--- Servo thermal monitor stopped ---")
