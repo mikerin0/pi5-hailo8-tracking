@@ -370,9 +370,19 @@ USB_MIC_CALIBRATE_SEC = 0.8
 USB_MIC_LISTEN_TIMEOUT_S = 1.0
 USB_MIC_PHRASE_TIME_LIMIT_S = 3.0
 USB_MIC_PAUSE_THRESHOLD_S = 0.6
+USB_MIC_GAIN = 1.0
 # Require a wake phrase prefix before executing a spoken command.
 USB_MIC_REQUIRE_WAKE_PHRASE = True
 USB_MIC_WAKE_PHRASE = "robot"
+# Wake phrase acknowledgement: tilt servo 2 briefly then return.
+USB_MIC_WAKE_ACK_ENABLED = True
+USB_MIC_WAKE_ACK_TILT_DEG = 45.0
+# 1 for positive servo direction, -1 for reverse direction.
+USB_MIC_WAKE_ACK_TILT_DIRECTION = 1
+USB_MIC_SERVO_US_PER_DEG = 8.33
+USB_MIC_WAKE_ACK_MOVE_MS = 320
+USB_MIC_WAKE_ACK_HOLD_S = 0.10
+USB_MIC_WAKE_ACK_COOLDOWN_S = 0.9
 STARTUP_SEED_RETRY_SEC = 6.0
 STARTUP_SEED_RETRY_INTERVAL_SEC = 0.25
 # Interactive startup wizard: require operator confirmation between

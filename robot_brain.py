@@ -1,4 +1,5 @@
 import json, os, serial, time, subprocess, tkinter as tk, threading, socket
+import audioop
 import numpy as np 
 import ikpy.chain
 import ikpy.link
@@ -54,6 +55,8 @@ table_pick_arm_callback = None
 table_color_follow_callback = None
 _first_move_capped = False
 _startup_t0 = time.monotonic()
+_wake_ack_lock = threading.Lock()
+_wake_ack_last_t = 0.0
 TUNER_PARAMS_PATH = os.path.join(os.path.dirname(__file__), "tuner_params.json")
 WINDOW_STATE_PATH = os.path.join(os.path.dirname(__file__), "window_state.json")
 
@@ -410,6 +413,43 @@ def _run_external_command(cmd, source="external"):
     return True
 
 
+def _trigger_wake_phrase_ack_motion():
+    global _wake_ack_last_t
+    if not bool(getattr(config, "USB_MIC_WAKE_ACK_ENABLED", True)):
+        return
+
+    now = time.monotonic()
+    cooldown = max(0.0, float(getattr(config, "USB_MIC_WAKE_ACK_COOLDOWN_S", 0.9)))
+    if (now - _wake_ack_last_t) < cooldown:
+        return
+    _wake_ack_last_t = now
+
+    if not _wake_ack_lock.acquire(blocking=False):
+        return
+
+    def _worker():
+        try:
+            base = int(_servo_last_commanded.get(2, 1500))
+            tilt_deg = max(0.0, float(getattr(config, "USB_MIC_WAKE_ACK_TILT_DEG", 45.0)))
+            us_per_deg = max(1.0, float(getattr(config, "USB_MIC_SERVO_US_PER_DEG", 8.33)))
+            direction = -1 if int(getattr(config, "USB_MIC_WAKE_ACK_TILT_DIRECTION", 1)) < 0 else 1
+            delta_us = int(round(tilt_deg * us_per_deg))
+            target = int(max(500, min(2500, base + (direction * delta_us))))
+            move_ms = max(120, int(getattr(config, "USB_MIC_WAKE_ACK_MOVE_MS", 320)))
+            hold_s = max(0.0, float(getattr(config, "USB_MIC_WAKE_ACK_HOLD_S", 0.10)))
+            if target != base:
+                move_servo(2, target, move_ms)
+                if hold_s > 0:
+                    time.sleep(hold_s)
+                move_servo(2, base, move_ms)
+        except Exception as e:
+            print(f"Wake-phrase ack motion error: {e}")
+        finally:
+            _wake_ack_lock.release()
+
+    threading.Thread(target=_worker, daemon=True).start()
+
+
 def _voice_text_to_command(text):
     phrase = str(text or "").strip().lower()
     if not phrase:
@@ -417,9 +457,11 @@ def _voice_text_to_command(text):
 
     require_wake = bool(getattr(config, "USB_MIC_REQUIRE_WAKE_PHRASE", True))
     wake_phrase = str(getattr(config, "USB_MIC_WAKE_PHRASE", "robot") or "").strip().lower()
+    wake_matched = False
     if require_wake and wake_phrase:
         # Accept either "robot <command>" or "robot, <command>" forms.
         if phrase == wake_phrase:
+            _trigger_wake_phrase_ack_motion()
             return None
         normalized = phrase.replace(",", " ").replace(".", " ").strip()
         wake_prefix = f"{wake_phrase} "
@@ -428,6 +470,10 @@ def _voice_text_to_command(text):
         phrase = normalized[len(wake_prefix):].strip()
         if not phrase:
             return None
+        wake_matched = True
+
+    if wake_matched:
+        _trigger_wake_phrase_ack_motion()
 
     if "table pick" in phrase or "table take" in phrase:
         return "TABLE_PICK"
@@ -491,6 +537,20 @@ def usb_mic_voice_listener():
 
                 text = ""
                 try:
+                    gain = float(
+                        tuner.shared_params.get(
+                            "usb_mic_gain",
+                            float(getattr(config, "USB_MIC_GAIN", 1.0)),
+                        )
+                    )
+                    gain = max(0.2, min(5.0, gain))
+                    if abs(gain - 1.0) > 1e-6:
+                        try:
+                            raw = audio.get_raw_data()
+                            boosted = audioop.mul(raw, int(audio.sample_width), gain)
+                            audio = sr.AudioData(boosted, int(audio.sample_rate), int(audio.sample_width))
+                        except Exception as e:
+                            print(f"USB mic gain processing failed: {e}")
                     text = recognizer.recognize_google(audio)
                 except sr.UnknownValueError:
                     continue
@@ -1097,6 +1157,7 @@ class RobotTuner:
             "table_object_target_label": str(getattr(config, "TABLE_OBJECT_TARGET_LABEL", "")),
             "table_object_hef_path": str(getattr(config, "TABLE_OBJECT_HEF_PATH", "")),
             "table_object_so_path": str(getattr(config, "TABLE_OBJECT_SO_PATH", "")),
+            "usb_mic_gain": float(getattr(config, "USB_MIC_GAIN", 1.0)),
             "table_follow_color_active": 0,
         }
         self.scale_widgets = {}
@@ -1639,6 +1700,22 @@ class RobotTuner:
         s.set(self.shared_params["pose_gesture_debug"])
         s.pack()
         self.scale_widgets["pose_gesture_debug"] = s
+
+        # --- USB Mic Voice Tune (sliders window) ---
+        tk.Label(slider_right, text="--- USB MIC VOICE ---", font=("Arial", 12, "bold")).pack(pady=8)
+        tk.Label(slider_right, text="Mic Gain").pack()
+        s = tk.Scale(
+            slider_right,
+            from_=0.2,
+            to=5.0,
+            resolution=0.1,
+            orient='horizontal',
+            length=320,
+            command=lambda v, k="usb_mic_gain": self.update_tune(k, v),
+        )
+        s.set(self.shared_params.get("usb_mic_gain", float(getattr(config, "USB_MIC_GAIN", 1.0))))
+        s.pack()
+        self.scale_widgets["usb_mic_gain"] = s
 
         # --- Auto Release Tune Frame (sliders window) ---
         tk.Label(slider_right, text="--- AUTO RELEASE TUNE ---", font=("Arial", 12, "bold")).pack(pady=8)
