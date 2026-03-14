@@ -415,6 +415,20 @@ def _voice_text_to_command(text):
     if not phrase:
         return None
 
+    require_wake = bool(getattr(config, "USB_MIC_REQUIRE_WAKE_PHRASE", True))
+    wake_phrase = str(getattr(config, "USB_MIC_WAKE_PHRASE", "robot") or "").strip().lower()
+    if require_wake and wake_phrase:
+        # Accept either "robot <command>" or "robot, <command>" forms.
+        if phrase == wake_phrase:
+            return None
+        normalized = phrase.replace(",", " ").replace(".", " ").strip()
+        wake_prefix = f"{wake_phrase} "
+        if not normalized.startswith(wake_prefix):
+            return None
+        phrase = normalized[len(wake_prefix):].strip()
+        if not phrase:
+            return None
+
     if "table pick" in phrase or "table take" in phrase:
         return "TABLE_PICK"
     if "take item" in phrase or "handoff" in phrase or phrase == "take":

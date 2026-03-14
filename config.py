@@ -370,6 +370,9 @@ USB_MIC_CALIBRATE_SEC = 0.8
 USB_MIC_LISTEN_TIMEOUT_S = 1.0
 USB_MIC_PHRASE_TIME_LIMIT_S = 3.0
 USB_MIC_PAUSE_THRESHOLD_S = 0.6
+# Require a wake phrase prefix before executing a spoken command.
+USB_MIC_REQUIRE_WAKE_PHRASE = True
+USB_MIC_WAKE_PHRASE = "robot"
 STARTUP_SEED_RETRY_SEC = 6.0
 STARTUP_SEED_RETRY_INTERVAL_SEC = 0.25
 # Interactive startup wizard: require operator confirmation between
