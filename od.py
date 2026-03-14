@@ -262,6 +262,9 @@ def _get_saved_video_window_state(window_name):
         return None
     if w <= 0 or h <= 0:
         return None
+    # Guard against accidentally persisted tiny windows (e.g. transient WM states).
+    if w < 320 or h < 180:
+        return None
     return {"x": x, "y": y, "w": w, "h": h}
 
 
@@ -272,8 +275,14 @@ def _apply_saved_video_window_state(window_name, default_w=None, default_h=None)
 
     saved_w = state.get("w") if isinstance(state, dict) else None
     saved_h = state.get("h") if isinstance(state, dict) else None
-    target_w = saved_w if isinstance(saved_w, int) and saved_w > 0 else default_w
-    target_h = saved_h if isinstance(saved_h, int) and saved_h > 0 else default_h
+    use_saved_size = (
+        isinstance(saved_w, int)
+        and isinstance(saved_h, int)
+        and saved_w >= 320
+        and saved_h >= 180
+    )
+    target_w = saved_w if use_saved_size else default_w
+    target_h = saved_h if use_saved_size else default_h
     if target_w and target_h:
         try:
             cv2.resizeWindow(window_name, int(target_w), int(target_h))
@@ -293,6 +302,8 @@ def _save_video_window_state(window_name):
     try:
         x, y, w, h = cv2.getWindowImageRect(window_name)
         if int(w) <= 0 or int(h) <= 0:
+            return
+        if int(w) < 320 or int(h) < 180:
             return
     except Exception:
         return
@@ -427,6 +438,8 @@ def _save_main_preview_window_state():
         w = int(row.get("w", 0))
         h = int(row.get("h", 0))
         if w <= 0 or h <= 0:
+            return
+        if w < 320 or h < 180:
             return
         _save_video_window_state_values(
             MAIN_PREVIEW_WINDOW_KEY,
