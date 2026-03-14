@@ -2750,9 +2750,12 @@ def camera_loop():
                 ).strip().lower()
             except Exception:
                 selected_target_type = "any"
-            # If a color target is explicitly selected, prefer color/blob pickup
-            # path so non-COCO objects (e.g., plain colored blocks) are still pickable.
-            if selected_target_type != "any":
+            summary_enabled = bool(getattr(config, "TABLE_OBJECT_SUMMARY_ENABLED", True))
+            # Keep AI-hat model active for vision summaries even when a color target
+            # is selected, unless summary mode is explicitly disabled.
+            # This lets "WHAT DO YOU SEE" describe detector labels instead of only
+            # color/blob fallback labels like "object".
+            if selected_target_type != "any" and not summary_enabled:
                 table_model_branch_enabled = False
             if bool(brain.tuner.shared_params.get("table_follow_color_active", 0)):
                 table_model_branch_enabled = False
