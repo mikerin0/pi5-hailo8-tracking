@@ -2899,6 +2899,8 @@ if __name__ == "__main__":
     brain.thermal_status_provider = servo_integration.get_thermal_status
     brain.thermal_park_callback = servo_integration.park_arm
     brain.thermal_resume_callback = servo_integration.resume_arm
+    brain.thermal_timeout_toggle_callback = servo_integration.toggle_motion_timeout_enabled
+    brain.thermal_timeout_state_provider = servo_integration.get_motion_timeout_state
     brain.servo_power_provider = servo_integration.is_servo_power_on
     brain.servo_power_up_callback = servo_integration.power_up_servos
     brain.vision_summary_provider = get_vision_summary_text

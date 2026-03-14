@@ -76,7 +76,26 @@ class ServoThermalMonitor:
                 "parked": self._parked,
                 "idle_secs": round(idle_secs, 1),
                 "high_load_counts": dict(self._high_load_counts),
+                "timeout_enabled": bool(self._enabled),
+                "idle_timeout_s": float(self._idle_timeout),
             }
+
+    def set_enabled(self, enabled):
+        with self._lock:
+            self._enabled = bool(enabled)
+
+    def is_enabled(self):
+        with self._lock:
+            return bool(self._enabled)
+
+    def set_idle_timeout(self, idle_timeout_s):
+        timeout = max(1.0, float(idle_timeout_s))
+        with self._lock:
+            self._idle_timeout = timeout
+
+    def get_idle_timeout(self):
+        with self._lock:
+            return float(self._idle_timeout)
 
     def park_now(self):
         """Immediately move the arm to rest position and mark it parked."""

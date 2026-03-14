@@ -39,6 +39,8 @@ servo_move_callback = None
 thermal_status_provider = None
 thermal_park_callback = None
 thermal_resume_callback = None
+thermal_timeout_toggle_callback = None
+thermal_timeout_state_provider = None
 servo_power_provider = None
 servo_power_up_callback = None
 vision_summary_provider = None
@@ -1168,15 +1170,20 @@ class RobotTuner:
                 self.servo_power_var.set(f"Servo Power error: {e}")
 
         provider = thermal_status_provider
+        timeout_state_provider = thermal_timeout_state_provider
         if provider is None:
             self.thermal_status_var.set("Thermal monitor: unavailable")
             self.servo5_load_var.set("Servo 5 Load: n/a")
             self.shelly_power_var.set("Shelly Power: n/a")
+            if hasattr(self, "motion_timeout_var"):
+                self.motion_timeout_var.set("Motion Timeout: unavailable")
         else:
             try:
                 status = provider() or {}
                 parked = bool(status.get("parked", False))
                 idle_secs = float(status.get("idle_secs", 0.0))
+                timeout_enabled = bool(status.get("timeout_enabled", True))
+                timeout_s = float(status.get("idle_timeout_s", float(getattr(config, "THERMAL_IDLE_TIMEOUT_S", 300.0))))
                 servo5_dev = status.get("servo5_deviation", None)
                 shelly_apower = status.get("shelly_apower_w", None)
                 high_counts = status.get("high_load_counts", {}) or {}
@@ -1185,6 +1192,10 @@ class RobotTuner:
                 self.thermal_status_var.set(
                     f"Parked: {parked} | Idle: {idle_secs:.1f}s | High load servos: {high_text}"
                 )
+                if hasattr(self, "motion_timeout_var"):
+                    self.motion_timeout_var.set(
+                        f"Motion Timeout: {'ON' if timeout_enabled else 'OFF'} ({int(timeout_s)}s)"
+                    )
                 if servo5_dev is None:
                     self.servo5_load_var.set("Servo 5 Load: n/a")
                 else:
@@ -1193,12 +1204,44 @@ class RobotTuner:
                     self.shelly_power_var.set("Shelly Power: n/a")
                 else:
                     self.shelly_power_var.set(f"Shelly Power: {float(shelly_apower):.1f} W")
+
+                if timeout_state_provider is not None:
+                    try:
+                        tstate = timeout_state_provider() or {}
+                        if hasattr(self, "motion_timeout_var"):
+                            t_enabled = bool(tstate.get("enabled", timeout_enabled))
+                            t_secs = float(tstate.get("idle_timeout_s", timeout_s))
+                            self.motion_timeout_var.set(
+                                f"Motion Timeout: {'ON' if t_enabled else 'OFF'} ({int(t_secs)}s)"
+                            )
+                    except Exception:
+                        pass
             except Exception as e:
                 self.thermal_status_var.set(f"Thermal monitor error: {e}")
                 self.servo5_load_var.set("Servo 5 Load: error")
                 self.shelly_power_var.set("Shelly Power: error")
+                if hasattr(self, "motion_timeout_var"):
+                    self.motion_timeout_var.set("Motion Timeout: error")
         if hasattr(self, "root") and self.root is not None:
             self.root.after(1000, self._update_thermal_status)
+
+    def _toggle_motion_timeout_clicked(self):
+        callback = thermal_timeout_toggle_callback
+        if callback is None:
+            print("Motion-timeout toggle unavailable")
+            return
+        try:
+            state = callback() or {}
+            enabled = bool(state.get("enabled", False))
+            secs = int(float(state.get("idle_timeout_s", float(getattr(config, "THERMAL_IDLE_TIMEOUT_S", 300.0)))))
+            msg = f"Motion timeout {'enabled' if enabled else 'disabled'} ({secs}s)"
+            print(msg)
+            if hasattr(self, "motion_timeout_var"):
+                self.motion_timeout_var.set(
+                    f"Motion Timeout: {'ON' if enabled else 'OFF'} ({secs}s)"
+                )
+        except Exception as e:
+            print(f"Motion-timeout toggle failed: {e}")
 
     def _run_thermal_action(self, action_name, callback):
         if callback is None:
@@ -1699,6 +1742,10 @@ class RobotTuner:
               bg="orange", command=self._park_arm_clicked).pack(side="left", padx=5)
         tk.Button(thermal_btn_frame, text="RESUME", width=12,
               bg="lightgreen", command=self._resume_arm_clicked).pack(side="left", padx=5)
+        tk.Button(thermal_btn_frame, text="TOGGLE TIMEOUT", width=14,
+              bg="lightyellow", command=self._toggle_motion_timeout_clicked).pack(side="left", padx=5)
+        self.motion_timeout_var = tk.StringVar(value=f"Motion Timeout: ON ({int(float(getattr(config, 'THERMAL_IDLE_TIMEOUT_S', 300.0)))}s)")
+        tk.Label(status_col, textvariable=self.motion_timeout_var, justify="left").pack(pady=(2, 8))
 
         # --- Crestron Lights Frame (status column) ---
         tk.Label(status_col, text="--- CRESTRON LIGHTS ---", font=("Arial", 12, "bold")).pack(pady=15)

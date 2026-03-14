@@ -314,6 +314,8 @@ def _safe_park_via_sequence():
 thermal_monitor = ServoThermalMonitor(
     controller,
     rest_position="home",
+    idle_timeout=float(getattr(config, "THERMAL_IDLE_TIMEOUT_S", 300.0)),
+    enabled=bool(getattr(config, "THERMAL_IDLE_TIMEOUT_ENABLED", True)),
     park_callback=_safe_park_via_sequence,
 )
 
@@ -473,6 +475,27 @@ def get_thermal_status():
     """Return the current thermal monitor status."""
     with _STATUS_CACHE_LOCK:
         return dict(_status_cache)
+
+
+def get_motion_timeout_state():
+    """Return timeout state dict for GUI controls."""
+    return {
+        "enabled": bool(thermal_monitor.is_enabled()),
+        "idle_timeout_s": float(thermal_monitor.get_idle_timeout()),
+    }
+
+
+def set_motion_timeout_enabled(enabled):
+    """Enable/disable thermal idle auto-park timeout."""
+    thermal_monitor.set_enabled(bool(enabled))
+    return get_motion_timeout_state()
+
+
+def toggle_motion_timeout_enabled():
+    """Toggle thermal idle auto-park timeout and return new state."""
+    current = bool(thermal_monitor.is_enabled())
+    thermal_monitor.set_enabled(not current)
+    return get_motion_timeout_state()
 
 
 def get_last_commanded_pose():
