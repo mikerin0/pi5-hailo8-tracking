@@ -1317,6 +1317,8 @@ class RobotTuner:
                 if key in self.shared_params:
                     if key == "busy":
                         continue
+                    if key in ("table_follow_color_active", "table_pick_request_active"):
+                        continue
                     current = self.shared_params[key]
                     if isinstance(current, str):
                         self.shared_params[key] = str(value)
@@ -1324,6 +1326,9 @@ class RobotTuner:
                         self.shared_params[key] = float(value)
                     else:
                         self.shared_params[key] = value
+            # Transient runtime flags must not persist across restarts.
+            self.shared_params["table_follow_color_active"] = 0
+            self.shared_params["table_pick_request_active"] = 0
             if not silent:
                 print(f"Loaded tuner preset: {TUNER_PARAMS_PATH}")
             self._sync_scale_widgets()

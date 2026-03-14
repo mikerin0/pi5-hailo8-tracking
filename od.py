@@ -293,6 +293,10 @@ def _apply_saved_video_window_state(window_name, default_w=None, default_h=None)
     saved_x = state.get("x") if isinstance(state, dict) else None
     saved_y = state.get("y") if isinstance(state, dict) else None
     if isinstance(saved_x, int) and isinstance(saved_y, int):
+        # Ignore clearly invalid/off-screen persisted coordinates.
+        if abs(int(saved_x)) > 5000 or abs(int(saved_y)) > 5000:
+            saved_x, saved_y = None, None
+    if isinstance(saved_x, int) and isinstance(saved_y, int):
         try:
             cv2.moveWindow(window_name, int(saved_x), int(saved_y))
         except Exception:
@@ -305,6 +309,8 @@ def _save_video_window_state(window_name):
         if int(w) <= 0 or int(h) <= 0:
             return
         if int(w) < 320 or int(h) < 180:
+            return
+        if abs(int(x)) > 5000 or abs(int(y)) > 5000:
             return
     except Exception:
         return
@@ -444,6 +450,8 @@ def _save_main_preview_window_state():
             return
         x = int(row.get("x", 0))
         y = int(row.get("y", 0))
+        if abs(x) > 5000 or abs(y) > 5000:
+            return
         _save_video_window_state_values(
             MAIN_PREVIEW_WINDOW_KEY,
             x, y, w, h,
