@@ -2043,9 +2043,14 @@ def app_callback(pad, info, user_data):
                     cx = p.get(f"{_tracking_target}_x", 0.5)
                     cy = p.get(f"{_tracking_target}_y", 0.5)
                     ry = (_smooth_x - cx) * p.get("ry_m", 0.3)
-                    rz = (config.ARM_RZ_BASE
-                          + (cy - _smooth_y) * p.get("rz_m", 0.3)
-                          + p.get("z_off", 0.0))
+                    base_arch_z = float(
+                        p.get("top_cam_arch_z", getattr(config, "TOP_CAM_ARCH_Z", config.ARM_RZ_BASE))
+                    )
+                    rz = (
+                        base_arch_z
+                        + (cy - _smooth_y) * p.get("rz_m", 0.3)
+                        + p.get("z_off", 0.0)
+                    )
                     brain.reach_for_coordinate(
                         config.ARM_REACH_X, ry,
                         max(config.ARM_MIN_Z, min(config.ARM_MAX_Z, rz)),
@@ -2061,6 +2066,11 @@ def app_callback(pad, info, user_data):
                 return Gst.PadProbeReturn.OK
             # No person in frame – enter standby after timeout
             now = time.time()
+            timeout_enabled = bool(getattr(config, "TRACKING_TIMEOUT_ENABLED", True))
+            if not timeout_enabled:
+                if _search_mode is True:
+                    _search_mode = False
+                return Gst.PadProbeReturn.OK
             if now - _last_seen_time > config.FLAGPOLE_TIMEOUT:
                 p = brain.tuner.get_params()
                 if p.get("busy", 0) == 0 and _search_mode is False:

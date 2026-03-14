@@ -43,7 +43,8 @@ KEYPOINTS = {              # Keypoint indices from the yolov8m_pose COCO skeleto
     'right_hand': 10,      # COCO: right_wrist
 }
 MOVE_COOLDOWN = 0.30       # minimum seconds between consecutive arm-move commands
-FLAGPOLE_TIMEOUT = 2.0     # seconds without a detected person before entering standby
+TRACKING_TIMEOUT_ENABLED = True  # if False, arm tracking will not time out on person-lost
+FLAGPOLE_TIMEOUT = 300.0   # seconds without a detected person before entering standby (5 min)
 
 # --- Pose-to-arm coordinate constants ---
 # Hailo returns normalised (0-1) coordinates.  The constants below map them
@@ -52,6 +53,8 @@ POSE_TELEPORT_THRESHOLD = 0.30  # max normalised jump between frames – larger 
                                  # are treated as noisy/invalid detections and dropped
 ARM_REACH_X = 0.25         # fixed forward reach (metres) while pose tracking
 ARM_RZ_BASE = 0.18         # arm height at the vertical centre of the frame (metres)
+# Adjustable base arch height for HIGH_CAM tracking (tunable via GUI slider).
+TOP_CAM_ARCH_Z = ARM_RZ_BASE
 ARM_MIN_Z   = 0.05         # minimum safe arm height (metres)
 ARM_MAX_Z   = 0.50         # maximum arm height (metres)
 

@@ -946,6 +946,7 @@ class RobotTuner:
     def __init__(self):
         self.shared_params = {
             "ry_m":0.42, "rz_m":0.45, "z_off":0.0, "speed":950, "smooth":0.20,
+            "top_cam_arch_z": float(getattr(config, "TOP_CAM_ARCH_Z", getattr(config, "ARM_RZ_BASE", 0.18))),
             "busy": 0, "tune_x":0.20, "tune_y":0.0, "tune_z":0.15,
             "nose_x":0.5, "nose_y":0.5,
             "left_hand_x":0.5, "left_hand_y":0.5,
@@ -1154,6 +1155,13 @@ class RobotTuner:
         else:
             self.tracking_status_var.set("Tracking: Paused")
 
+        if hasattr(self, "tracking_timeout_var"):
+            enabled = bool(getattr(config, "TRACKING_TIMEOUT_ENABLED", True))
+            secs = int(float(getattr(config, "FLAGPOLE_TIMEOUT", 300.0)))
+            self.tracking_timeout_var.set(
+                f"Tracking Timeout: {'ON' if enabled else 'OFF'} ({secs}s)"
+            )
+
         power_provider = servo_power_provider
         if power_provider is None:
             self.servo_power_var.set("Servo Power: unknown")
@@ -1168,6 +1176,24 @@ class RobotTuner:
                 self.servo_power_var.set(f"Servo Power error: {e}")
         if hasattr(self, "root") and self.root is not None:
             self.root.after(1000, self._update_thermal_status)
+
+    def _resume_tracking_clicked(self):
+        self.shared_params["busy"] = 0
+        self.manual_mode = False
+        if hasattr(self, "manual_var"):
+            self.manual_var.set(False)
+        print("Tracking resumed")
+
+    def _toggle_tracking_timeout_clicked(self):
+        enabled = bool(getattr(config, "TRACKING_TIMEOUT_ENABLED", True))
+        config.TRACKING_TIMEOUT_ENABLED = not enabled
+        new_state = bool(config.TRACKING_TIMEOUT_ENABLED)
+        secs = int(float(getattr(config, "FLAGPOLE_TIMEOUT", 300.0)))
+        print(f"Tracking timeout {'enabled' if new_state else 'disabled'} ({secs}s)")
+        if hasattr(self, "tracking_timeout_var"):
+            self.tracking_timeout_var.set(
+                f"Tracking Timeout: {'ON' if new_state else 'OFF'} ({secs}s)"
+            )
 
     def _park_and_shutdown_clicked(self):
         self._save_window_state(silent=True)
@@ -1450,6 +1476,7 @@ class RobotTuner:
         for lbl, k, mn, mx, res in [
             ("Y Gain", "ry_m", 0.10, 0.80, 0.01),
             ("Z Gain", "rz_m", 0.10, 0.80, 0.01),
+            ("Top Cam Arch Z", "top_cam_arch_z", float(getattr(config, "ARM_MIN_Z", 0.05)), float(getattr(config, "ARM_MAX_Z", 0.50)), 0.005),
             ("Z Offset", "z_off", -0.20, 0.20, 0.005),
         ]:
             tk.Label(slider_right, text=lbl).pack()
@@ -1508,6 +1535,17 @@ class RobotTuner:
         tk.Label(status_col, textvariable=self.vision_summary_var, wraplength=260, justify="left").pack(pady=(0, 8))
         self.pickup_status_var = tk.StringVar(value="Pickup: idle")
         tk.Label(status_col, textvariable=self.pickup_status_var, wraplength=260, justify="left").pack(pady=(0, 8))
+
+        timeout_btn_frame = tk.Frame(status_col)
+        timeout_btn_frame.pack(pady=(2, 8))
+        tk.Button(timeout_btn_frame, text="RESUME", width=12,
+                  bg="lightgreen", command=self._resume_tracking_clicked).pack(side="left", padx=5)
+        tk.Button(timeout_btn_frame, text="DON'T TIMEOUT TRACKING", width=22,
+                  bg="lightyellow", command=self._toggle_tracking_timeout_clicked).pack(side="left", padx=5)
+        self.tracking_timeout_var = tk.StringVar(
+            value=f"Tracking Timeout: {'ON' if bool(getattr(config, 'TRACKING_TIMEOUT_ENABLED', True)) else 'OFF'} ({int(float(getattr(config, 'FLAGPOLE_TIMEOUT', 300.0)))}s)"
+        )
+        tk.Label(status_col, textvariable=self.tracking_timeout_var, wraplength=260, justify="left").pack(pady=(0, 8))
 
         # --- HIGH CAM Model Frame (model column) ---
         tk.Label(model_col, text="--- HIGH CAM POSE MODEL ---", font=("Arial", 12, "bold")).pack(pady=(4, 4))
