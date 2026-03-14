@@ -37,6 +37,12 @@ if _qt_rt_stat.st_uid == os.getuid():
     if not os.environ.get("XDG_RUNTIME_DIR"):
         os.environ["XDG_RUNTIME_DIR"] = _qt_rt
 
+# OpenCV wheels on Pi often include xcb but not wayland Qt platform plugins.
+# On Wayland sessions, force Qt backend to xcb for HighGUI windows.
+if not os.environ.get("QT_QPA_PLATFORM"):
+    if str(os.environ.get("XDG_SESSION_TYPE", "")).strip().lower() == "wayland":
+        os.environ["QT_QPA_PLATFORM"] = "xcb"
+
 # Ensure the Hailo GStreamer plugin directory is on the search path before
 # any import can call Gst.init() (e.g. gi, hailo, robot_brain).
 #
@@ -2627,7 +2633,8 @@ def camera_loop():
         cv2.namedWindow(main_window_name, cv2.WINDOW_NORMAL)
         _apply_saved_video_window_state(main_window_name, config.FRAME_W, config.FRAME_H)
         main_window_ready = True
-    except Exception:
+    except Exception as e:
+        print(f"Preview window disabled: {e}")
         main_window_ready = False
 
     global _table_obj_dualcam_disabled_warned
