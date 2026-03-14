@@ -406,9 +406,11 @@ def _run_external_command(cmd, source="external"):
         tuner.shared_params["busy"] = 1
         reach_for_coordinate(0.05, 0.0, 0.46, speed=500)
         say("Flagpole Mode. Manual lock engaged.")
+    elif cmd in ("PAUSE", "PAUSE_TRACKING"):
+        tuner.pause_tracking()
+        say("Tracking paused")
     elif cmd == "RESUME":
-        tuner.shared_params["busy"] = 1
-        tuner.shared_params["busy"] = 0
+        tuner.resume_tracking()
         say("Resuming tracking")
     else:
         print(f"Unknown {source} command: {cmd}")
@@ -525,6 +527,9 @@ def _voice_text_to_command(text):
     if "flagpole" in phrase:
         _voice_wake_until = 0.0
         return "FLAGPOLE"
+    if "pause tracking" in phrase or phrase == "pause":
+        _voice_wake_until = 0.0
+        return "PAUSE"
     if "resume" in phrase or "track again" in phrase:
         _voice_wake_until = 0.0
         return "RESUME"
@@ -1422,6 +1427,31 @@ class RobotTuner:
             self.root.after(1000, self._update_thermal_status)
 
     def _resume_tracking_clicked(self):
+        self.resume_tracking()
+
+    def _pause_tracking_worker(self):
+        callback = thermal_park_callback
+        try:
+            if callback is not None:
+                callback()
+        except Exception as e:
+            print(f"Pause tracking park failed: {e}")
+
+    def pause_tracking(self):
+        self.shared_params["busy"] = 1
+        self.manual_mode = False
+        if hasattr(self, "manual_var"):
+            self.manual_var.set(False)
+        threading.Thread(target=self._pause_tracking_worker, daemon=True).start()
+        print("Tracking paused")
+
+    def resume_tracking(self):
+        callback = thermal_resume_callback
+        try:
+            if callback is not None:
+                callback()
+        except Exception as e:
+            print(f"Resume tracking power-up failed: {e}")
         self.shared_params["busy"] = 0
         self.manual_mode = False
         if hasattr(self, "manual_var"):
@@ -1801,6 +1831,8 @@ class RobotTuner:
 
         timeout_btn_frame = tk.Frame(status_col)
         timeout_btn_frame.pack(pady=(2, 8))
+        tk.Button(timeout_btn_frame, text="PAUSE", width=12,
+              bg="lightcoral", command=self.pause_tracking).pack(side="left", padx=5)
         tk.Button(timeout_btn_frame, text="RESUME", width=12,
                   bg="lightgreen", command=self._resume_tracking_clicked).pack(side="left", padx=5)
         tk.Button(timeout_btn_frame, text="DON'T TIMEOUT TRACKING", width=22,

@@ -2955,6 +2955,8 @@ if __name__ == "__main__":
     brain.servo_move_callback = servo_integration.note_servo_move
     brain.servo_power_provider = servo_integration.is_servo_power_on
     brain.servo_power_up_callback = servo_integration.power_up_servos
+    brain.thermal_park_callback = servo_integration.park_arm
+    brain.thermal_resume_callback = servo_integration.resume_arm
     brain.vision_summary_provider = get_vision_summary_text
     brain.table_model_update_callback = update_table_model_paths
     brain.high_cam_model_update_callback = update_high_cam_model_paths
