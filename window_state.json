@@ -1,4 +1,12 @@
 {
-  "geometry": "1326x1012+99+62",
+  "controls": {
+    "geometry": "1007x1012+0+64",
+    "state": "normal"
+  },
+  "geometry": "1007x1012+0+64",
+  "sliders": {
+    "geometry": "760x860+580+141",
+    "state": "normal"
+  },
   "state": "normal"
 }

@@ -1823,3 +1823,7 @@ def start_brain_ui():
         print(f"GUI disabled (no display): {e}")
         while not shutdown_event.is_set():
             time.sleep(0.5)
+    except Exception as e:
+        print(f"GUI runtime error: {e}")
+        while not shutdown_event.is_set():
+            time.sleep(0.5)
