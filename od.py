@@ -1181,15 +1181,35 @@ def get_vision_summary_text():
             return f"I do not see anything right now on {mode}."
         return f"I do not currently detect objects on {mode}."
 
+    color_names = {"red", "green", "blue", "yellow", "orange", "white", "black"}
     ordered = sorted(labels.items(), key=lambda item: (-int(item[1]), item[0]))
     top_items = ordered[:4]
     parts = []
-    for name, count in top_items:
-        if int(count) > 1:
-            parts.append(f"{name} x{int(count)}")
+    for raw_name, raw_count in top_items:
+        name = str(raw_name or "").strip().lower()
+        count = max(1, int(raw_count))
+
+        if not name:
+            continue
+        if name in color_names:
+            obj_text = f"{name} object"
+        elif name == "person":
+            obj_text = "person"
+        elif name == "object":
+            obj_text = "object"
         else:
-            parts.append(name)
-    summary = ", ".join(parts)
+            obj_text = name.replace("_", " ")
+
+        if count > 1:
+            if obj_text.endswith("s"):
+                parts.append(f"{count} {obj_text}")
+            else:
+                parts.append(f"{count} {obj_text}s")
+        else:
+            article = "an" if obj_text[:1] in {"a", "e", "i", "o", "u"} else "a"
+            parts.append(f"{article} {obj_text}")
+
+    summary = ", ".join(parts) if parts else "an object"
     if age > 2.5:
         return f"Last seen on {mode}: {summary}."
     return f"I see {summary} on {mode}."
