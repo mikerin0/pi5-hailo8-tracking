@@ -528,9 +528,15 @@ def _voice_text_to_command(text):
     if "resume" in phrase or "track again" in phrase:
         _voice_wake_until = 0.0
         return "RESUME"
+    if "shutdown" in phrase or "shut down" in phrase:
+        _voice_wake_until = 0.0
+        return "EXIT"
     if "open" in phrase and "hand" not in phrase:
         _voice_wake_until = 0.0
         return "OPEN"
+    if "shut" in phrase and "down" not in phrase and "hand" not in phrase:
+        _voice_wake_until = 0.0
+        return "CLOSE"
     if "close" in phrase and "hand" not in phrase:
         _voice_wake_until = 0.0
         return "CLOSE"
