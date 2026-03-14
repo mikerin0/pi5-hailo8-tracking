@@ -2612,6 +2612,7 @@ def camera_loop():
     main_window_ready = False
     last_preview_ok_t = 0.0
     last_preview_warn_t = 0.0
+    last_preview_reset_t = 0.0
 
     def _open_main_preview_window():
         try:
@@ -2884,6 +2885,25 @@ def camera_loop():
                             except Exception:
                                 pass
                             main_window_ready = False
+
+                # Window watchdog: if preview has not rendered for a while,
+                # force-reset to a known visible geometry.
+                now = time.time()
+                if preview_sink is not None and (now - last_preview_ok_t) > 3.0 and (now - last_preview_reset_t) > 3.0:
+                    print("Preview watchdog: no rendered frames recently; resetting preview window")
+                    last_preview_reset_t = now
+                    try:
+                        cv2.destroyWindow(main_window_name)
+                    except Exception:
+                        pass
+                    main_window_ready = _open_main_preview_window()
+                    if main_window_ready:
+                        try:
+                            cv2.resizeWindow(main_window_name, int(config.FRAME_W), int(config.FRAME_H))
+                            cv2.moveWindow(main_window_name, 80, 80)
+                            cv2.waitKey(1)
+                        except Exception as e:
+                            print(f"Preview watchdog reset failed: {e}")
                 time.sleep(0.1)
 
         except Exception as e:
