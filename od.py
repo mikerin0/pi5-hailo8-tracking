@@ -2610,13 +2610,20 @@ def camera_loop():
 
     main_window_name = "Pi5 AI Vision"
     main_window_ready = False
-    try:
-        cv2.namedWindow(main_window_name, cv2.WINDOW_NORMAL)
-        _apply_saved_video_window_state(main_window_name, config.FRAME_W, config.FRAME_H)
-        main_window_ready = True
-    except Exception as e:
-        print(f"Preview window disabled: {e}")
-        main_window_ready = False
+    last_preview_ok_t = 0.0
+    last_preview_warn_t = 0.0
+
+    def _open_main_preview_window():
+        try:
+            cv2.namedWindow(main_window_name, cv2.WINDOW_NORMAL)
+            _apply_saved_video_window_state(main_window_name, config.FRAME_W, config.FRAME_H)
+            cv2.waitKey(1)
+            return True
+        except Exception as e:
+            print(f"Preview window disabled: {e}")
+            return False
+
+    main_window_ready = _open_main_preview_window()
 
     global _table_obj_dualcam_disabled_warned
     while not brain.shutdown_event.is_set():
@@ -2836,9 +2843,21 @@ def camera_loop():
                     sample = table_obj_sink.emit("try-pull-sample", int(0.03 * Gst.SECOND))
                     if sample is not None:
                         _maybe_pick_table_object_from_sample(sample, time.time())
+                if preview_sink is not None and not main_window_ready:
+                    now = time.time()
+                    if (now - last_preview_warn_t) > 2.0:
+                        print("Preview window not ready; retrying window create")
+                        last_preview_warn_t = now
+                    main_window_ready = _open_main_preview_window()
+
                 if preview_sink is not None and main_window_ready:
                     sample = preview_sink.emit("try-pull-sample", int(0.03 * Gst.SECOND))
-                    if sample is not None:
+                    if sample is None:
+                        now = time.time()
+                        if (now - last_preview_ok_t) > 2.0 and (now - last_preview_warn_t) > 2.0:
+                            print("Preview warning: no samples from preview sink")
+                            last_preview_warn_t = now
+                    else:
                         try:
                             buf = sample.get_buffer()
                             caps = sample.get_caps()
@@ -2852,13 +2871,19 @@ def camera_loop():
                                     frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
                                     cv2.imshow(main_window_name, frame_bgr)
                                     cv2.waitKey(1)
+                                    last_preview_ok_t = time.time()
                                 finally:
                                     try:
                                         buf.unmap(mapinfo)
                                     except Exception:
                                         pass
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            print(f"Preview render error: {e}")
+                            try:
+                                cv2.destroyWindow(main_window_name)
+                            except Exception:
+                                pass
+                            main_window_ready = False
                 time.sleep(0.1)
 
         except Exception as e:
