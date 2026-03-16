@@ -1568,7 +1568,7 @@ def _table_object_model_callback(_pad, info, _user_data):
 def _person_lost_park_async():
     import servo_arm_integration as servo_integration
     # Move to timeout pose (user can define this pose in rest_positions.py or here)
-    TIMEOUT_POSE = {5: 2230, 4: 2306, 3: 1594, 6: 1500}  # User-specified timeout pose
+    TIMEOUT_POSE = {5: 2230, 4: 2170, 3: 1594, 6: 1500}  # User-specified timeout pose
     try:
         servo_integration.controller.move_servos(TIMEOUT_POSE, time_ms=2000)
     except Exception as e:
