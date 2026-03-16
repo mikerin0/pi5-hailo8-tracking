@@ -166,6 +166,9 @@ _VERSION = "2026.03.01-03"
 _GST_DEBUG_MAX_LINES = 25
 # Timeout (seconds) for gst-inspect-1.0 when collecting runtime diagnostics.
 _GST_INSPECT_TIMEOUT = 20
+VIDEO_WINDOW_DEFAULT_X = 1280  # Upper right
+VIDEO_WINDOW_DEFAULT_Y = 0
+VIDEO_WINDOW_STATE_PATH = os.path.join(os.path.dirname(__file__), "video_window_state.json")
 
 # All remaining imports come after the environment is prepared.
 import time, threading, gi, hailo, numpy as np, cv2, robot_brain as brain

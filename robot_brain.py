@@ -1056,6 +1056,12 @@ def reach_for_coordinate(x, y, z, speed=800):
         if cap > 0 and not _first_move_capped:
             speed = max(speed, cap)
             _first_move_capped = True
+        # Override IK with user-provided upright pose for tracking
+        if getattr(config, "FORCE_UPRIGHT_TRACKING_POSE", False):
+            new_p = {5: 1200, 4: 2306, 3: 1827}
+            for id, pos in new_p.items(): move_servo(id, pos, speed)
+            last_angles = [None]*5
+            return
         angles = _solve_ik_with_safe_guess([x, y, z])
         if not np.all(np.isfinite(angles)):
             print(f"IK rejected (non-finite solution) for target x={x:.3f} y={y:.3f} z={z:.3f}")
