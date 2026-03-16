@@ -15,7 +15,7 @@ import urllib.error
 import robot_brain as brain
 import config
 from lsc6_controller import ALL_SERVO_IDS, LSC6Controller
-from rest_positions import HOME, move_to_home, move_to_position
+from rest_positions import get_home_position, move_to_home, move_to_position
 from servo_thermal_monitor import ServoThermalMonitor
 
 logger = logging.getLogger(__name__)
@@ -419,8 +419,10 @@ def go_home_staged(time_ms=None, steps=None):
         )
         return
 
+    home_pose = get_home_position()
+
     max_delta = 0
-    for sid, target in HOME.items():
+    for sid, target in home_pose.items():
         src = seeded.get(int(sid), None)
         if src is None:
             continue
@@ -437,7 +439,7 @@ def go_home_staged(time_ms=None, steps=None):
     for step_idx in range(1, steps + 1):
         t = step_idx / float(steps)
         pose = {}
-        for sid, target in HOME.items():
+        for sid, target in home_pose.items():
             src = seeded.get(int(sid), None)
             if src is None:
                 continue

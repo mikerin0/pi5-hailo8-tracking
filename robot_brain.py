@@ -873,7 +873,7 @@ def go_home():
         reach_for_coordinate(hx, hy, hz, speed=hs)
     else:
         # Legacy absolute pulse fallback.
-        for id, pos in {6: 1883, 5: 700, 4: 655, 3: 720, 2: 1500, 1: 1500}.items():
+        for id, pos in {6: 1883, 5: 1500, 4: 1200, 3: 1050, 2: 1500, 1: 1500}.items():
             move_servo(id, pos, 2000)
     set_holding_item(False)
 
@@ -1250,6 +1250,9 @@ class RobotTuner:
         self.shared_params = {
             "ry_m":0.42, "rz_m":0.45, "z_off":0.0, "speed":950, "smooth":0.20,
             "top_cam_arch_z": float(getattr(config, "TOP_CAM_ARCH_Z", getattr(config, "ARM_RZ_BASE", 0.18))),
+            "home_pulse_servo3": float(getattr(config, "HOME_PULSE_SERVO3", 1050)),
+            "home_pulse_servo4": float(getattr(config, "HOME_PULSE_SERVO4", 1200)),
+            "home_pulse_servo5": float(getattr(config, "HOME_PULSE_SERVO5", 1500)),
             "busy": 0, "tune_x":0.20, "tune_y":0.0, "tune_z":0.15,
             "nose_x":0.5, "nose_y":0.5,
             "left_hand_x":0.5, "left_hand_y":0.5,
@@ -1285,6 +1288,7 @@ class RobotTuner:
         self._slider_window_state = None
         self._resume_ready = False
         self._load_tuner_params(silent=True)
+        self._apply_home_pose_params_to_config()
         self._load_window_state(silent=True)
 
     def get_params(self): return self.shared_params
@@ -1329,11 +1333,31 @@ class RobotTuner:
             # Transient runtime flags must not persist across restarts.
             self.shared_params["table_follow_color_active"] = 0
             self.shared_params["table_pick_request_active"] = 0
+            self._apply_home_pose_params_to_config()
             if not silent:
                 print(f"Loaded tuner preset: {TUNER_PARAMS_PATH}")
             self._sync_scale_widgets()
         except Exception as e:
             print(f"Failed to load tuner preset: {e}")
+
+    def _apply_home_pose_params_to_config(self):
+        try:
+            s3 = int(round(float(self.shared_params.get("home_pulse_servo3", getattr(config, "HOME_PULSE_SERVO3", 1050)))))
+            s4 = int(round(float(self.shared_params.get("home_pulse_servo4", getattr(config, "HOME_PULSE_SERVO4", 1200)))))
+            s5 = int(round(float(self.shared_params.get("home_pulse_servo5", getattr(config, "HOME_PULSE_SERVO5", 1500)))))
+        except Exception:
+            return
+
+        config.HOME_PULSE_SERVO3 = s3
+        config.HOME_PULSE_SERVO4 = s4
+        config.HOME_PULSE_SERVO5 = s5
+        try:
+            if isinstance(getattr(config, "STARTUP_ABS_SERVO_POSITIONS", None), dict):
+                config.STARTUP_ABS_SERVO_POSITIONS[3] = s3
+                config.STARTUP_ABS_SERVO_POSITIONS[4] = s4
+                config.STARTUP_ABS_SERVO_POSITIONS[5] = s5
+        except Exception:
+            pass
 
     def _load_window_state(self, silent=False):
         if not os.path.isfile(WINDOW_STATE_PATH):
@@ -1835,6 +1859,19 @@ class RobotTuner:
             s.set(self.shared_params[k]); s.pack()
             self.scale_widgets[k] = s
 
+        # --- Home Pulse Pose (sliders window) ---
+        tk.Label(slider_right, text="--- HOME PULSE POSE ---", font=("Arial", 12, "bold")).pack(pady=8)
+        for lbl, k, mn, mx, res in [
+            ("Home Servo 3", "home_pulse_servo3", 700.0, 1700.0, 1.0),
+            ("Home Servo 4", "home_pulse_servo4", 700.0, 1900.0, 1.0),
+            ("Home Servo 5", "home_pulse_servo5", 900.0, 2100.0, 1.0),
+        ]:
+            tk.Label(slider_right, text=lbl).pack()
+            s = tk.Scale(slider_right, from_=mn, to=mx, resolution=res, orient='horizontal',
+                         length=320, command=lambda v, k=k: self.update_tune(k, v))
+            s.set(self.shared_params[k]); s.pack()
+            self.scale_widgets[k] = s
+
         # --- Gesture Debug (sliders window) ---
         tk.Label(slider_right, text="--- GESTURE DEBUG ---", font=("Arial", 12, "bold")).pack(pady=8)
         tk.Label(slider_right, text="Debug Log (0/1)").pack()
@@ -2009,6 +2046,8 @@ class RobotTuner:
         if self._syncing_scales:
             return
         self.shared_params[k] = float(v)
+        if k in ("home_pulse_servo3", "home_pulse_servo4", "home_pulse_servo5"):
+            self._apply_home_pose_params_to_config()
         if k in ("tune_x", "tune_y", "tune_z"):
             self._clamp_manual_target()
             self._sync_scale_widgets()

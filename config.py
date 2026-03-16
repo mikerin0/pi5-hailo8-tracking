@@ -92,6 +92,11 @@ HOME_X = 0.06
 HOME_Y = 0.0
 HOME_Z = 0.40
 HOME_SPEED = 700
+# Home/rest pulse pose (used by staged-home and pulse fallback paths).
+# Keep servo 5 more upright and put more bend into servos 3/4.
+HOME_PULSE_SERVO3 = 1050
+HOME_PULSE_SERVO4 = 1200
+HOME_PULSE_SERVO5 = 1500
 
 # --- Manual slider safety bounds ---
 # Manual mode sends coordinates directly to IK; keep these conservative to
@@ -414,9 +419,9 @@ STARTUP_ABS_SERVO_PRIME_ENABLED = False
 STARTUP_ABS_SERVO_TIME_MS = 8000
 STARTUP_ABS_SERVO_POSITIONS = {
     6: 1883,
-    5: 700,
-    4: 655,
-    3: 720,
+    5: 1500,
+    4: 1200,
+    3: 1050,
     2: 1500,
     1: 1500,
 }
