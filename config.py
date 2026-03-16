@@ -436,7 +436,7 @@ TRACKING_RESUME_WARMUP_SEC = 2.5
 
 # --- Resume motion behavior ---
 # On RESUME, move to a known absolute HOME pose slowly before tracking.
-RESUME_USE_HOME_POSE = True
+RESUME_USE_HOME_POSE = False
 RESUME_HOME_TIME_MS = 3500
 RESUME_SETTLE_SEC = 0.2
 # When enabled, RESUME powers servos but does not command any reposition move.
