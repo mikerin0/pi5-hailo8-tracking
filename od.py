@@ -1569,10 +1569,15 @@ def _person_lost_park_async():
     import servo_arm_integration as servo_integration
     # Move to timeout pose (user can define this pose in rest_positions.py or here)
     TIMEOUT_POSE = {5: 2230, 4: 2170, 3: 1594, 6: 1500}  # User-specified timeout pose
+    # Temporarily disable delta guard for this move
+    import config
+    original_guard = getattr(config, "SERVO_MOVE_DELTA_GUARD_ENABLED", True)
+    config.SERVO_MOVE_DELTA_GUARD_ENABLED = False
     try:
         servo_integration.controller.move_servos(TIMEOUT_POSE, time_ms=2000)
     except Exception as e:
         print(f"Failed to move to timeout pose: {e}")
+    config.SERVO_MOVE_DELTA_GUARD_ENABLED = original_guard
     # Power off Shelly relay
     try:
         servo_integration._shelly_set_output(False)
