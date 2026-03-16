@@ -452,8 +452,8 @@ RESUME_SAFE_STEP_PAUSE_SEC = 1.0
 RESUME_SAFE_SEQUENCE = [
     (1, 1500),  # gripper
     (2, 1500),  # wrist rotation
-    (3, 1497),  # wrist
-    (4, 1782),  # elbow
-    (5, 2078),  # shoulder
+    (3, 1924),  # wrist
+    (4, 2276),  # elbow
+    (5, 1088),  # shoulder
     (6, 1183),  # waist
 ]
