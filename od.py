@@ -1566,8 +1566,19 @@ def _table_object_model_callback(_pad, info, _user_data):
 
 
 def _person_lost_park_async():
-    # Thermal auto-park removed by configuration/request.
-    return
+    import servo_arm_integration as servo_integration
+    # Move to timeout pose (user can define this pose in rest_positions.py or here)
+    TIMEOUT_POSE = {5: 1200, 4: 2306, 3: 1827}  # Example: upright pose
+    try:
+        servo_integration.controller.move_servos(TIMEOUT_POSE, time_ms=2000)
+    except Exception as e:
+        print(f"Failed to move to timeout pose: {e}")
+    # Power off Shelly relay
+    try:
+        servo_integration._shelly_set_output(False)
+        print("Shelly relay powered off for timeout.")
+    except Exception as e:
+        print(f"Failed to power off Shelly relay: {e}")
 
 
 def _point_confidence(point):

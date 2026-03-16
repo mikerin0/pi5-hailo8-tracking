@@ -516,6 +516,12 @@ def park_arm():
 def resume_arm():
     """Resume thermal monitoring after a manual park."""
     power_up_servos()
+        # Power on Shelly relay on resume
+        try:
+            _shelly_set_output(True)
+            logger.info("Shelly relay powered on for resume.")
+        except Exception as e:
+            logger.warning(f"Failed to power on Shelly relay on resume: {e}")
     if bool(getattr(config, "RESUME_HOLD_CURRENT_POSE", True)):
         settle_s = max(0.05, float(getattr(config, "RESUME_SETTLE_SEC", 0.2)))
         if settle_s > 0.0:
