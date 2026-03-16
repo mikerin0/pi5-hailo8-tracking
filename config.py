@@ -56,7 +56,7 @@ ARM_RZ_BASE = 0.18         # arm height at the vertical centre of the frame (met
 # Adjustable base arch height for HIGH_CAM tracking (tunable via GUI slider).
 TOP_CAM_ARCH_Z = ARM_RZ_BASE
 ARM_MIN_Z   = 0.05         # minimum safe arm height (metres)
-ARM_MAX_Z   = 0.50         # maximum arm height (metres)
+ARM_MAX_Z   = 0.75         # maximum arm height (metres)
 
 # --- Face Detection Parameters (OpenCV Haar Cascade) – used in CPU fallback ---
 HAAR_CASCADE_PATH = "/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml"

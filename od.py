@@ -295,10 +295,15 @@ def _apply_saved_video_window_state(window_name, default_w=None, default_h=None)
 
     saved_x = state.get("x") if isinstance(state, dict) else None
     saved_y = state.get("y") if isinstance(state, dict) else None
-    if isinstance(saved_x, int) and isinstance(saved_y, int):
-        # Ignore clearly invalid/off-screen persisted coordinates.
-        if abs(int(saved_x)) > 5000 or abs(int(saved_y)) > 5000:
-            saved_x, saved_y = None, None
+    if not (isinstance(saved_x, int) and isinstance(saved_y, int)):
+        # No saved position, force upper right and save
+        try:
+            cv2.moveWindow(window_name, VIDEO_WINDOW_DEFAULT_X, VIDEO_WINDOW_DEFAULT_Y)
+            _save_video_window_state_values(window_name, VIDEO_WINDOW_DEFAULT_X, VIDEO_WINDOW_DEFAULT_Y, target_w or 640, target_h or 480)
+        except Exception:
+            pass
+    elif abs(int(saved_x)) > 5000 or abs(int(saved_y)) > 5000:
+        saved_x, saved_y = None, None
     if isinstance(saved_x, int) and isinstance(saved_y, int):
         try:
             cv2.moveWindow(window_name, int(saved_x), int(saved_y))
@@ -2101,11 +2106,15 @@ def app_callback(pad, info, user_data):
                         + (cy - _smooth_y) * p.get("rz_m", 0.3)
                         + p.get("z_off", 0.0)
                     )
-                    brain.reach_for_coordinate(
-                        config.ARM_REACH_X, ry,
-                        max(config.ARM_MIN_Z, min(config.ARM_MAX_Z, rz)),
-                        speed=int(p.get("speed", 1200)),
-                    )
+                    if getattr(config, "FORCE_UPRIGHT_TRACKING_POSE", False):
+                        # Force upright pose for each tracking update
+                        brain.reach_for_coordinate(None, None, None, speed=int(p.get("speed", 1200)))
+                    else:
+                        brain.reach_for_coordinate(
+                            config.ARM_REACH_X, ry,
+                            max(config.ARM_MIN_Z, min(config.ARM_MAX_Z, rz)),
+                            speed=int(p.get("speed", 1200)),
+                        )
                     _last_move_time = now
             else:
                 _maybe_send_pose_gesture_events(None, now)
