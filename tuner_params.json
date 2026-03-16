@@ -31,7 +31,7 @@
   "take_x": 0.28,
   "take_y": 0.01,
   "take_z": 0.18,
-  "top_cam_arch_z": 0.275,
+  "top_cam_arch_z": 0.75,
   "tune_x": 0.2,
   "tune_y": -0.003,
   "tune_z": 0.389,
