@@ -1379,6 +1379,84 @@ class RobotTuner:
         self._apply_home_pose_params_to_config()
         self._load_window_state(silent=True)
 
+    def toggle_listening(self):
+        if not self.listening:
+            # Start listening
+            self.listening = True
+            self.listen_button.config(text="Stop Listening", bg="orange")
+            if self.listen_thread is None or not self.listen_thread.is_alive():
+                import threading
+                self._stop_listen_event = threading.Event()
+                def listen_wrapper():
+                    import robot_brain as brain
+                    import time
+                    try:
+                        mic_index = getattr(config, "USB_MIC_DEVICE_INDEX", None)
+                        import speech_recognition as sr
+                        recognizer = sr.Recognizer()
+                        recognizer.dynamic_energy_threshold = True
+                        recognizer.pause_threshold = float(getattr(config, "USB_MIC_PAUSE_THRESHOLD_S", 0.6))
+                        with sr.Microphone(device_index=mic_index) as source:
+                            calibrate_sec = max(0.0, float(getattr(config, "USB_MIC_CALIBRATE_SEC", 0.8)))
+                            if calibrate_sec > 0.0:
+                                recognizer.adjust_for_ambient_noise(source, duration=calibrate_sec)
+                            while not self._stop_listen_event.is_set():
+                                try:
+                                    audio = recognizer.listen(
+                                        source,
+                                        timeout=max(0.2, float(getattr(config, "USB_MIC_LISTEN_TIMEOUT_S", 1.0))),
+                                        phrase_time_limit=max(1.0, float(getattr(config, "USB_MIC_PHRASE_TIME_LIMIT_S", 3.0))),
+                                    )
+                                except sr.WaitTimeoutError:
+                                    continue
+                                except Exception as e:
+                                    print(f"USB mic listen error: {e}")
+                                    time.sleep(0.4)
+                                    continue
+                                text = ""
+                                try:
+                                    gain = float(self.shared_params.get(
+                                        "usb_mic_gain",
+                                        float(getattr(config, "USB_MIC_GAIN", 1.0)),
+                                    ))
+                                    gain = max(0.2, min(5.0, gain))
+                                    if abs(gain - 1.0) > 1e-6:
+                                        try:
+                                            raw = audio.get_raw_data()
+                                            import audioop
+                                            boosted = audioop.mul(raw, int(audio.sample_width), gain)
+                                            audio = sr.AudioData(boosted, int(audio.sample_rate), int(audio.sample_width))
+                                        except Exception as e:
+                                            print(f"USB mic gain processing failed: {e}")
+                                    text = recognizer.recognize_google(audio)
+                                except sr.UnknownValueError:
+                                    continue
+                                except sr.RequestError as e:
+                                    print(f"USB mic recognition unavailable: {e}")
+                                    time.sleep(1.0)
+                                    continue
+                                except Exception as e:
+                                    print(f"USB mic recognition error: {e}")
+                                    continue
+                                spoken = str(text).strip()
+                                if not spoken:
+                                    continue
+                                print(f"USB mic heard: {spoken}")
+                                cmd = brain._voice_text_to_command(spoken)
+                                if cmd is not None:
+                                    brain._voice_cmd_queue.put(cmd)
+                    except Exception as e:
+                        print(f"USB mic voice listener stopped: {e}")
+                self.listen_thread = threading.Thread(target=listen_wrapper, daemon=True)
+                self.listen_thread.start()
+        else:
+            # Stop listening
+            self.listening = False
+            self.listen_button.config(text="Start Listening", bg="deepskyblue")
+            if hasattr(self, '_stop_listen_event'):
+                self._stop_listen_event.set()
+            # Thread will exit on next loop
+
     def get_params(self): return self.shared_params
 
     def _clamp_manual_target(self):
