@@ -1962,8 +1962,15 @@ class RobotTuner:
         # --- Start/Stop Listening Button ---
         self.listening = False
         self.listen_thread = None
-        self.listen_button = tk.Button(action_col, text="Start Listening", command=self.toggle_listening, bg="deepskyblue", fg="black")
+        self.listen_button = tk.Button(
+            action_col,
+            text="Start Listening",
+            command=self.toggle_listening,
+            bg="deepskyblue",
+            fg="black"
+        )
         self.listen_button.pack(pady=6)
+        self.listen_button.config(state="normal")
         tk.Button(action_col, text='FOLLOW "SELECTED COLOR" OBJECT', command=start_follow_selected_color_sequence, bg="gold", fg="black").pack(pady=6)
         tk.Button(action_col, text="GRAB TRACKED OBJECT", command=start_grab_tracked_object_sequence, bg="khaki", fg="black").pack(pady=6)
         tk.Button(action_col, text="RELEASE ITEM", command=release_item_manual, bg="orange", fg="black").pack(pady=6)
