@@ -1,5 +1,5 @@
 {
-  "busy": 0,
+  "busy": 1,
   "camera_mode": "HIGH_CAM",
   "home_pulse_servo3": 1190.0,
   "home_pulse_servo4": 1283.0,
