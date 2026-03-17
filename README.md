@@ -37,13 +37,18 @@ Open a terminal on your Raspberry Pi (or SSH into it) and run:
 ```bash
 git clone https://github.com/mikerin0/pi5-hailo8-tracking.git
 cd pi5-hailo8-tracking
-git checkout copilot/add-face-tracking-module
+git checkout copilot/create-python-library-lsc-6
 ```
 
+> **Important: use the full `https://github.com/…` URL.**  
+> Running `git clone mikerin0/pi5-hailo8-tracking` (without the full URL) will fail
+> with `fatal: repository 'mikerin0/pi5-hailo8-tracking' does not exist`.  
+> Always include `https://github.com/` at the start.
+
 > **Why `git checkout`?**  
-> The full codebase (`config.py`, `face_tracking.py`, and the updated scripts) lives on
-> the `copilot/add-face-tracking-module` branch while the PR is open.  
-> The `git checkout` line switches you to that branch so you have all five files.
+> The latest codebase (servo thermal management, fixed `robot_brain.py`, and all
+> supporting modules) lives on the `copilot/create-python-library-lsc-6` branch
+> while the PR is open.  The `git checkout` line switches you to that branch.
 
 > **Already cloned before?**  
 > If you see `fatal: destination path 'pi5-hailo8-tracking' already exists`, the
@@ -51,7 +56,7 @@ git checkout copilot/add-face-tracking-module
 > ```bash
 > cd pi5-hailo8-tracking
 > git fetch
-> git checkout copilot/add-face-tracking-module
+> git checkout copilot/create-python-library-lsc-6
 > git pull
 > ```
 
@@ -59,9 +64,9 @@ git checkout copilot/add-face-tracking-module
 > `sudo apt install -y git` then repeat the commands above.
 >
 > **Prefer a zip download?**  
-> On the GitHub page use the **branch dropdown** (top-left of the file list, currently showing `main`) to select **`copilot/add-face-tracking-module`**, then click
+> On the GitHub page use the **branch dropdown** (top-left of the file list, currently showing `main`) to select **`copilot/create-python-library-lsc-6`**, then click
 > **Code → Download ZIP**, copy the zip to the Pi (e.g. with `scp`), and
-> `unzip pi5-hailo8-tracking-copilot-add-face-tracking-module.zip`.
+> `unzip pi5-hailo8-tracking-copilot-create-python-library-lsc-6.zip`.
 
 #### ✅ Verify the files are there
 
@@ -71,7 +76,7 @@ After cloning and checking out the branch, run:
 ls
 ```
 
-You should see exactly these five files:
+You should see these files (among others):
 
 ```
 README.md
@@ -79,17 +84,21 @@ config.py
 face_tracking.py
 od.py
 robot_brain.py
+lsc6_controller.py
+rest_positions.py
+servo_arm_integration.py
+servo_thermal_monitor.py
 ```
 
-If `config.py` or `face_tracking.py` are missing, you might still be on the `main` branch (or the clone may have been incomplete).  
+If the servo/thermal files are missing, you might still be on the `main` branch.  
 Fix it with:
 
 ```bash
 git fetch
-git checkout copilot/add-face-tracking-module
+git checkout copilot/create-python-library-lsc-6
 ```
 
-Then run `ls` again — all five files should be there.
+Then run `ls` again — all files should be there.
 
 ### Step 1 – Install system packages
 
@@ -485,3 +494,57 @@ The current mode is shown beneath the buttons.
 | `LIGHT_ON` | Index finger pointing up |
 | `HAND_OPEN` | All five fingers extended |
 | `HAND_CLOSED` | All five fingers folded |
+
+---
+
+## Troubleshooting
+
+### `fatal: repository 'mikerin0/pi5-hailo8-tracking' does not exist`
+
+You are missing the full GitHub URL prefix.  The correct command is:
+
+```bash
+git clone https://github.com/mikerin0/pi5-hailo8-tracking.git
+```
+
+`git clone mikerin0/pi5-hailo8-tracking` (without `https://github.com/`) is **not**
+a valid URL and always fails with that error.
+
+---
+
+### `Traceback … File "od.py", line 174, in <module>` / `ModuleNotFoundError: No module named 'audioop'`
+
+This crash means you are running **old code from the `main` branch** with Python 3.13.
+The `audioop` standard-library module was removed in Python 3.13; the main branch
+`robot_brain.py` imported it unconditionally, causing `import robot_brain` (od.py
+line 174) to fail.
+
+**Fix**: pull the latest code from this branch, which no longer imports `audioop`:
+
+```bash
+cd pi5-hailo8-tracking
+git fetch
+git checkout copilot/create-python-library-lsc-6
+git pull
+```
+
+Then restart:
+
+```bash
+source ~/hailo-venv/bin/activate
+python od.py
+```
+
+---
+
+### `Failed to load tuner preset: could not convert string to float: 'HIGH_CAM'`
+
+An older version of the code saved the `camera_mode` key (a string) into the tuner
+preset file.  The current code auto-deletes the stale file at startup.
+
+If you still see the error, delete the file manually and restart:
+
+```bash
+rm -f ~/.robot_tuner_preset.json
+python od.py
+```
