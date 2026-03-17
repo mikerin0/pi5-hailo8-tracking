@@ -154,12 +154,27 @@ except (FileNotFoundError, subprocess.TimeoutExpired):
 
 # Increment this whenever a new version is pushed so users can confirm they
 # are running the latest code after a git pull.
-_VERSION = "2026.03.01-03"
+_VERSION = "2026.03.04-01"
 
 # Maximum number of GST_DEBUG log lines to embed in the runtime-failure error.
 _GST_DEBUG_MAX_LINES = 25
 # Timeout (seconds) for gst-inspect-1.0 when collecting runtime diagnostics.
 _GST_INSPECT_TIMEOUT = 20
+
+# One-time cleanup: delete stale tuner preset if it contains non-numeric
+# values (e.g. old code saved camera_mode="HIGH_CAM" into the preset file,
+# which causes a float-conversion error on load).  Must run before robot_brain
+# is imported so the clean file is what _load_preset sees.
+import json as _json
+_preset_path = os.path.expanduser("~/.robot_tuner_preset.json")
+try:
+    with open(_preset_path) as _pf:
+        _preset_data = _json.load(_pf)
+    if any(not isinstance(v, (int, float)) for v in _preset_data.values()):
+        os.remove(_preset_path)
+except Exception:
+    pass
+del _json, _preset_path  # keep namespace clean
 
 # All remaining imports come after the environment is prepared.
 import time, threading, gi, hailo, numpy as np, cv2, robot_brain as brain
