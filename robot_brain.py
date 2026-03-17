@@ -86,6 +86,17 @@ import numpy as np
 import ikpy.chain
 import ikpy.link
 import config
+def move_to_exit_pose():
+    """Move the arm to the exit pose using config.py values."""
+    exit_pose = {
+        6: int(getattr(config, "EXIT_PULSE_SERVO6", 1189)),
+        5: int(getattr(config, "EXIT_PULSE_SERVO5", 2078)),
+        4: int(getattr(config, "EXIT_PULSE_SERVO4", 2132)),
+        3: int(getattr(config, "EXIT_PULSE_SERVO3", 1769)),
+    }
+    for servo_id, pos in exit_pose.items():
+        move_servo(servo_id, pos, 2000)
+    set_holding_item(False)
 try:
     import speech_recognition as sr
 except Exception:
