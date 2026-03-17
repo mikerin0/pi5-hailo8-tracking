@@ -1,3 +1,8 @@
+## Robot brain main module
+
+class RobotTuner:
+    # ...existing code...
+
     def toggle_listening(self):
         if not self.listening:
             # Start listening
