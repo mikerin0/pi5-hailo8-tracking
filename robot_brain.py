@@ -484,6 +484,7 @@ def _run_external_command(cmd, source="external"):
         start_take_item_sequence()
     elif cmd in ("EXIT", "SHUTDOWN", "STOP"):
         print("Shutdown requested")
+        move_to_exit_pose()
         shutdown_program()
     elif cmd in ("HIGH_CAM", "TABLE_CAM", "DUAL_CAM"):
         switch_camera(cmd)
@@ -492,6 +493,7 @@ def _run_external_command(cmd, source="external"):
         reach_for_coordinate(0.05, 0.0, 0.46, speed=500)
         say("Flagpole Mode. Manual lock engaged.")
     elif cmd in ("PAUSE", "PAUSE_TRACKING"):
+        move_to_exit_pose()
         tuner.pause_tracking()
         say("Tracking paused")
     elif cmd == "RESUME":
@@ -749,6 +751,7 @@ def tcp_listener():
 def request_shutdown():
     if shutdown_event.is_set():
         return
+    move_to_exit_pose()
     shutdown_event.set()
     try:
         if _gpio_mod and getattr(config, "GRIPPER_SWITCH_PIN_BCM", None) is not None:

@@ -92,11 +92,15 @@ HOME_X = 0.06
 HOME_Y = 0.0
 HOME_Z = 0.40
 HOME_SPEED = 700
-# Home/rest pulse pose (used by staged-home and pulse fallback paths).
-# Keep servo 5 more upright and put more bend into servos 3/4.
 HOME_PULSE_SERVO3 = 1050
 HOME_PULSE_SERVO4 = 1200
 HOME_PULSE_SERVO5 = 1500
+
+# --- Exit pose pulse values ---
+EXIT_PULSE_SERVO6 = 1189
+EXIT_PULSE_SERVO5 = 2078
+EXIT_PULSE_SERVO4 = 2132
+EXIT_PULSE_SERVO3 = 1769
 
 # --- Manual slider safety bounds ---
 # Manual mode sends coordinates directly to IK; keep these conservative to
