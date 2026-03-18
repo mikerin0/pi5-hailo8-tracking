@@ -26,17 +26,20 @@ class RobotTuner:
                                 recognizer.adjust_for_ambient_noise(source, duration=calibrate_sec)
                             while not self._stop_listen_event.is_set():
                                 try:
+                                    # Reduce timeout for faster stop
                                     audio = recognizer.listen(
                                         source,
-                                        timeout=max(0.2, float(getattr(config, "USB_MIC_LISTEN_TIMEOUT_S", 1.0))),
-                                        phrase_time_limit=max(1.0, float(getattr(config, "USB_MIC_PHRASE_TIME_LIMIT_S", 3.0))),
+                                        timeout=0.2,
+                                        phrase_time_limit=1.0,
                                     )
                                 except sr.WaitTimeoutError:
                                     continue
                                 except Exception as e:
                                     print(f"USB mic listen error: {e}")
-                                    time.sleep(0.4)
+                                    time.sleep(0.1)
                                     continue
+                                if self._stop_listen_event.is_set():
+                                    break
                                 text = ""
                                 try:
                                     gain = float(self.shared_params.get(
@@ -57,11 +60,13 @@ class RobotTuner:
                                     continue
                                 except sr.RequestError as e:
                                     print(f"USB mic recognition unavailable: {e}")
-                                    time.sleep(1.0)
+                                    time.sleep(0.2)
                                     continue
                                 except Exception as e:
                                     print(f"USB mic recognition error: {e}")
                                     continue
+                                if self._stop_listen_event.is_set():
+                                    break
                                 spoken = str(text).strip()
                                 if not spoken:
                                     continue
