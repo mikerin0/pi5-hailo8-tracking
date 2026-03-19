@@ -131,7 +131,7 @@ GST_SYNC = "false"         # appsink / ximagesink sync flag
 # Set GRIPPER_SWITCH_PIN_BCM to your Raspberry Pi BCM GPIO number (e.g. 17),
 # then set the electrical polarity fields to match your wiring.
 # Physical header wiring: pin 13 (GPIO27) signal, pin 14 (GND) return.
-GRIPPER_SWITCH_PIN_BCM = 27
+GRIPPER_SWITCH_PIN_BCM = 17
 GRIPPER_SWITCH_PULL_UP = True
 GRIPPER_SWITCH_PRESSED_STATE = 0
 # Close motion runs in short increments so the switch can stop the gripper early.
