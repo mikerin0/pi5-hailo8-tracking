@@ -1,7 +1,8 @@
 # These imports must come first so that libgomp and GST_PLUGIN_PATH are
 # configured BEFORE any other package (hailo, robot_brain, gi) can trigger a
 # GStreamer initialisation internally.
-import os, sys, platform, glob as _glob, subprocess, json, shutil
+
+import time
 
 # libgsthailotools.so depends on libgomp.so.1 (OpenMP), which has a static TLS
 # block that must be mapped before the dynamic linker exhausts glibc's fixed
