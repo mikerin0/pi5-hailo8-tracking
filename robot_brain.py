@@ -1984,6 +1984,24 @@ class RobotTuner:
         tk.Button(action_col, text="TAKE ITEM", command=start_take_item_sequence, bg="purple", fg="white").pack(pady=6)
         tk.Button(action_col, text="TABLE PICK", command=start_table_pick_sequence, bg="darkgreen", fg="white").pack(pady=6)
 
+        # --- LCD Face Buttons ---
+        try:
+            import lcd_faces
+            face_frame = tk.Frame(action_col)
+            face_frame.pack(pady=(12, 6))
+            tk.Label(face_frame, text="--- LCD FACE ---", font=("Arial", 12, "bold")).pack()
+            btns = [
+                ("Happy", lcd_faces.draw_happy_face),
+                ("Sad", lcd_faces.draw_sad_face),
+                ("Thinking", lcd_faces.draw_thinking_face),
+                ("Sleeping", lcd_faces.draw_sleeping_face),
+                ("Mad", lcd_faces.draw_mad_face),
+            ]
+            for label, func in btns:
+                tk.Button(face_frame, text=label + " Face", width=12, command=func).pack(pady=2)
+        except Exception as e:
+            tk.Label(action_col, text=f"LCD face buttons unavailable: {e}", fg="red").pack()
+
         # --- Start/Stop Listening Button ---
         self.listening = False
         self.listen_thread = None
