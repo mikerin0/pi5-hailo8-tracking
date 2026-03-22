@@ -1,3 +1,4 @@
+import threading
 
 # These imports must come first so that libgomp and GST_PLUGIN_PATH are
 # configured BEFORE any other package (hailo, robot_brain, gi) can trigger a
