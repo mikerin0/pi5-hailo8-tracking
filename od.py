@@ -1,3 +1,5 @@
+import hailo
+import cv2
 import robot_brain as brain
 import servo_arm_integration as servo_integration
 import config
