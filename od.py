@@ -179,6 +179,8 @@ try:
     import mediapipe as mp
 except Exception:
     mp = None
+
+import gi
 gi.require_version('Gst', '1.0')
 from gi.repository import Gst
 Gst.init(None)
