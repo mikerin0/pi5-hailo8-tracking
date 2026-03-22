@@ -1,3 +1,4 @@
+import config
 import threading
 
 # These imports must come first so that libgomp and GST_PLUGIN_PATH are
