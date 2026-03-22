@@ -172,7 +172,18 @@ VIDEO_WINDOW_STATE_PATH = os.path.join(os.path.dirname(__file__), "video_window_
 
 # All remaining imports come after the environment is prepared.
 
-# --- LCD Happy Face Test ---
+
+try:
+    # Suppress the benign MediaPipe "NORM_RECT without IMAGE_DIMENSIONS" glog warning.
+    os.environ.setdefault("GLOG_minloglevel", "2")
+    import mediapipe as mp
+except Exception:
+    mp = None
+gi.require_version('Gst', '1.0')
+from gi.repository import Gst
+Gst.init(None)
+
+# --- LCD Happy Face Test (after all imports) ---
 try:
     from luma.core.interface.serial import spi
     from luma.lcd.device import st7789
