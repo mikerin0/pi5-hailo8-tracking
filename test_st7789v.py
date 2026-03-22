@@ -4,7 +4,7 @@ from PIL import Image, ImageDraw
 import time
 
 serial = spi(port=0, device=0, gpio_DC=25, gpio_RST=27, gpio_LIGHT=18)
-device = st7789(serial, width=240, height=320, rotate=0)
+device = st7789(serial, width=320, height=240, rotate=0)
 
 bar_width = 20
 for x in range(0, device.width, 2):
