@@ -16,32 +16,14 @@ def get_lcd_device():
 
 def draw_happy_face():
     lcd = get_lcd_device()
-    image = Image.new("RGB", (lcd.width, lcd.height), (0, 0, 0))
-    draw = ImageDraw.Draw(image)
-    cx, cy = lcd.width // 2, lcd.height // 2
-    face_radius = 80
-    eye_radius = 10
-    eye_offset_x = 30
-    eye_offset_y = 25
-    smile_radius = 40
-    draw.ellipse([
-        (cx - face_radius, cy - face_radius),
-        (cx + face_radius, cy + face_radius)
-    ], fill="yellow", outline="orange", width=4)
-    draw.ellipse([
-        (cx - eye_offset_x - eye_radius, cy - eye_offset_y - eye_radius),
-        (cx - eye_offset_x + eye_radius, cy - eye_offset_y + eye_radius)
-    ], fill="black")
-    draw.ellipse([
-        (cx + eye_offset_x - eye_radius, cy - eye_offset_y - eye_radius),
-        (cx + eye_offset_x + eye_radius, cy - eye_offset_y + eye_radius)
-    ], fill="black")
-    smile_box = [
-        (cx - smile_radius, cy - 10),
-        (cx + smile_radius, cy + 50)
-    ]
-    draw.arc(smile_box, start=20, end=160, fill="black", width=5)
-    lcd.display(image)
+    from PIL import Image
+    try:
+        image = Image.open("/home/arm/faces/happy-face.png").convert("RGB")
+        # Resize and center if needed
+        image = image.resize((lcd.width, lcd.height), Image.LANCZOS)
+        lcd.display(image)
+    except Exception as e:
+        print(f"[LCD] Could not display happy-face.png: {e}")
 
 def draw_sad_face():
     lcd = get_lcd_device()
