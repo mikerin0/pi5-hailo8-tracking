@@ -1,3 +1,12 @@
+# Resume-safe sequence for gentle wake-up (moved from config.py)
+RESUME_SAFE_SEQUENCE = [
+    (1, 1500),  # gripper
+    (2, 1500),  # wrist rotation
+    (3, 1924),  # wrist
+    (4, 2276),  # elbow
+    (5, 1088),  # shoulder
+    (6, 1183),  # waist
+]
 # rest_positions.py
 """Pre-defined low-strain rest positions for the Hiwonder LeArm 6DOF arm.
 

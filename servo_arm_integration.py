@@ -15,7 +15,7 @@ import urllib.error
 import robot_brain as brain
 import config
 from lsc6_controller import ALL_SERVO_IDS, LSC6Controller
-from rest_positions import get_home_position, move_to_home, move_to_position
+from rest_positions import get_home_position, move_to_home, move_to_position, RESUME_SAFE_SEQUENCE
 from servo_thermal_monitor import ServoThermalMonitor
 
 logger = logging.getLogger(__name__)
@@ -515,6 +515,7 @@ def park_arm():
 
 def resume_arm():
     """Resume thermal monitoring after a manual park."""
+
     power_up_servos()
     # Power on Shelly relay on resume
     try:
@@ -522,6 +523,37 @@ def resume_arm():
         logger.info("Shelly relay powered on for resume.")
     except Exception as e:
         logger.warning(f"Failed to power on Shelly relay on resume: {e}")
+
+    # --- NEW: Seed controller with current physical positions before any resume motion ---
+    try:
+        current_positions = {
+            int(sid): controller.read_position(int(sid), fast=True)
+            for sid in ALL_SERVO_IDS
+        }
+        logger.info(f"Resume: read current positions {current_positions}")
+    except Exception:
+        current_positions = {}
+        logger.info("Resume: read current positions failed")
+    seeded = {
+        int(sid): int(pos)
+        for sid, pos in (current_positions or {}).items()
+        if pos is not None
+    }
+    if seeded:
+        try:
+            seed_time_ms = max(800, int(getattr(config, "STARTUP_SEED_TIME_MS", 1200)))
+            logger.info(f"Resume: seeding commanded pose {seeded} time_ms={seed_time_ms}")
+            controller.move_servos(seeded, time_ms=seed_time_ms)
+            for sid, pos in seeded.items():
+                try:
+                    controller.note_commanded_position(int(sid), int(pos))
+                except Exception:
+                    pass
+            time.sleep(0.08)
+        except Exception:
+            logger.info("Resume: seeding commanded pose failed")
+            pass
+
     if bool(getattr(config, "RESUME_HOLD_CURRENT_POSE", True)):
         settle_s = max(0.05, float(getattr(config, "RESUME_SETTLE_SEC", 0.2)))
         if settle_s > 0.0:
@@ -532,10 +564,7 @@ def resume_arm():
     if bool(getattr(config, "RESUME_SAFE_SEQUENCE_ENABLED", True)):
         step_time_ms = max(200, int(getattr(config, "RESUME_SAFE_STEP_TIME_MS", 500)))
         step_pause_s = max(0.0, float(getattr(config, "RESUME_SAFE_STEP_PAUSE_SEC", 1.0)))
-        sequence = getattr(config, "RESUME_SAFE_SEQUENCE", None)
-        if not isinstance(sequence, (list, tuple)) or not sequence:
-            sequence = [(1, 1500), (2, 1500), (3, 1497), (4, 1782), (5, 2078), (6, 1183)]
-
+        sequence = RESUME_SAFE_SEQUENCE
         for item in sequence:
             try:
                 sid, pos = int(item[0]), int(item[1])

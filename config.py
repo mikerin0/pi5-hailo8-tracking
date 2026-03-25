@@ -453,11 +453,3 @@ RESUME_AUTO_ENABLE_TRACKING = True
 RESUME_SAFE_SEQUENCE_ENABLED = True
 RESUME_SAFE_STEP_TIME_MS = 500
 RESUME_SAFE_STEP_PAUSE_SEC = 1.0
-RESUME_SAFE_SEQUENCE = [
-    (1, 1500),  # gripper
-    (2, 1500),  # wrist rotation
-    (3, 1924),  # wrist
-    (4, 2276),  # elbow
-    (5, 1088),  # shoulder
-    (6, 1183),  # waist
-]
