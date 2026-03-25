@@ -1,0 +1,14 @@
+# Python package requirements for pi5-hailo8-tracking
+#
+# Install inside the hailo-venv virtual environment (see README Step 2):
+#   pip install -r requirements.txt
+#
+# numpy must stay below 2.0: the Hailo SDK (hailort Python bindings) and ikpy
+# are compiled against the NumPy 1.x C ABI.  NumPy 2.x changed that ABI, so
+# importing hailo or ikpy with NumPy>=2 raises an immediate crash:
+#   "A module that was compiled using NumPy 1.x cannot be run in NumPy 2.x"
+numpy<2
+ikpy
+pyserial
+mediapipe
+SpeechRecognition
