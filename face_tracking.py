@@ -29,7 +29,8 @@ def _map_face_to_arm(cx, cy, frame_w, frame_h):
     x = config.ARM_X_CENTER + config.ARM_X_RANGE * (0.5 - nx)
     # Lateral swing: left half of frame → positive Y, right → negative Y
     y = config.ARM_Y_RANGE * (0.5 - ny)
-    z = config.ARM_Z_DEFAULT
+    # Map vertical face position to Z height (top of frame = max Z, bottom = min Z)
+    z = config.ARM_MIN_Z + (1.0 - ny) * (config.ARM_MAX_Z - config.ARM_MIN_Z)
     return float(x), float(y), float(z)
 
 
