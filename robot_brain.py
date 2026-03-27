@@ -2031,15 +2031,26 @@ class RobotTuner:
         tk.Button(preset_frame, text="LOAD TUNE", width=12, command=lambda: self._load_tuner_params(silent=False)).pack(side="left", padx=5)
         tk.Button(preset_frame, text="SAVE TUNE", width=12, command=self._save_tuner_params).pack(side="left", padx=5)
 
-        for lbl, k, mn, mx, res in [
+          # Horizontal sliders for X and Y
+          for lbl, k, mn, mx, res in [
               ("Reach X", "tune_x", float(getattr(config, "MANUAL_X_MIN", 0.14)), float(getattr(config, "MANUAL_X_MAX", 0.30)), 0.001),
               ("Swing Y", "tune_y", float(getattr(config, "MANUAL_Y_MIN", -0.12)), float(getattr(config, "MANUAL_Y_MAX", 0.12)), 0.001),
-              ("Height Z", "tune_z", float(getattr(config, "MANUAL_Z_MIN", 0.12)), float(getattr(config, "MANUAL_Z_MAX", 0.40)), 0.001),
-        ]:
+          ]:
             tk.Label(slider_left, text=lbl).pack()
             s = tk.Scale(slider_left, from_=mn, to=mx, resolution=res, orient='horizontal', length=320, command=lambda v, k=k: self.update_tune(k, v))
             s.set(self.shared_params[k]); s.pack()
             self.scale_widgets[k] = s
+
+          # Vertical slider for Z
+          z_lbl = "Height Z"
+          z_k = "tune_z"
+          z_mn = float(getattr(config, "MANUAL_Z_MIN", 0.12))
+          z_mx = float(getattr(config, "MANUAL_Z_MAX", 0.40))
+          z_res = 0.001
+          tk.Label(slider_left, text=z_lbl).pack()
+          z_slider = tk.Scale(slider_left, from_=z_mx, to=z_mn, resolution=z_res, orient='vertical', length=220, command=lambda v, k=z_k: self.update_tune(k, v))
+          z_slider.set(self.shared_params[z_k]); z_slider.pack()
+          self.scale_widgets[z_k] = z_slider
 
         # --- Handoff Tune Frame (sliders window) ---
         tk.Label(slider_left, text="--- TAKE ITEM TUNE ---", font=("Arial", 12, "bold")).pack(pady=8)
