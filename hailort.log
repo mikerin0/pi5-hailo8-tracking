@@ -1895,3 +1895,297 @@
 [2026-03-25 11:38:18.693] [388945] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element PushQEl7AsyncHwEl has 0 frames in his Queue on destruction
 [2026-03-25 11:38:18.694] [388945] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element PushQEl1AsyncHwEl has 0 frames in his Queue on destruction
 [2026-03-25 11:38:18.694] [388945] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element PushQEl5AsyncHwEl has 0 frames in his Queue on destruction
+[2026-03-25 15:15:51.978] [8945] [HailoRT] [info] [vdevice.cpp:523] [create] Creating vdevice with params: device_count: 1, scheduling_algorithm: ROUND_ROBIN, multi_process_service: false
+[2026-03-25 15:15:51.990] [8945] [HailoRT] [info] [device.cpp:49] [Device] OS Version: Linux 6.12.75+rpt-rpi-2712 #1 SMP PREEMPT Debian 1:6.12.75-1+rpt1~bookworm (2026-03-11) aarch64
+[2026-03-25 15:15:51.992] [8945] [HailoRT] [info] [control.cpp:108] [control__parse_identify_results] firmware_version is: 4.20.0
+[2026-03-25 15:15:51.992] [8945] [HailoRT] [info] [vdevice.cpp:651] [create] VDevice Infos: 0001:01:00.0
+[2026-03-25 15:15:52.021] [8945] [HailoRT] [info] [hef.cpp:1929] [get_network_group_and_network_name] No name was given. Addressing all networks of default network_group: yolov8m_pose
+[2026-03-25 15:15:52.021] [8945] [HailoRT] [info] [hef.cpp:1929] [get_network_group_and_network_name] No name was given. Addressing all networks of default network_group: yolov8m_pose
+[2026-03-25 15:15:52.085] [8945] [HailoRT] [info] [internal_buffer_manager.cpp:204] [print_execution_results] Planned internal buffer memory: CMA memory 0, user memory 2997248. memory to edge layer usage factor is 1
+[2026-03-25 15:15:52.085] [8945] [HailoRT] [info] [internal_buffer_manager.cpp:212] [print_execution_results] Default Internal buffer planner executed successfully
+[2026-03-25 15:15:52.146] [8945] [HailoRT] [info] [device_internal.cpp:57] [configure] Configuring HEF took 76.972385 milliseconds
+[2026-03-25 15:15:52.146] [8945] [HailoRT] [info] [vdevice.cpp:749] [configure] Configuring HEF on VDevice took 77.832221 milliseconds
+[2026-03-25 15:15:52.146] [8945] [HailoRT] [info] [infer_model.cpp:436] [configure] Configuring network group 'yolov8m_pose' with params: batch size: 0, power mode: PERFORMANCE, latency: NONE
+[2026-03-25 15:15:52.146] [8945] [HailoRT] [info] [multi_io_elements.cpp:756] [create] Created (AsyncHwEl)
+[2026-03-25 15:15:52.146] [8945] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (EntryPushQEl0yolov8m_pose/input_layer1 | timeout: 10s)
+[2026-03-25 15:15:52.146] [8945] [HailoRT] [info] [filter_elements.cpp:101] [create] Created (PreInferEl3yolov8m_pose/input_layer1 | Reorder - src_order: RGB4, src_shape: (640, 640, 3), dst_order: NHWC, dst_shape: (640, 640, 3))
+[2026-03-25 15:15:52.146] [8945] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (PushQEl3yolov8m_pose/input_layer1 | timeout: 10s)
+[2026-03-25 15:15:52.146] [8945] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl6AsyncHwEl)
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (PushQEl7AsyncHwEl | timeout: 10s)
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [filter_elements.cpp:375] [create] Created (PostInferEl7AsyncHwEl | Reorder - src_order: FCR, src_shape: (40, 40, 56), dst_order: FCR, dst_shape: (40, 40, 51))
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl0PostInferEl7AsyncHwEl)
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl0AsyncHwEl)
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (PushQEl1AsyncHwEl | timeout: 10s)
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [filter_elements.cpp:375] [create] Created (PostInferEl1AsyncHwEl | Reorder - src_order: FCR, src_shape: (20, 20, 56), dst_order: FCR, dst_shape: (20, 20, 51))
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl0PostInferEl1AsyncHwEl)
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl2AsyncHwEl)
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl3AsyncHwEl)
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl8AsyncHwEl)
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl4AsyncHwEl)
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (PushQEl5AsyncHwEl | timeout: 10s)
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [filter_elements.cpp:375] [create] Created (PostInferEl5AsyncHwEl | Reorder - src_order: FCR, src_shape: (80, 80, 56), dst_order: FCR, dst_shape: (80, 80, 51))
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl0PostInferEl5AsyncHwEl)
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] EntryPushQEl0yolov8m_pose/input_layer1 | inputs: user | outputs: PreInferEl3yolov8m_pose/input_layer1(running in thread_id: 8972)
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PreInferEl3yolov8m_pose/input_layer1 | inputs: EntryPushQEl0yolov8m_pose/input_layer1[0] | outputs: PushQEl3yolov8m_pose/input_layer1
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PushQEl3yolov8m_pose/input_layer1 | inputs: PreInferEl3yolov8m_pose/input_layer1[0] | outputs: AsyncHwEl(running in thread_id: 8973)
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] AsyncHwEl | inputs: PushQEl3yolov8m_pose/input_layer1[0] | outputs: LastAsyncEl0AsyncHwEl PushQEl1AsyncHwEl LastAsyncEl2AsyncHwEl LastAsyncEl3AsyncHwEl LastAsyncEl4AsyncHwEl PushQEl5AsyncHwEl LastAsyncEl6AsyncHwEl PushQEl7AsyncHwEl LastAsyncEl8AsyncHwEl
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl0AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PushQEl1AsyncHwEl | inputs: AsyncHwEl[0] | outputs: PostInferEl1AsyncHwEl(running in thread_id: 8975)
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PostInferEl1AsyncHwEl | inputs: PushQEl1AsyncHwEl[0] | outputs: LastAsyncEl0PostInferEl1AsyncHwEl
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl0PostInferEl1AsyncHwEl | inputs: PostInferEl1AsyncHwEl[0] | outputs: user
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl2AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl3AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl4AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PushQEl5AsyncHwEl | inputs: AsyncHwEl[0] | outputs: PostInferEl5AsyncHwEl(running in thread_id: 8976)
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PostInferEl5AsyncHwEl | inputs: PushQEl5AsyncHwEl[0] | outputs: LastAsyncEl0PostInferEl5AsyncHwEl
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl0PostInferEl5AsyncHwEl | inputs: PostInferEl5AsyncHwEl[0] | outputs: user
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl6AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PushQEl7AsyncHwEl | inputs: AsyncHwEl[0] | outputs: PostInferEl7AsyncHwEl(running in thread_id: 8974)
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PostInferEl7AsyncHwEl | inputs: PushQEl7AsyncHwEl[0] | outputs: LastAsyncEl0PostInferEl7AsyncHwEl
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl0PostInferEl7AsyncHwEl | inputs: PostInferEl7AsyncHwEl[0] | outputs: user
+[2026-03-25 15:15:52.147] [8945] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl8AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-25 15:15:52.244] [8967] [HailoRT] [info] [hef.cpp:1929] [get_network_group_and_network_name] No name was given. Addressing all networks of default network_group: yolov8m_pose
+[2026-03-25 15:20:54.209] [8945] [HailoRT] [info] [async_infer_runner.cpp:86] [shutdown] Pipeline was aborted. Shutting it down
+[2026-03-25 15:20:54.209] [8945] [HailoRT] [info] [queue_elements.cpp:570] [execute_deactivate] enqueue() in element PushQEl1AsyncHwEl was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-25 15:20:54.209] [8945] [HailoRT] [info] [queue_elements.cpp:570] [execute_deactivate] enqueue() in element PushQEl5AsyncHwEl was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-25 15:20:54.209] [8945] [HailoRT] [info] [queue_elements.cpp:570] [execute_deactivate] enqueue() in element PushQEl7AsyncHwEl was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-25 15:20:54.209] [8945] [HailoRT] [info] [queue_elements.cpp:570] [execute_deactivate] enqueue() in element PushQEl3yolov8m_pose/input_layer1 was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-25 15:20:54.209] [8945] [HailoRT] [info] [queue_elements.cpp:570] [execute_deactivate] enqueue() in element EntryPushQEl0yolov8m_pose/input_layer1 was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-25 15:20:54.209] [8945] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element EntryPushQEl0yolov8m_pose/input_layer1 has 0 frames in his Queue on destruction
+[2026-03-25 15:20:54.209] [8945] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element PushQEl3yolov8m_pose/input_layer1 has 0 frames in his Queue on destruction
+[2026-03-25 15:20:54.210] [8945] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element PushQEl7AsyncHwEl has 0 frames in his Queue on destruction
+[2026-03-25 15:20:54.210] [8945] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element PushQEl1AsyncHwEl has 0 frames in his Queue on destruction
+[2026-03-25 15:20:54.210] [8945] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element PushQEl5AsyncHwEl has 0 frames in his Queue on destruction
+[2026-03-25 18:32:45.655] [25833] [HailoRT] [info] [vdevice.cpp:523] [create] Creating vdevice with params: device_count: 1, scheduling_algorithm: ROUND_ROBIN, multi_process_service: false
+[2026-03-25 18:32:45.666] [25833] [HailoRT] [info] [device.cpp:49] [Device] OS Version: Linux 6.12.75+rpt-rpi-2712 #1 SMP PREEMPT Debian 1:6.12.75-1+rpt1~bookworm (2026-03-11) aarch64
+[2026-03-25 18:32:45.669] [25833] [HailoRT] [info] [control.cpp:108] [control__parse_identify_results] firmware_version is: 4.20.0
+[2026-03-25 18:32:45.669] [25833] [HailoRT] [info] [vdevice.cpp:651] [create] VDevice Infos: 0001:01:00.0
+[2026-03-25 18:32:45.699] [25833] [HailoRT] [info] [hef.cpp:1929] [get_network_group_and_network_name] No name was given. Addressing all networks of default network_group: yolov8m_pose
+[2026-03-25 18:32:45.700] [25833] [HailoRT] [info] [hef.cpp:1929] [get_network_group_and_network_name] No name was given. Addressing all networks of default network_group: yolov8m_pose
+[2026-03-25 18:32:45.764] [25833] [HailoRT] [info] [internal_buffer_manager.cpp:204] [print_execution_results] Planned internal buffer memory: CMA memory 0, user memory 2997248. memory to edge layer usage factor is 1
+[2026-03-25 18:32:45.764] [25833] [HailoRT] [info] [internal_buffer_manager.cpp:212] [print_execution_results] Default Internal buffer planner executed successfully
+[2026-03-25 18:32:45.814] [25833] [HailoRT] [info] [device_internal.cpp:57] [configure] Configuring HEF took 60.32222 milliseconds
+[2026-03-25 18:32:45.814] [25833] [HailoRT] [info] [vdevice.cpp:749] [configure] Configuring HEF on VDevice took 60.766147 milliseconds
+[2026-03-25 18:32:45.814] [25833] [HailoRT] [info] [infer_model.cpp:436] [configure] Configuring network group 'yolov8m_pose' with params: batch size: 0, power mode: PERFORMANCE, latency: NONE
+[2026-03-25 18:32:45.814] [25833] [HailoRT] [info] [multi_io_elements.cpp:756] [create] Created (AsyncHwEl)
+[2026-03-25 18:32:45.814] [25833] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (EntryPushQEl0yolov8m_pose/input_layer1 | timeout: 10s)
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [filter_elements.cpp:101] [create] Created (PreInferEl3yolov8m_pose/input_layer1 | Reorder - src_order: RGB4, src_shape: (640, 640, 3), dst_order: NHWC, dst_shape: (640, 640, 3))
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (PushQEl3yolov8m_pose/input_layer1 | timeout: 10s)
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl6AsyncHwEl)
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (PushQEl7AsyncHwEl | timeout: 10s)
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [filter_elements.cpp:375] [create] Created (PostInferEl7AsyncHwEl | Reorder - src_order: FCR, src_shape: (40, 40, 56), dst_order: FCR, dst_shape: (40, 40, 51))
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl0PostInferEl7AsyncHwEl)
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl0AsyncHwEl)
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (PushQEl1AsyncHwEl | timeout: 10s)
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [filter_elements.cpp:375] [create] Created (PostInferEl1AsyncHwEl | Reorder - src_order: FCR, src_shape: (20, 20, 56), dst_order: FCR, dst_shape: (20, 20, 51))
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl0PostInferEl1AsyncHwEl)
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl2AsyncHwEl)
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl3AsyncHwEl)
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl8AsyncHwEl)
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl4AsyncHwEl)
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (PushQEl5AsyncHwEl | timeout: 10s)
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [filter_elements.cpp:375] [create] Created (PostInferEl5AsyncHwEl | Reorder - src_order: FCR, src_shape: (80, 80, 56), dst_order: FCR, dst_shape: (80, 80, 51))
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl0PostInferEl5AsyncHwEl)
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] EntryPushQEl0yolov8m_pose/input_layer1 | inputs: user | outputs: PreInferEl3yolov8m_pose/input_layer1(running in thread_id: 25860)
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PreInferEl3yolov8m_pose/input_layer1 | inputs: EntryPushQEl0yolov8m_pose/input_layer1[0] | outputs: PushQEl3yolov8m_pose/input_layer1
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PushQEl3yolov8m_pose/input_layer1 | inputs: PreInferEl3yolov8m_pose/input_layer1[0] | outputs: AsyncHwEl(running in thread_id: 25861)
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] AsyncHwEl | inputs: PushQEl3yolov8m_pose/input_layer1[0] | outputs: LastAsyncEl0AsyncHwEl PushQEl1AsyncHwEl LastAsyncEl2AsyncHwEl LastAsyncEl3AsyncHwEl LastAsyncEl4AsyncHwEl PushQEl5AsyncHwEl LastAsyncEl6AsyncHwEl PushQEl7AsyncHwEl LastAsyncEl8AsyncHwEl
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl0AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PushQEl1AsyncHwEl | inputs: AsyncHwEl[0] | outputs: PostInferEl1AsyncHwEl(running in thread_id: 25863)
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PostInferEl1AsyncHwEl | inputs: PushQEl1AsyncHwEl[0] | outputs: LastAsyncEl0PostInferEl1AsyncHwEl
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl0PostInferEl1AsyncHwEl | inputs: PostInferEl1AsyncHwEl[0] | outputs: user
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl2AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl3AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl4AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PushQEl5AsyncHwEl | inputs: AsyncHwEl[0] | outputs: PostInferEl5AsyncHwEl(running in thread_id: 25864)
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PostInferEl5AsyncHwEl | inputs: PushQEl5AsyncHwEl[0] | outputs: LastAsyncEl0PostInferEl5AsyncHwEl
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl0PostInferEl5AsyncHwEl | inputs: PostInferEl5AsyncHwEl[0] | outputs: user
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl6AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PushQEl7AsyncHwEl | inputs: AsyncHwEl[0] | outputs: PostInferEl7AsyncHwEl(running in thread_id: 25862)
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PostInferEl7AsyncHwEl | inputs: PushQEl7AsyncHwEl[0] | outputs: LastAsyncEl0PostInferEl7AsyncHwEl
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl0PostInferEl7AsyncHwEl | inputs: PostInferEl7AsyncHwEl[0] | outputs: user
+[2026-03-25 18:32:45.815] [25833] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl8AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-25 18:32:45.935] [25855] [HailoRT] [info] [hef.cpp:1929] [get_network_group_and_network_name] No name was given. Addressing all networks of default network_group: yolov8m_pose
+[2026-03-26 11:30:14.552] [25833] [HailoRT] [info] [async_infer_runner.cpp:86] [shutdown] Pipeline was aborted. Shutting it down
+[2026-03-26 11:30:14.552] [25833] [HailoRT] [info] [queue_elements.cpp:570] [execute_deactivate] enqueue() in element PushQEl1AsyncHwEl was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-26 11:30:14.552] [25833] [HailoRT] [info] [queue_elements.cpp:570] [execute_deactivate] enqueue() in element PushQEl5AsyncHwEl was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-26 11:30:14.552] [25833] [HailoRT] [info] [queue_elements.cpp:570] [execute_deactivate] enqueue() in element PushQEl7AsyncHwEl was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-26 11:30:14.552] [25833] [HailoRT] [info] [queue_elements.cpp:570] [execute_deactivate] enqueue() in element PushQEl3yolov8m_pose/input_layer1 was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-26 11:30:14.552] [25833] [HailoRT] [info] [queue_elements.cpp:570] [execute_deactivate] enqueue() in element EntryPushQEl0yolov8m_pose/input_layer1 was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-26 11:30:14.552] [25833] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element EntryPushQEl0yolov8m_pose/input_layer1 has 0 frames in his Queue on destruction
+[2026-03-26 11:30:14.552] [25833] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element PushQEl3yolov8m_pose/input_layer1 has 0 frames in his Queue on destruction
+[2026-03-26 11:30:14.552] [25833] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element PushQEl7AsyncHwEl has 0 frames in his Queue on destruction
+[2026-03-26 11:30:14.553] [25833] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element PushQEl1AsyncHwEl has 0 frames in his Queue on destruction
+[2026-03-26 11:30:14.553] [25833] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element PushQEl5AsyncHwEl has 0 frames in his Queue on destruction
+[2026-03-26 15:54:24.842] [166370] [HailoRT] [info] [vdevice.cpp:523] [create] Creating vdevice with params: device_count: 1, scheduling_algorithm: ROUND_ROBIN, multi_process_service: false
+[2026-03-26 15:54:24.854] [166370] [HailoRT] [info] [device.cpp:49] [Device] OS Version: Linux 6.12.75+rpt-rpi-2712 #1 SMP PREEMPT Debian 1:6.12.75-1+rpt1~bookworm (2026-03-11) aarch64
+[2026-03-26 15:54:24.857] [166370] [HailoRT] [info] [control.cpp:108] [control__parse_identify_results] firmware_version is: 4.20.0
+[2026-03-26 15:54:24.857] [166370] [HailoRT] [info] [vdevice.cpp:651] [create] VDevice Infos: 0001:01:00.0
+[2026-03-26 15:54:24.886] [166370] [HailoRT] [info] [hef.cpp:1929] [get_network_group_and_network_name] No name was given. Addressing all networks of default network_group: yolov8m_pose
+[2026-03-26 15:54:24.886] [166370] [HailoRT] [info] [hef.cpp:1929] [get_network_group_and_network_name] No name was given. Addressing all networks of default network_group: yolov8m_pose
+[2026-03-26 15:54:24.952] [166370] [HailoRT] [info] [internal_buffer_manager.cpp:204] [print_execution_results] Planned internal buffer memory: CMA memory 0, user memory 2997248. memory to edge layer usage factor is 1
+[2026-03-26 15:54:24.952] [166370] [HailoRT] [info] [internal_buffer_manager.cpp:212] [print_execution_results] Default Internal buffer planner executed successfully
+[2026-03-26 15:54:25.023] [166370] [HailoRT] [info] [device_internal.cpp:57] [configure] Configuring HEF took 78.390855 milliseconds
+[2026-03-26 15:54:25.023] [166370] [HailoRT] [info] [vdevice.cpp:749] [configure] Configuring HEF on VDevice took 78.837617 milliseconds
+[2026-03-26 15:54:25.023] [166370] [HailoRT] [info] [infer_model.cpp:436] [configure] Configuring network group 'yolov8m_pose' with params: batch size: 0, power mode: PERFORMANCE, latency: NONE
+[2026-03-26 15:54:25.023] [166370] [HailoRT] [info] [multi_io_elements.cpp:756] [create] Created (AsyncHwEl)
+[2026-03-26 15:54:25.023] [166370] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (EntryPushQEl0yolov8m_pose/input_layer1 | timeout: 10s)
+[2026-03-26 15:54:25.024] [166370] [HailoRT] [info] [filter_elements.cpp:101] [create] Created (PreInferEl3yolov8m_pose/input_layer1 | Reorder - src_order: RGB4, src_shape: (640, 640, 3), dst_order: NHWC, dst_shape: (640, 640, 3))
+[2026-03-26 15:54:25.024] [166370] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (PushQEl3yolov8m_pose/input_layer1 | timeout: 10s)
+[2026-03-26 15:54:25.024] [166370] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl6AsyncHwEl)
+[2026-03-26 15:54:25.025] [166370] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (PushQEl7AsyncHwEl | timeout: 10s)
+[2026-03-26 15:54:25.025] [166370] [HailoRT] [info] [filter_elements.cpp:375] [create] Created (PostInferEl7AsyncHwEl | Reorder - src_order: FCR, src_shape: (40, 40, 56), dst_order: FCR, dst_shape: (40, 40, 51))
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl0PostInferEl7AsyncHwEl)
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl0AsyncHwEl)
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (PushQEl1AsyncHwEl | timeout: 10s)
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [filter_elements.cpp:375] [create] Created (PostInferEl1AsyncHwEl | Reorder - src_order: FCR, src_shape: (20, 20, 56), dst_order: FCR, dst_shape: (20, 20, 51))
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl0PostInferEl1AsyncHwEl)
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl2AsyncHwEl)
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl3AsyncHwEl)
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl8AsyncHwEl)
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl4AsyncHwEl)
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (PushQEl5AsyncHwEl | timeout: 10s)
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [filter_elements.cpp:375] [create] Created (PostInferEl5AsyncHwEl | Reorder - src_order: FCR, src_shape: (80, 80, 56), dst_order: FCR, dst_shape: (80, 80, 51))
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl0PostInferEl5AsyncHwEl)
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] EntryPushQEl0yolov8m_pose/input_layer1 | inputs: user | outputs: PreInferEl3yolov8m_pose/input_layer1(running in thread_id: 166397)
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PreInferEl3yolov8m_pose/input_layer1 | inputs: EntryPushQEl0yolov8m_pose/input_layer1[0] | outputs: PushQEl3yolov8m_pose/input_layer1
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PushQEl3yolov8m_pose/input_layer1 | inputs: PreInferEl3yolov8m_pose/input_layer1[0] | outputs: AsyncHwEl(running in thread_id: 166398)
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] AsyncHwEl | inputs: PushQEl3yolov8m_pose/input_layer1[0] | outputs: LastAsyncEl0AsyncHwEl PushQEl1AsyncHwEl LastAsyncEl2AsyncHwEl LastAsyncEl3AsyncHwEl LastAsyncEl4AsyncHwEl PushQEl5AsyncHwEl LastAsyncEl6AsyncHwEl PushQEl7AsyncHwEl LastAsyncEl8AsyncHwEl
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl0AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PushQEl1AsyncHwEl | inputs: AsyncHwEl[0] | outputs: PostInferEl1AsyncHwEl(running in thread_id: 166400)
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PostInferEl1AsyncHwEl | inputs: PushQEl1AsyncHwEl[0] | outputs: LastAsyncEl0PostInferEl1AsyncHwEl
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl0PostInferEl1AsyncHwEl | inputs: PostInferEl1AsyncHwEl[0] | outputs: user
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl2AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl3AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl4AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PushQEl5AsyncHwEl | inputs: AsyncHwEl[0] | outputs: PostInferEl5AsyncHwEl(running in thread_id: 166401)
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PostInferEl5AsyncHwEl | inputs: PushQEl5AsyncHwEl[0] | outputs: LastAsyncEl0PostInferEl5AsyncHwEl
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl0PostInferEl5AsyncHwEl | inputs: PostInferEl5AsyncHwEl[0] | outputs: user
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl6AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PushQEl7AsyncHwEl | inputs: AsyncHwEl[0] | outputs: PostInferEl7AsyncHwEl(running in thread_id: 166399)
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PostInferEl7AsyncHwEl | inputs: PushQEl7AsyncHwEl[0] | outputs: LastAsyncEl0PostInferEl7AsyncHwEl
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl0PostInferEl7AsyncHwEl | inputs: PostInferEl7AsyncHwEl[0] | outputs: user
+[2026-03-26 15:54:25.026] [166370] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl8AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-26 15:54:25.130] [166392] [HailoRT] [info] [hef.cpp:1929] [get_network_group_and_network_name] No name was given. Addressing all networks of default network_group: yolov8m_pose
+[2026-03-26 21:27:57.120] [166370] [HailoRT] [info] [async_infer_runner.cpp:86] [shutdown] Pipeline was aborted. Shutting it down
+[2026-03-26 21:27:57.121] [166370] [HailoRT] [info] [queue_elements.cpp:570] [execute_deactivate] enqueue() in element PushQEl1AsyncHwEl was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-26 21:27:57.121] [166370] [HailoRT] [info] [queue_elements.cpp:570] [execute_deactivate] enqueue() in element PushQEl5AsyncHwEl was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-26 21:27:57.121] [166370] [HailoRT] [info] [queue_elements.cpp:570] [execute_deactivate] enqueue() in element PushQEl7AsyncHwEl was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-26 21:27:57.121] [166370] [HailoRT] [info] [queue_elements.cpp:570] [execute_deactivate] enqueue() in element PushQEl3yolov8m_pose/input_layer1 was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-26 21:27:57.121] [166370] [HailoRT] [info] [queue_elements.cpp:570] [execute_deactivate] enqueue() in element EntryPushQEl0yolov8m_pose/input_layer1 was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-26 21:27:57.121] [166370] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element EntryPushQEl0yolov8m_pose/input_layer1 has 0 frames in his Queue on destruction
+[2026-03-26 21:27:57.121] [166370] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element PushQEl3yolov8m_pose/input_layer1 has 0 frames in his Queue on destruction
+[2026-03-26 21:27:57.121] [166370] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element PushQEl7AsyncHwEl has 0 frames in his Queue on destruction
+[2026-03-26 21:27:57.121] [166370] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element PushQEl1AsyncHwEl has 0 frames in his Queue on destruction
+[2026-03-26 21:27:57.121] [166370] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element PushQEl5AsyncHwEl has 0 frames in his Queue on destruction
+[2026-03-27 13:45:55.687] [284929] [HailoRT] [info] [vdevice.cpp:523] [create] Creating vdevice with params: device_count: 1, scheduling_algorithm: ROUND_ROBIN, multi_process_service: false
+[2026-03-27 13:45:55.698] [284929] [HailoRT] [info] [device.cpp:49] [Device] OS Version: Linux 6.12.75+rpt-rpi-2712 #1 SMP PREEMPT Debian 1:6.12.75-1+rpt1~bookworm (2026-03-11) aarch64
+[2026-03-27 13:45:55.701] [284929] [HailoRT] [info] [control.cpp:108] [control__parse_identify_results] firmware_version is: 4.20.0
+[2026-03-27 13:45:55.701] [284929] [HailoRT] [info] [vdevice.cpp:651] [create] VDevice Infos: 0001:01:00.0
+[2026-03-27 13:45:55.733] [284929] [HailoRT] [info] [hef.cpp:1929] [get_network_group_and_network_name] No name was given. Addressing all networks of default network_group: yolov8m_pose
+[2026-03-27 13:45:55.733] [284929] [HailoRT] [info] [hef.cpp:1929] [get_network_group_and_network_name] No name was given. Addressing all networks of default network_group: yolov8m_pose
+[2026-03-27 13:45:55.792] [284929] [HailoRT] [info] [internal_buffer_manager.cpp:204] [print_execution_results] Planned internal buffer memory: CMA memory 0, user memory 2997248. memory to edge layer usage factor is 1
+[2026-03-27 13:45:55.792] [284929] [HailoRT] [info] [internal_buffer_manager.cpp:212] [print_execution_results] Default Internal buffer planner executed successfully
+[2026-03-27 13:45:55.852] [284929] [HailoRT] [info] [device_internal.cpp:57] [configure] Configuring HEF took 68.505998 milliseconds
+[2026-03-27 13:45:55.852] [284929] [HailoRT] [info] [vdevice.cpp:749] [configure] Configuring HEF on VDevice took 68.952591 milliseconds
+[2026-03-27 13:45:55.852] [284929] [HailoRT] [info] [infer_model.cpp:436] [configure] Configuring network group 'yolov8m_pose' with params: batch size: 0, power mode: PERFORMANCE, latency: NONE
+[2026-03-27 13:45:55.852] [284929] [HailoRT] [info] [multi_io_elements.cpp:756] [create] Created (AsyncHwEl)
+[2026-03-27 13:45:55.853] [284929] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (EntryPushQEl0yolov8m_pose/input_layer1 | timeout: 10s)
+[2026-03-27 13:45:55.853] [284929] [HailoRT] [info] [filter_elements.cpp:101] [create] Created (PreInferEl3yolov8m_pose/input_layer1 | Reorder - src_order: RGB4, src_shape: (640, 640, 3), dst_order: NHWC, dst_shape: (640, 640, 3))
+[2026-03-27 13:45:55.853] [284929] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (PushQEl3yolov8m_pose/input_layer1 | timeout: 10s)
+[2026-03-27 13:45:55.853] [284929] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl6AsyncHwEl)
+[2026-03-27 13:45:55.853] [284929] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (PushQEl7AsyncHwEl | timeout: 10s)
+[2026-03-27 13:45:55.853] [284929] [HailoRT] [info] [filter_elements.cpp:375] [create] Created (PostInferEl7AsyncHwEl | Reorder - src_order: FCR, src_shape: (40, 40, 56), dst_order: FCR, dst_shape: (40, 40, 51))
+[2026-03-27 13:45:55.853] [284929] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl0PostInferEl7AsyncHwEl)
+[2026-03-27 13:45:55.853] [284929] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl0AsyncHwEl)
+[2026-03-27 13:45:55.853] [284929] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (PushQEl1AsyncHwEl | timeout: 10s)
+[2026-03-27 13:45:55.853] [284929] [HailoRT] [info] [filter_elements.cpp:375] [create] Created (PostInferEl1AsyncHwEl | Reorder - src_order: FCR, src_shape: (20, 20, 56), dst_order: FCR, dst_shape: (20, 20, 51))
+[2026-03-27 13:45:55.853] [284929] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl0PostInferEl1AsyncHwEl)
+[2026-03-27 13:45:55.853] [284929] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl2AsyncHwEl)
+[2026-03-27 13:45:55.853] [284929] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl3AsyncHwEl)
+[2026-03-27 13:45:55.853] [284929] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl8AsyncHwEl)
+[2026-03-27 13:45:55.853] [284929] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl4AsyncHwEl)
+[2026-03-27 13:45:55.853] [284929] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (PushQEl5AsyncHwEl | timeout: 10s)
+[2026-03-27 13:45:55.853] [284929] [HailoRT] [info] [filter_elements.cpp:375] [create] Created (PostInferEl5AsyncHwEl | Reorder - src_order: FCR, src_shape: (80, 80, 56), dst_order: FCR, dst_shape: (80, 80, 51))
+[2026-03-27 13:45:55.854] [284929] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl0PostInferEl5AsyncHwEl)
+[2026-03-27 13:45:55.854] [284929] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] EntryPushQEl0yolov8m_pose/input_layer1 | inputs: user | outputs: PreInferEl3yolov8m_pose/input_layer1(running in thread_id: 284957)
+[2026-03-27 13:45:55.854] [284929] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PreInferEl3yolov8m_pose/input_layer1 | inputs: EntryPushQEl0yolov8m_pose/input_layer1[0] | outputs: PushQEl3yolov8m_pose/input_layer1
+[2026-03-27 13:45:55.854] [284929] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PushQEl3yolov8m_pose/input_layer1 | inputs: PreInferEl3yolov8m_pose/input_layer1[0] | outputs: AsyncHwEl(running in thread_id: 284958)
+[2026-03-27 13:45:55.854] [284929] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] AsyncHwEl | inputs: PushQEl3yolov8m_pose/input_layer1[0] | outputs: LastAsyncEl0AsyncHwEl PushQEl1AsyncHwEl LastAsyncEl2AsyncHwEl LastAsyncEl3AsyncHwEl LastAsyncEl4AsyncHwEl PushQEl5AsyncHwEl LastAsyncEl6AsyncHwEl PushQEl7AsyncHwEl LastAsyncEl8AsyncHwEl
+[2026-03-27 13:45:55.854] [284929] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl0AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-27 13:45:55.854] [284929] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PushQEl1AsyncHwEl | inputs: AsyncHwEl[0] | outputs: PostInferEl1AsyncHwEl(running in thread_id: 284960)
+[2026-03-27 13:45:55.854] [284929] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PostInferEl1AsyncHwEl | inputs: PushQEl1AsyncHwEl[0] | outputs: LastAsyncEl0PostInferEl1AsyncHwEl
+[2026-03-27 13:45:55.854] [284929] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl0PostInferEl1AsyncHwEl | inputs: PostInferEl1AsyncHwEl[0] | outputs: user
+[2026-03-27 13:45:55.854] [284929] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl2AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-27 13:45:55.854] [284929] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl3AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-27 13:45:55.854] [284929] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl4AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-27 13:45:55.854] [284929] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PushQEl5AsyncHwEl | inputs: AsyncHwEl[0] | outputs: PostInferEl5AsyncHwEl(running in thread_id: 284961)
+[2026-03-27 13:45:55.854] [284929] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PostInferEl5AsyncHwEl | inputs: PushQEl5AsyncHwEl[0] | outputs: LastAsyncEl0PostInferEl5AsyncHwEl
+[2026-03-27 13:45:55.854] [284929] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl0PostInferEl5AsyncHwEl | inputs: PostInferEl5AsyncHwEl[0] | outputs: user
+[2026-03-27 13:45:55.854] [284929] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl6AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-27 13:45:55.854] [284929] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PushQEl7AsyncHwEl | inputs: AsyncHwEl[0] | outputs: PostInferEl7AsyncHwEl(running in thread_id: 284959)
+[2026-03-27 13:45:55.854] [284929] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PostInferEl7AsyncHwEl | inputs: PushQEl7AsyncHwEl[0] | outputs: LastAsyncEl0PostInferEl7AsyncHwEl
+[2026-03-27 13:45:55.854] [284929] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl0PostInferEl7AsyncHwEl | inputs: PostInferEl7AsyncHwEl[0] | outputs: user
+[2026-03-27 13:45:55.854] [284929] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl8AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-27 13:45:55.987] [284952] [HailoRT] [info] [hef.cpp:1929] [get_network_group_and_network_name] No name was given. Addressing all networks of default network_group: yolov8m_pose
+[2026-03-27 14:14:29.961] [284929] [HailoRT] [info] [async_infer_runner.cpp:86] [shutdown] Pipeline was aborted. Shutting it down
+[2026-03-27 14:14:29.961] [284929] [HailoRT] [info] [queue_elements.cpp:570] [execute_deactivate] enqueue() in element PushQEl1AsyncHwEl was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-27 14:14:29.961] [284929] [HailoRT] [info] [queue_elements.cpp:570] [execute_deactivate] enqueue() in element PushQEl5AsyncHwEl was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-27 14:14:29.961] [284929] [HailoRT] [info] [queue_elements.cpp:570] [execute_deactivate] enqueue() in element PushQEl7AsyncHwEl was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-27 14:14:29.961] [284929] [HailoRT] [info] [queue_elements.cpp:570] [execute_deactivate] enqueue() in element PushQEl3yolov8m_pose/input_layer1 was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-27 14:14:29.961] [284929] [HailoRT] [info] [queue_elements.cpp:570] [execute_deactivate] enqueue() in element EntryPushQEl0yolov8m_pose/input_layer1 was aborted, got status = HAILO_SHUTDOWN_EVENT_SIGNALED(57)
+[2026-03-27 14:14:29.961] [284929] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element EntryPushQEl0yolov8m_pose/input_layer1 has 0 frames in his Queue on destruction
+[2026-03-27 14:14:29.961] [284929] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element PushQEl3yolov8m_pose/input_layer1 has 0 frames in his Queue on destruction
+[2026-03-27 14:14:29.962] [284929] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element PushQEl7AsyncHwEl has 0 frames in his Queue on destruction
+[2026-03-27 14:14:29.962] [284929] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element PushQEl1AsyncHwEl has 0 frames in his Queue on destruction
+[2026-03-27 14:14:29.962] [284929] [HailoRT] [info] [queue_elements.cpp:46] [~BaseQueueElement] Queue element PushQEl5AsyncHwEl has 0 frames in his Queue on destruction
+[2026-03-27 14:25:00.284] [289450] [HailoRT] [info] [vdevice.cpp:523] [create] Creating vdevice with params: device_count: 1, scheduling_algorithm: ROUND_ROBIN, multi_process_service: false
+[2026-03-27 14:25:00.297] [289450] [HailoRT] [info] [device.cpp:49] [Device] OS Version: Linux 6.12.75+rpt-rpi-2712 #1 SMP PREEMPT Debian 1:6.12.75-1+rpt1~bookworm (2026-03-11) aarch64
+[2026-03-27 14:25:00.300] [289450] [HailoRT] [info] [control.cpp:108] [control__parse_identify_results] firmware_version is: 4.20.0
+[2026-03-27 14:25:00.300] [289450] [HailoRT] [info] [vdevice.cpp:651] [create] VDevice Infos: 0001:01:00.0
+[2026-03-27 14:25:00.325] [289450] [HailoRT] [info] [hef.cpp:1929] [get_network_group_and_network_name] No name was given. Addressing all networks of default network_group: yolov8m_pose
+[2026-03-27 14:25:00.325] [289450] [HailoRT] [info] [hef.cpp:1929] [get_network_group_and_network_name] No name was given. Addressing all networks of default network_group: yolov8m_pose
+[2026-03-27 14:25:00.379] [289450] [HailoRT] [info] [internal_buffer_manager.cpp:204] [print_execution_results] Planned internal buffer memory: CMA memory 0, user memory 2997248. memory to edge layer usage factor is 1
+[2026-03-27 14:25:00.379] [289450] [HailoRT] [info] [internal_buffer_manager.cpp:212] [print_execution_results] Default Internal buffer planner executed successfully
+[2026-03-27 14:25:00.434] [289450] [HailoRT] [info] [device_internal.cpp:57] [configure] Configuring HEF took 62.671969 milliseconds
+[2026-03-27 14:25:00.434] [289450] [HailoRT] [info] [vdevice.cpp:749] [configure] Configuring HEF on VDevice took 63.103268 milliseconds
+[2026-03-27 14:25:00.434] [289450] [HailoRT] [info] [infer_model.cpp:436] [configure] Configuring network group 'yolov8m_pose' with params: batch size: 0, power mode: PERFORMANCE, latency: NONE
+[2026-03-27 14:25:00.434] [289450] [HailoRT] [info] [multi_io_elements.cpp:756] [create] Created (AsyncHwEl)
+[2026-03-27 14:25:00.434] [289450] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (EntryPushQEl0yolov8m_pose/input_layer1 | timeout: 10s)
+[2026-03-27 14:25:00.434] [289450] [HailoRT] [info] [filter_elements.cpp:101] [create] Created (PreInferEl3yolov8m_pose/input_layer1 | Reorder - src_order: RGB4, src_shape: (640, 640, 3), dst_order: NHWC, dst_shape: (640, 640, 3))
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (PushQEl3yolov8m_pose/input_layer1 | timeout: 10s)
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl6AsyncHwEl)
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (PushQEl7AsyncHwEl | timeout: 10s)
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [filter_elements.cpp:375] [create] Created (PostInferEl7AsyncHwEl | Reorder - src_order: FCR, src_shape: (40, 40, 56), dst_order: FCR, dst_shape: (40, 40, 51))
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl0PostInferEl7AsyncHwEl)
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl0AsyncHwEl)
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (PushQEl1AsyncHwEl | timeout: 10s)
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [filter_elements.cpp:375] [create] Created (PostInferEl1AsyncHwEl | Reorder - src_order: FCR, src_shape: (20, 20, 56), dst_order: FCR, dst_shape: (20, 20, 51))
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl0PostInferEl1AsyncHwEl)
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl2AsyncHwEl)
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl3AsyncHwEl)
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl8AsyncHwEl)
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl4AsyncHwEl)
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [queue_elements.cpp:450] [create] Created (PushQEl5AsyncHwEl | timeout: 10s)
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [filter_elements.cpp:375] [create] Created (PostInferEl5AsyncHwEl | Reorder - src_order: FCR, src_shape: (80, 80, 56), dst_order: FCR, dst_shape: (80, 80, 51))
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [edge_elements.cpp:187] [create] Created (LastAsyncEl0PostInferEl5AsyncHwEl)
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] EntryPushQEl0yolov8m_pose/input_layer1 | inputs: user | outputs: PreInferEl3yolov8m_pose/input_layer1(running in thread_id: 289480)
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PreInferEl3yolov8m_pose/input_layer1 | inputs: EntryPushQEl0yolov8m_pose/input_layer1[0] | outputs: PushQEl3yolov8m_pose/input_layer1
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PushQEl3yolov8m_pose/input_layer1 | inputs: PreInferEl3yolov8m_pose/input_layer1[0] | outputs: AsyncHwEl(running in thread_id: 289481)
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] AsyncHwEl | inputs: PushQEl3yolov8m_pose/input_layer1[0] | outputs: LastAsyncEl0AsyncHwEl PushQEl1AsyncHwEl LastAsyncEl2AsyncHwEl LastAsyncEl3AsyncHwEl LastAsyncEl4AsyncHwEl PushQEl5AsyncHwEl LastAsyncEl6AsyncHwEl PushQEl7AsyncHwEl LastAsyncEl8AsyncHwEl
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl0AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PushQEl1AsyncHwEl | inputs: AsyncHwEl[0] | outputs: PostInferEl1AsyncHwEl(running in thread_id: 289483)
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PostInferEl1AsyncHwEl | inputs: PushQEl1AsyncHwEl[0] | outputs: LastAsyncEl0PostInferEl1AsyncHwEl
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl0PostInferEl1AsyncHwEl | inputs: PostInferEl1AsyncHwEl[0] | outputs: user
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl2AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl3AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl4AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PushQEl5AsyncHwEl | inputs: AsyncHwEl[0] | outputs: PostInferEl5AsyncHwEl(running in thread_id: 289484)
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PostInferEl5AsyncHwEl | inputs: PushQEl5AsyncHwEl[0] | outputs: LastAsyncEl0PostInferEl5AsyncHwEl
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl0PostInferEl5AsyncHwEl | inputs: PostInferEl5AsyncHwEl[0] | outputs: user
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl6AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PushQEl7AsyncHwEl | inputs: AsyncHwEl[0] | outputs: PostInferEl7AsyncHwEl(running in thread_id: 289482)
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] PostInferEl7AsyncHwEl | inputs: PushQEl7AsyncHwEl[0] | outputs: LastAsyncEl0PostInferEl7AsyncHwEl
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl0PostInferEl7AsyncHwEl | inputs: PostInferEl7AsyncHwEl[0] | outputs: user
+[2026-03-27 14:25:00.435] [289450] [HailoRT] [info] [pipeline.cpp:891] [print_deep_description] LastAsyncEl8AsyncHwEl | inputs: AsyncHwEl[0] | outputs: user
+[2026-03-27 14:25:00.561] [289475] [HailoRT] [info] [hef.cpp:1929] [get_network_group_and_network_name] No name was given. Addressing all networks of default network_group: yolov8m_pose
