@@ -16,6 +16,7 @@ import cv2
 import config
 import servo_arm_integration as servo_integration
 import robot_brain as brain
+import face_tracking
 import hailo
 import cv2
 import robot_brain as brain
@@ -2598,7 +2599,26 @@ def camera_loop():
     # when the operator switches camera mode from the GUI or via Crestron.
     # HIGH_CAM and DUAL_CAM share the same main pipeline/camera path, so avoid
     # tearing down/rebuilding libcamerasrc between those two modes.
-    brain.camera_switch_handlers["HIGH_CAM"] = lambda: None
+    # Start face tracking pipeline when switching to HIGH_CAM, stop when leaving
+    def _high_cam_handler():
+        try:
+            face_tracking.start()
+        except Exception as e:
+            print(f"[face_tracking] Failed to start: {e}")
+    def _table_cam_handler():
+        try:
+            face_tracking.stop()
+        except Exception:
+            pass
+        _restart_event.set()
+    def _dual_cam_handler():
+        try:
+            face_tracking.stop()
+        except Exception:
+            pass
+    brain.camera_switch_handlers["HIGH_CAM"] = _high_cam_handler
+    brain.camera_switch_handlers["TABLE_CAM"] = _table_cam_handler
+    brain.camera_switch_handlers["DUAL_CAM"] = _dual_cam_handler
     brain.camera_switch_handlers["TABLE_CAM"] = lambda: _restart_event.set()
     brain.camera_switch_handlers["DUAL_CAM"] = lambda: None
 
