@@ -72,6 +72,9 @@ def _on_new_sample(sink, _user_data=None):
             cy = face_y + face_h // 2
 
             tx, ty, tz = _map_face_to_arm(cx, cy, w, h)
+            ny = cy / h
+            if getattr(config, "DEBUG_FACE_Z", True):
+                print(f"[DEBUG] Detected face: cy={cy}, ny={ny:.3f}, z={tz:.3f} (frame h={h})")
 
             # Exponential moving average for smooth motion
             a = config.TRACKING_ALPHA
