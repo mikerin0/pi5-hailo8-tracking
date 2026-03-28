@@ -2101,6 +2101,7 @@ def app_callback(pad, info, user_data):
         return Gst.PadProbeReturn.OK
 
     try:
+        # ...existing code...
         roi = hailo.get_roi_from_buffer(buffer)
         detections = roi.get_objects_typed(hailo.HAILO_DETECTION)
         _update_vision_summary(
@@ -2111,58 +2112,9 @@ def app_callback(pad, info, user_data):
             (d for d in detections if d.get_label() == "person"), None
         )
         now = time.time()
-
-        busy_now = int(brain.tuner.shared_params.get("busy", 0))
-        if _tracking_prev_busy != 0 and busy_now == 0:
-            warmup_s = max(0.0, float(getattr(config, "TRACKING_RESUME_WARMUP_SEC", 1.5)))
-            _tracking_resume_warmup_until = now + warmup_s
-            _seed_brain_ik_from_last_commanded()
-            _last_move_time = now
-            print(f"Tracking re-enable warmup: holding arm motion for {warmup_s:.2f}s")
-        _tracking_prev_busy = busy_now
-
-        if person:
-            _last_seen_time = now
-
-            # Manual override: do not move the arm, but keep last_seen fresh
-            if _search_mode == "MANUAL":
-                return Gst.PadProbeReturn.OK
-
-            # Wake up from standby when a person reappears and brain is free
-            if _search_mode is True:
-                p = brain.tuner.get_params()
-                if p.get("busy", 0) == 0:
-                    print("Pose tracking: person reacquired – resuming")
-                    _search_mode = False
-                    _smooth_x, _smooth_y = 0.5, 0.5
-
-            # Extract the target keypoint from the pose landmarks
-            landmarks = person.get_objects_typed(hailo.HAILO_LANDMARKS)
-            if landmarks:
-                points = landmarks[0].get_points()
-                _maybe_send_pose_gesture_events(points, now)
-                _maybe_release_to_user_from_table(points, now)
-                target_idx = config.KEYPOINTS.get(_tracking_target, 0)
-                raw_x = 1.0 - points[target_idx].x()   # Hailo x=0 is the left edge of the
-                raw_y = points[target_idx].y()           # frame; inverting aligns it with the
-                                                         # arm's positive-Y direction (its right)
-
-                # Discard frames where the keypoint teleports across more than
-                # POSE_TELEPORT_THRESHOLD of the frame – these are noisy detections.
-                if (abs(raw_x - _smooth_x) > config.POSE_TELEPORT_THRESHOLD
-                        or abs(raw_y - _smooth_y) > config.POSE_TELEPORT_THRESHOLD):
-                    return Gst.PadProbeReturn.OK
-    try:
-        roi = hailo.get_roi_from_buffer(buffer)
-        detections = roi.get_objects_typed(hailo.HAILO_DETECTION)
-        _update_vision_summary(
-            _extract_detection_labels(detections),
-            mode=brain.tuner.shared_params.get("camera_mode", "HIGH_CAM"),
-        )
-        person = next(
-            (d for d in detections if d.get_label() == "person"), None
-        )
-        now = time.time()
+        # ...existing code...
+    except Exception:
+        pass
 
         busy_now = int(brain.tuner.shared_params.get("busy", 0))
         if _tracking_prev_busy != 0 and busy_now == 0:
