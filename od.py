@@ -2152,6 +2152,58 @@ def app_callback(pad, info, user_data):
                 if (abs(raw_x - _smooth_x) > config.POSE_TELEPORT_THRESHOLD
                         or abs(raw_y - _smooth_y) > config.POSE_TELEPORT_THRESHOLD):
                     return Gst.PadProbeReturn.OK
+    try:
+        roi = hailo.get_roi_from_buffer(buffer)
+        detections = roi.get_objects_typed(hailo.HAILO_DETECTION)
+        _update_vision_summary(
+            _extract_detection_labels(detections),
+            mode=brain.tuner.shared_params.get("camera_mode", "HIGH_CAM"),
+        )
+        person = next(
+            (d for d in detections if d.get_label() == "person"), None
+        )
+        now = time.time()
+
+        busy_now = int(brain.tuner.shared_params.get("busy", 0))
+        if _tracking_prev_busy != 0 and busy_now == 0:
+            warmup_s = max(0.0, float(getattr(config, "TRACKING_RESUME_WARMUP_SEC", 1.5)))
+            _tracking_resume_warmup_until = now + warmup_s
+            _seed_brain_ik_from_last_commanded()
+            _last_move_time = now
+            print(f"Tracking re-enable warmup: holding arm motion for {warmup_s:.2f}s")
+        _tracking_prev_busy = busy_now
+
+        if person:
+            _last_seen_time = now
+
+            # Manual override: do not move the arm, but keep last_seen fresh
+            if _search_mode == "MANUAL":
+                return Gst.PadProbeReturn.OK
+
+            # Wake up from standby when a person reappears and brain is free
+            if _search_mode is True:
+                p = brain.tuner.get_params()
+                if p.get("busy", 0) == 0:
+                    print("Pose tracking: person reacquired – resuming")
+                    _search_mode = False
+                    _smooth_x, _smooth_y = 0.5, 0.5
+
+            # Extract the target keypoint from the pose landmarks
+            landmarks = person.get_objects_typed(hailo.HAILO_LANDMARKS)
+            if landmarks:
+                points = landmarks[0].get_points()
+                _maybe_send_pose_gesture_events(points, now)
+                _maybe_release_to_user_from_table(points, now)
+                target_idx = config.KEYPOINTS.get(_tracking_target, 0)
+                raw_x = 1.0 - points[target_idx].x()   # Hailo x=0 is the left edge of the
+                raw_y = points[target_idx].y()           # frame; inverting aligns it with the
+                                                         # arm's positive-Y direction (its right)
+
+                # Discard frames where the keypoint teleports across more than
+                # POSE_TELEPORT_THRESHOLD of the frame – these are noisy detections.
+                if (abs(raw_x - _smooth_x) > config.POSE_TELEPORT_THRESHOLD
+                        or abs(raw_y - _smooth_y) > config.POSE_TELEPORT_THRESHOLD):
+                    return Gst.PadProbeReturn.OK
 
                 p = brain.tuner.get_params()
                 sf = p.get("smooth", 0.2)
@@ -2161,9 +2213,11 @@ def app_callback(pad, info, user_data):
                 if now < _tracking_resume_warmup_until:
                     return Gst.PadProbeReturn.OK
 
+                # Only move the arm if not in HIGH_CAM mode
                 if (now - _last_move_time > config.MOVE_COOLDOWN
                         and p.get("busy", 0) == 0
-                        and _search_mode is False):
+                        and _search_mode is False
+                        and brain.tuner.shared_params.get("camera_mode", "HIGH_CAM") != "HIGH_CAM"):
                     cx = p.get(f"{_tracking_target}_x", 0.5)
                     cy = p.get(f"{_tracking_target}_y", 0.5)
                     ry = (_smooth_x - cx) * p.get("ry_m", 0.3)
@@ -2198,60 +2252,6 @@ def app_callback(pad, info, user_data):
             if not timeout_enabled:
                 if _search_mode is True:
                     _search_mode = False
-                return Gst.PadProbeReturn.OK
-            if now - _last_seen_time > config.FLAGPOLE_TIMEOUT:
-                p = brain.tuner.get_params()
-                if p.get("busy", 0) == 0 and _search_mode is False:
-                    print("Pose tracking: person lost – parking arm + power off (RESUME required)")
-                    brain.tuner.shared_params["busy"] = 1
-                    _search_mode = True
-                    _person_lost_park_async()
-
-    except Exception as e:
-        print(f"app_callback error: {e}")
-
-    return Gst.PadProbeReturn.OK
-
-def _cpu_fallback_loop():
-    # CPU fallback face detection removed. Use face_tracking.py for all face tracking.
-    pass
-
-
-_restart_event = threading.Event()
-_table_preview_stop = threading.Event()
-_table_preview_thread = None
-_table_obj_stop = threading.Event()
-_table_obj_thread = None
-_table_obj_dualcam_disabled_warned = False
-
-
-def _maybe_pick_table_object_from_frame(frame_bgr, now):
-    """Detect a table object in TABLE_CAM and trigger take-item sequence."""
-    global _table_obj_hits, _last_table_obj_trigger_time, _last_table_obj_block_log_time
-    global _table_obj_center_hits, _last_table_obj_align_log_time
-
-    pickup_enabled = bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False))
-    color_follow_active = bool(brain.tuner.shared_params.get("table_follow_color_active", 0))
-    summary_enabled = bool(getattr(config, "TABLE_OBJECT_SUMMARY_ENABLED", True))
-    if not (pickup_enabled or summary_enabled or color_follow_active):
-        _table_obj_hits = 0
-        return
-    if brain.tuner.shared_params.get("camera_mode", "HIGH_CAM") != "TABLE_CAM":
-        _table_obj_hits = 0
-        _table_obj_center_hits = 0
-        return
-
-    arm_delay = max(0.0, float(getattr(config, "TABLE_OBJECT_ARM_DELAY_SEC", 4.0)))
-    if (not color_follow_active) and (now - _table_cam_enter_time < arm_delay):
-        if now - _last_table_obj_block_log_time > 1.5:
-            print("TABLE_CAM auto-pick blocked: arm delay active")
-            _last_table_obj_block_log_time = now
-        _table_obj_hits = 0
-        _table_obj_center_hits = 0
-        return
-    if brain.is_holding_item():
-        if now - _last_table_obj_block_log_time > 2.0:
-            print("DUAL_CAM auto-pick blocked: already holding item")
             _last_table_obj_block_log_time = now
         _table_obj_hits = 0
         _table_obj_center_hits = 0
