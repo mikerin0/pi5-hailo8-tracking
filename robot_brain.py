@@ -1,11 +1,3 @@
-        # --- Debug Print Toggles ---
-        self.debug_prints_enabled = tk.BooleanVar(value=True)
-        def toggle_debug_prints():
-            import config
-            config.FINGER_GESTURE_PRINTS_ENABLED = self.debug_prints_enabled.get()
-            config.DEBUG_FACE_Z = self.debug_prints_enabled.get()
-            config.CRESTRON_PRINTS_ENABLED = self.debug_prints_enabled.get()
-        tk.Checkbutton(action_col, text="Enable Finger/Creston Debug Prints", variable=self.debug_prints_enabled, command=toggle_debug_prints, font=("Arial", 10), fg="purple").pack(pady=6)
 ## Robot brain main module
 
 class RobotTuner:
@@ -1945,6 +1937,14 @@ class RobotTuner:
         return body
 
     def create_gui(self):
+                # --- Debug Print Toggles ---
+                self.debug_prints_enabled = tk.BooleanVar(value=True)
+                def toggle_debug_prints():
+                    import config
+                    config.FINGER_GESTURE_PRINTS_ENABLED = self.debug_prints_enabled.get()
+                    config.DEBUG_FACE_Z = self.debug_prints_enabled.get()
+                    config.CRESTRON_PRINTS_ENABLED = self.debug_prints_enabled.get()
+                tk.Checkbutton(action_col, text="Enable Finger/Creston Debug Prints", variable=self.debug_prints_enabled, command=toggle_debug_prints, font=("Arial", 10), fg="purple").pack(pady=6)
         self.root = tk.Tk()
         self.root.title("Robot Controls - Pi Server Mode")
         self.root.geometry("980x860")
