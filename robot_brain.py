@@ -1158,6 +1158,10 @@ def release_item_manual():
 def reach_for_coordinate(x, y, z, speed=800):
     global last_angles
     global _first_move_capped
+    import traceback
+    print("[DEBUG] reach_for_coordinate called with x=", x, "y=", y, "z=", z, "speed=", speed)
+    print("[DEBUG] Call stack:")
+    traceback.print_stack(limit=8)
     try:
         x = float(x)
         y = float(y)
