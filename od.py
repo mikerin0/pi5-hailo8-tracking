@@ -1758,6 +1758,8 @@ def _maybe_send_finger_gesture_events_from_sample(sample, now):
     """Run MediaPipe Hands on side-branch sample and emit configured finger gesture events."""
     if not bool(getattr(config, "FINGER_GESTURE_EVENTS_ENABLED", True)):
         return
+    if hasattr(config, "FINGER_GESTURE_PRINTS_ENABLED") and not getattr(config, "FINGER_GESTURE_PRINTS_ENABLED", True):
+        return
     if brain.tuner.shared_params.get("camera_mode", "HIGH_CAM") != "HIGH_CAM":
         return
 
@@ -1825,7 +1827,7 @@ def _maybe_send_finger_gesture_events_from_sample(sample, now):
         event_name = str(event_map.get(state, "")).strip().upper()
         if event_name and _finger_event_allowed(event_name, now):
             brain.send_to_crestron(event_name)
-            if bool(getattr(config, "FINGER_GESTURE_DEBUG", False)):
+            if bool(getattr(config, "FINGER_GESTURE_DEBUG", False)) and getattr(config, "FINGER_GESTURE_PRINTS_ENABLED", True):
                 flip = bool(getattr(config, "FINGER_GESTURE_FLIP_HANDEDNESS", True))
                 raw_h = str(raw_handedness_label or "?")
                 print(f"Finger gesture: {state} -> {event_name} (hand={handedness_label}, raw={raw_h}, flip={flip})")

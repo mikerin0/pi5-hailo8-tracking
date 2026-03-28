@@ -1,3 +1,11 @@
+        # --- Debug Print Toggles ---
+        self.debug_prints_enabled = tk.BooleanVar(value=True)
+        def toggle_debug_prints():
+            import config
+            config.FINGER_GESTURE_PRINTS_ENABLED = self.debug_prints_enabled.get()
+            config.DEBUG_FACE_Z = self.debug_prints_enabled.get()
+            config.CRESTRON_PRINTS_ENABLED = self.debug_prints_enabled.get()
+        tk.Checkbutton(action_col, text="Enable Finger/Creston Debug Prints", variable=self.debug_prints_enabled, command=toggle_debug_prints, font=("Arial", 10), fg="purple").pack(pady=6)
 ## Robot brain main module
 
 class RobotTuner:
@@ -813,12 +821,16 @@ def send_to_crestron(command):
         try:
             # Sending \n ensures Crestron Serial Gather or S-1 triggers
             crestron_conn.sendall(f"{command}\n".encode())
-            print(f"Pushed to Crestron: {command}")
+            import config
+            if getattr(config, "CRESTRON_PRINTS_ENABLED", True):
+                print(f"Pushed to Crestron: {command}")
         except Exception as e:
             print(f"Push failed: {e}")
             crestron_conn = None
     else:
-        print("Error: Crestron is not connected to Pi Server.")
+        import config
+        if getattr(config, "CRESTRON_PRINTS_ENABLED", True):
+            print("Error: Crestron is not connected to Pi Server.")
 
 
 def switch_camera(mode):

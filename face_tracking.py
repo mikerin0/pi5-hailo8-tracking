@@ -31,6 +31,8 @@ def _map_face_to_arm(cx, cy, frame_w, frame_h):
     y = config.ARM_Y_RANGE * (0.5 - ny)
     # Map vertical face position to Z height (top of frame = max Z, bottom = min Z)
     z = config.ARM_MIN_Z + (1.0 - ny) * (config.ARM_MAX_Z - config.ARM_MIN_Z)
+    if getattr(config, "DEBUG_FACE_Z", False):
+        print(f"[DEBUG] Face centroid: cx={cx}, cy={cy}, nx={nx:.3f}, ny={ny:.3f}, z={z:.3f}")
     return float(x), float(y), float(z)
 
 
