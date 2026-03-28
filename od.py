@@ -2214,14 +2214,7 @@ def app_callback(pad, info, user_data):
 
 def _cpu_fallback_loop():
     # CPU fallback face detection removed. Use face_tracking.py for all face tracking.
-    finally:
-        pipe.set_state(Gst.State.NULL)
-        if window_ready:
-            _save_video_window_state(window_name)
-            try:
-                cv2.destroyWindow(window_name)
-            except Exception:
-                pass
+    pass
 
 
 _restart_event = threading.Event()
