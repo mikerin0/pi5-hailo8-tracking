@@ -59,6 +59,9 @@ def _on_new_sample(sink, _user_data=None):
     try:
         print(f"[DEBUG] Mapping buffer to frame of size w={w}, h={h}")
         frame = np.frombuffer(mapinfo.data, dtype=np.uint8).reshape((h, w, 3))
+        # Show video preview window
+        cv2.imshow("Face Tracking Preview", frame)
+        cv2.waitKey(1)
         gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
         faces = _face_cascade.detectMultiScale(
             gray,

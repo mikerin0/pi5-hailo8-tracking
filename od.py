@@ -2595,6 +2595,13 @@ def camera_loop():
         _cpu_fallback_loop()
         return
 
+    # Ensure _restart_event and _table_preview_stop are defined
+    global _restart_event, _table_preview_stop
+    import threading
+    if '_restart_event' not in globals() or _restart_event is None:
+        _restart_event = threading.Event()
+    if '_table_preview_stop' not in globals() or _table_preview_stop is None:
+        _table_preview_stop = threading.Event()
     # Register handlers so robot_brain.switch_camera() can restart this pipeline
     # when the operator switches camera mode from the GUI or via Crestron.
     # HIGH_CAM and DUAL_CAM share the same main pipeline/camera path, so avoid
