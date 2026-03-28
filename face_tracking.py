@@ -40,8 +40,10 @@ def _on_new_sample(sink, _user_data=None):
     """Appsink callback: pull a frame, run Haar detection, update arm position."""
     global _smooth_x, _smooth_y, _smooth_z
 
+    print("[DEBUG] _on_new_sample called")
     sample = sink.emit("pull-sample")
     if sample is None:
+        print("[DEBUG] No sample pulled from sink")
         return Gst.FlowReturn.OK
 
     buf = sample.get_buffer()
@@ -55,6 +57,7 @@ def _on_new_sample(sink, _user_data=None):
         return Gst.FlowReturn.OK
 
     try:
+        print(f"[DEBUG] Mapping buffer to frame of size w={w}, h={h}")
         frame = np.frombuffer(mapinfo.data, dtype=np.uint8).reshape((h, w, 3))
         gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
         faces = _face_cascade.detectMultiScale(
@@ -64,6 +67,7 @@ def _on_new_sample(sink, _user_data=None):
             minSize=config.FACE_MIN_SIZE,
         )
 
+        print(f"[DEBUG] faces detected: {len(faces)}")
         if len(faces):
             # Track the largest detected face
             areas = [face_w * face_h for _, _, face_w, face_h in faces]
@@ -71,10 +75,10 @@ def _on_new_sample(sink, _user_data=None):
             cx = face_x + face_w // 2
             cy = face_y + face_h // 2
 
+            print(f"[DEBUG] Largest face center: cx={cx}, cy={cy}")
             tx, ty, tz = _map_face_to_arm(cx, cy, w, h)
             ny = cy / h
-            if getattr(config, "DEBUG_FACE_Z", True):
-                print(f"[DEBUG] Detected face: cy={cy}, ny={ny:.3f}, z={tz:.3f} (frame h={h})")
+            print(f"[DEBUG] Detected face: cy={cy}, ny={ny:.3f}, z={tz:.3f} (frame h={h})")
 
             # Exponential moving average for smooth motion
             a = config.TRACKING_ALPHA
