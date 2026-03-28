@@ -7,7 +7,11 @@ import subprocess
 import json
 import shutil
 import time
+
 import threading
+
+# Ensure _table_preview_thread is defined at module level to avoid NameError
+_table_preview_thread = None
 
 # Third-party imports
 import numpy as np
