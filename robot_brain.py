@@ -2306,11 +2306,10 @@ class RobotTuner:
         self.shared_params[k] = float(v)
         if k in ("home_pulse_servo3", "home_pulse_servo4", "home_pulse_servo5"):
             self._apply_home_pose_params_to_config()
-        if k in ("tune_x", "tune_y", "tune_z"):
-            self._clamp_manual_target()
-            self._sync_scale_widgets()
+        # Only clamp in manual mode
         if self.manual_mode and k in ("tune_x", "tune_y", "tune_z"):
             self._clamp_manual_target()
+            self._sync_scale_widgets()
             reach_for_manual_coordinate(
                 self.shared_params["tune_x"],
                 self.shared_params["tune_y"],
