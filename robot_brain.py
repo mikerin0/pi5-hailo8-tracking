@@ -1938,19 +1938,20 @@ class RobotTuner:
 
     def create_gui(self):
         # --- Debug Print Toggles ---
-        self.debug_prints_enabled = tk.BooleanVar(value=True)
-        def toggle_debug_prints():
-            import config
-            config.FINGER_GESTURE_PRINTS_ENABLED = self.debug_prints_enabled.get()
-            config.DEBUG_FACE_Z = self.debug_prints_enabled.get()
-            config.CRESTRON_PRINTS_ENABLED = self.debug_prints_enabled.get()
-        tk.Checkbutton(action_col, text="Enable Finger/Creston Debug Prints", variable=self.debug_prints_enabled, command=toggle_debug_prints, font=("Arial", 10), fg="purple").pack(pady=6)
+        # Must be created after self.root = tk.Tk()
         self.root = tk.Tk()
         self.root.title("Robot Controls - Pi Server Mode")
         self.root.geometry("980x860")
         self._apply_window_state()
         self.root.protocol("WM_DELETE_WINDOW", self._on_window_close)
 
+        self.debug_prints_enabled = tk.BooleanVar(value=True)
+        def toggle_debug_prints():
+            import config
+            config.FINGER_GESTURE_PRINTS_ENABLED = self.debug_prints_enabled.get()
+            config.DEBUG_FACE_Z = self.debug_prints_enabled.get()
+            config.CRESTRON_PRINTS_ENABLED = self.debug_prints_enabled.get()
+        # The action_col is created below, so we will add the Checkbutton after action_col is created.
         self.slider_window = tk.Toplevel(self.root)
         self.slider_window.title("Robot Sliders - Pi Server Mode")
         self.slider_window.geometry("760x860")
@@ -1968,6 +1969,9 @@ class RobotTuner:
         action_col.grid(row=0, column=0, sticky="nw", padx=(0, 10))
         status_col.grid(row=0, column=1, sticky="nw", padx=(0, 10))
         model_col.grid(row=0, column=2, sticky="nw")
+
+        # Now that action_col exists, add the debug print toggle button
+        tk.Checkbutton(action_col, text="Enable Finger/Creston Debug Prints", variable=self.debug_prints_enabled, command=toggle_debug_prints, font=("Arial", 10), fg="purple").pack(pady=6)
 
         slider_cols = tk.Frame(sliders_body)
         slider_cols.pack(fill="both", expand=True, padx=10, pady=8)
