@@ -1159,6 +1159,14 @@ def reach_for_coordinate(x, y, z, speed=800):
         y = float(y)
         z = float(z)
         speed = int(speed)
+        # Update GUI Z slider to reflect tracked Z
+        try:
+            if hasattr(globals().get('tuner', None), 'shared_params'):
+                tuner.shared_params['tune_z'] = z
+                if hasattr(tuner, '_sync_scale_widgets'):
+                    tuner._sync_scale_widgets()
+        except Exception as e:
+            print(f"[DEBUG] Failed to update Z slider: {e}")
         cap = int(getattr(config, "SAFE_STARTUP_FIRST_MOVE_SPEED_CAP", 0))
         if cap > 0 and not _first_move_capped:
             speed = max(speed, cap)
@@ -1181,7 +1189,8 @@ def reach_for_coordinate(x, y, z, speed=800):
             3: 1500 + int(angles[4] * 637)
         }
         for id, pos in new_p.items(): move_servo(id, pos, speed)
-    except Exception as e: print(f"IK Error: {e}")
+    except Exception as e:
+        print(f"IK Error: {e}")
 
 
 def reach_for_manual_coordinate(x, y, z, speed=900, respect_config_speed=True):
