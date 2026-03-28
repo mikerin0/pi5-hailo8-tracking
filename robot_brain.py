@@ -2053,8 +2053,8 @@ class RobotTuner:
         # Vertical slider for Z
         z_lbl = "Height Z"
         z_k = "tune_z"
-        z_mn = float(getattr(config, "MANUAL_Z_MIN", 0.12))
-        z_mx = float(getattr(config, "MANUAL_Z_MAX", 0.40))
+        z_mn = float(getattr(config, "ARM_MIN_Z", 0.05))
+        z_mx = float(getattr(config, "ARM_MAX_Z", 0.75))
         z_res = 0.001
         tk.Label(slider_left, text=z_lbl).pack()
         z_slider = tk.Scale(slider_left, from_=z_mx, to=z_mn, resolution=z_res, orient='vertical', length=220, command=lambda v, k=z_k: self.update_tune(k, v))
