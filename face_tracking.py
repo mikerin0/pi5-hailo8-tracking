@@ -107,6 +107,7 @@ def _build_pipeline():
         f"queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
         f"appsink name=sink emit-signals=true sync={config.GST_SYNC}"
     )
+    print("[DEBUG] _build_pipeline called")
     pipe = Gst.parse_launch(launch_str)
     sink = pipe.get_by_name("sink")
     sink.connect("new-sample", _on_new_sample)
@@ -117,8 +118,10 @@ def _build_pipeline():
 def start():
     """Start the face-tracking pipeline (non-blocking)."""
     global _pipe, _running
+    print("[DEBUG] face_tracking.start() called")
     with _lock:
         if _running:
+            print("[DEBUG] face_tracking.start(): already running")
             return
         _pipe = _build_pipeline()
         _pipe.set_state(Gst.State.PLAYING)
@@ -140,6 +143,7 @@ def stop():
 
 def camera_loop():
     """Blocking loop that starts face tracking and restarts on failure."""
+    print("[DEBUG] face_tracking.camera_loop() called")
     while True:
         start()
         try:
