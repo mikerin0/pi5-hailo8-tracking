@@ -110,6 +110,7 @@ def _build_pipeline():
     pipe = Gst.parse_launch(launch_str)
     sink = pipe.get_by_name("sink")
     sink.connect("new-sample", _on_new_sample)
+    print("[DEBUG] Registered _on_new_sample callback with appsink")
     return pipe
 
 
