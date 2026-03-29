@@ -41,24 +41,32 @@ def _on_new_sample(sink, _user_data=None):
     global _smooth_x, _smooth_y, _smooth_z
 
     print("[DEBUG] _on_new_sample called")
+    print(f"[DEBUG] sink: {sink}, user_data: {_user_data}")
     sample = sink.emit("pull-sample")
+    print(f"[DEBUG] sample: {sample}")
     if sample is None:
         print("[DEBUG] No sample pulled from sink")
         return Gst.FlowReturn.OK
 
     buf = sample.get_buffer()
+    print(f"[DEBUG] buffer: {buf}")
     caps = sample.get_caps()
+    print(f"[DEBUG] caps: {caps}")
     struct = caps.get_structure(0)
     w = struct.get_value("width")
     h = struct.get_value("height")
+    print(f"[DEBUG] frame width: {w}, height: {h}")
 
     success, mapinfo = buf.map(Gst.MapFlags.READ)
+    print(f"[DEBUG] buffer map success: {success}")
     if not success:
+        print("[DEBUG] Failed to map buffer")
         return Gst.FlowReturn.OK
 
     try:
         print(f"[DEBUG] Mapping buffer to frame of size w={w}, h={h}")
         frame = np.frombuffer(mapinfo.data, dtype=np.uint8).reshape((h, w, 3))
+        print(f"[DEBUG] Frame shape: {frame.shape}")
         # Show video preview window
         cv2.imshow("Face Tracking Preview", frame)
         cv2.waitKey(1)
@@ -96,6 +104,7 @@ def _on_new_sample(sink, _user_data=None):
                     int(params.get("speed", 800)),
                 )
     finally:
+        print("[DEBUG] Unmapping buffer")
         buf.unmap(mapinfo)
 
     return Gst.FlowReturn.OK
@@ -111,6 +120,7 @@ def _build_pipeline():
         f"appsink name=sink emit-signals=true sync={config.GST_SYNC}"
     )
     print("[DEBUG] _build_pipeline called")
+    print(f"[DEBUG] Building pipeline with device: {config.PI_CAMERA_DEVICE}, width: {config.FRAME_W}, height: {config.FRAME_H}")
     pipe = Gst.parse_launch(launch_str)
     sink = pipe.get_by_name("sink")
     sink.connect("new-sample", _on_new_sample)
@@ -127,7 +137,9 @@ def start():
             print("[DEBUG] face_tracking.start(): already running")
             return
         _pipe = _build_pipeline()
-        _pipe.set_state(Gst.State.PLAYING)
+        print(f"[DEBUG] Pipeline object: {_pipe}")
+        ret = _pipe.set_state(Gst.State.PLAYING)
+        print(f"[DEBUG] Pipeline set_state PLAYING returned: {ret}")
         _running = True
         print("--- Face Tracking: Pipeline Started ---")
 
