@@ -1,5 +1,6 @@
 # face_tracking.py – Face tracking via Pi Camera (port 1) with OpenCV Haar Cascade
 import os, time, threading
+import sys
 import cv2
 import numpy as np
 import gi
@@ -16,6 +17,12 @@ _smooth_y = config.ARM_Y_DEFAULT
 _smooth_z = config.ARM_Z_DEFAULT
 
 _face_cascade = cv2.CascadeClassifier(config.HAAR_CASCADE_PATH)
+
+# Redirect all stdout/stderr to a log file for debugging
+_LOG_PATH = os.path.join(os.path.dirname(__file__), "face_tracking_debug.log")
+_log_file = open(_LOG_PATH, "a", buffering=1)
+sys.stdout = _log_file
+sys.stderr = _log_file
 _pipe = None
 _running = False
 _lock = threading.Lock()
