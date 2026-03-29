@@ -8,6 +8,9 @@ import json
 import shutil
 import time
 
+# Ensure _last_table_obj_trigger_time is always defined
+_last_table_obj_trigger_time = 0.0
+
 import threading
 
 # Ensure _table_preview_thread, _table_obj_stop, _table_obj_thread, and _last_table_obj_trigger_time are defined at module level to avoid NameError
