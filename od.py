@@ -2686,39 +2686,15 @@ def camera_loop():
         _restart_event.clear()
 
         pipe = None
-        try:
-            pre_window_ids = {row.get("id") for row in _wmctrl_windows()}
-            src_segment = _build_camera_src_segment(mode, cam_path)
-            # Capture at IMX708 native 16:9, downscale to the 640×640 square the
-            # yolov8m_pose network expects.  hailotracker provides consistent IDs
-            # across frames; hailooverlay draws skeleton overlays on the preview.
-            overlay_enabled = (
-                mode == "TABLE_CAM"
-                and bool(getattr(config, "TABLE_HANDOFF_OVERLAY_ENABLED", False))
+        # All pipeline and preview logic removed for HIGH_CAM mode; face_tracking.py owns the camera
+        selected_target_type = str(
+            brain.tuner.shared_params.get(
+                "table_object_target_type",
+                getattr(config, "TABLE_OBJECT_TARGET_TYPE", "any"),
             )
-            finger_branch_enabled = (
-                mode == "HIGH_CAM"
-                and bool(getattr(config, "FINGER_GESTURE_EVENTS_ENABLED", True))
-                and mp is not None
-            )
-            table_model_branch_enabled = (
-                mode == "TABLE_CAM"
-                and (
-                    bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False))
-                    or bool(getattr(config, "TABLE_OBJECT_SUMMARY_ENABLED", True))
-                )
-                and bool(getattr(config, "TABLE_OBJECT_MODEL_ENABLED", False))
-                and os.path.isfile(getattr(config, "TABLE_OBJECT_HEF_PATH", ""))
-                and os.path.isfile(getattr(config, "TABLE_OBJECT_SO_PATH", ""))
-            )
-            selected_target_type = str(
-                brain.tuner.shared_params.get(
-                    "table_object_target_type",
-                    getattr(config, "TABLE_OBJECT_TARGET_TYPE", "any"),
-                )
-            ).strip().lower()
-            # Remove all pipeline creation and preview logic in HIGH_CAM mode; face_tracking.py owns the camera
-            pipe = None
+        ).strip().lower()
+        # Remove all pipeline creation and preview logic in HIGH_CAM mode; face_tracking.py owns the camera
+        pipe = None
 
 if __name__ == "__main__":
     print(f"--- od.py version {_VERSION} ---")
