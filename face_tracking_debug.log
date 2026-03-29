@@ -60389,3 +60389,238 @@ Camera switched to: HIGH_CAM
 [DEBUG] Unmapping buffer
 [DEBUG] _on_new_sample called
 [DEBUG] sink: <__gi__.GstAppSink object at 0x7fff68707c80 (GstAppSink at 0x2d124580)>, user_data: None
+Displayed thinking face on LCD
+--- od.py version 2026.03.01-03 ---
+[STARTUP +  0.000s] od.py main: startup begin
+[STARTUP +  0.000s] startup config: power_on=False coord_move=False slow_home=True
+[STARTUP +  0.000s] startup hard no-motion override active
+[STARTUP +  0.000s] step 1/3: power up board (auto)
+Startup safety: servo power remains OFF until an explicit motion command
+[STARTUP +  0.000s] startup path: power remains off
+[STARTUP +  0.000s] step 3 confirmed: startup complete, tracking remains paused
+Startup complete. Tracking remains paused; press RESUME when ready.
+[STARTUP +  0.000s] startup path: steer worker started
+[STARTUP +  0.001s] startup path: camera_thread started
+[STARTUP +  0.001s] startup path: entering brain UI
+Gripper microswitch: enabled on BCM 17
+--- Pi Server Active: Waiting for Crestron on 50005 ---
+--- USB Mic Voice Commands: listener starting ---
+Camera already in mode: HIGH_CAM
+[TABLE_CAM] Switched to TABLE_CAM (face_tracking stopped)
+Camera switched to: TABLE_CAM
+[DEBUG] face_tracking.start() called
+[DEBUG] _build_pipeline called (Hailo pose pipeline)
+[DEBUG] Building pipeline with device: /base/axi/pcie@1000120000/rp1/i2c@80000/imx708@1a, width: 640, height: 360
+[DEBUG] Registered _on_new_sample callback with appsink (preview_sink)
+[DEBUG] Pipeline object: <Gst.Pipeline object at 0x7fff7842ccc0 (GstPipeline at 0x43a100d0)>
+[DEBUG] Pipeline set_state PLAYING returned: <enum GST_STATE_CHANGE_ASYNC of type Gst.StateChangeReturn>
+--- Face Tracking: Pipeline Started ---
+Camera switched to: HIGH_CAM
+[DEBUG] _on_new_sample called
+[DEBUG] sink: <__gi__.GstAppSink object at 0x7fff7842ef40 (GstAppSink at 0x43a0c4b0)>, user_data: None
+[DEBUG] sample: <Gst.Sample object at 0x7fff784211f0 (GstSample at 0x42741480)>
+[DEBUG] buffer: <Gst.Buffer object at 0x7fff784212b0 (GstBuffer at 0x7fff2c0d9900)>
+[DEBUG] caps: <Gst.Caps object at 0x7fff78421310 (GstCaps at 0x7ffef80064f0)>
+[DEBUG] frame width: 640, height: 360
+[DEBUG] buffer map success: True
+[DEBUG] Mapping buffer to frame of size w=640, h=360
+[DEBUG] Frame shape: (360, 640, 3)
+[DEBUG] faces detected: 0
+[DEBUG] Unmapping buffer
+[DEBUG] _on_new_sample called
+[DEBUG] sink: <__gi__.GstAppSink object at 0x7fff7842ef40 (GstAppSink at 0x43a0c4b0)>, user_data: None
+[DEBUG] sample: <Gst.Sample object at 0x7fff784214f0 (GstSample at 0x42741480)>
+[DEBUG] buffer: <Gst.Buffer object at 0x7fff78421490 (GstBuffer at 0x7fff2c0d9a20)>
+[DEBUG] caps: <Gst.Caps object at 0x7fff78421430 (GstCaps at 0x7ffef80064f0)>
+[DEBUG] frame width: 640, height: 360
+[DEBUG] buffer map success: True
+[DEBUG] Mapping buffer to frame of size w=640, h=360
+[DEBUG] Frame shape: (360, 640, 3)
+[DEBUG] faces detected: 0
+[DEBUG] Unmapping buffer
+[DEBUG] _on_new_sample called
+[DEBUG] sink: <__gi__.GstAppSink object at 0x7fff7842ef40 (GstAppSink at 0x43a0c4b0)>, user_data: None
+[DEBUG] sample: <Gst.Sample object at 0x7fff784211f0 (GstSample at 0x42741480)>
+[DEBUG] buffer: <Gst.Buffer object at 0x7fff784212b0 (GstBuffer at 0x7fff2c0d9900)>
+[DEBUG] caps: <Gst.Caps object at 0x7fff78421310 (GstCaps at 0x7ffef80064f0)>
+[DEBUG] frame width: 640, height: 360
+[DEBUG] buffer map success: True
+[DEBUG] Mapping buffer to frame of size w=640, h=360
+[DEBUG] Frame shape: (360, 640, 3)
+[DEBUG] faces detected: 0
+[DEBUG] Unmapping buffer
+[DEBUG] _on_new_sample called
+[DEBUG] sink: <__gi__.GstAppSink object at 0x7fff7842ef40 (GstAppSink at 0x43a0c4b0)>, user_data: None
+[DEBUG] sample: <Gst.Sample object at 0x7fff784214f0 (GstSample at 0x42741480)>
+[DEBUG] buffer: <Gst.Buffer object at 0x7fff78421490 (GstBuffer at 0x7fff2c0d9a20)>
+[DEBUG] caps: <Gst.Caps object at 0x7fff78421430 (GstCaps at 0x7ffef80064f0)>
+[DEBUG] frame width: 640, height: 360
+[DEBUG] buffer map success: True
+[DEBUG] Mapping buffer to frame of size w=640, h=360
+[DEBUG] Frame shape: (360, 640, 3)
+[DEBUG] faces detected: 0
+[DEBUG] Unmapping buffer
+[DEBUG] _on_new_sample called
+[DEBUG] sink: <__gi__.GstAppSink object at 0x7fff7afa9a00 (GstAppSink at 0x43a0c4b0)>, user_data: None
+[DEBUG] sample: <Gst.Sample object at 0x7fff78420fb0 (GstSample at 0x42741480)>
+[DEBUG] buffer: <Gst.Buffer object at 0x7fff784212b0 (GstBuffer at 0x7fff2c0d9900)>
+[DEBUG] caps: <Gst.Caps object at 0x7fff78421310 (GstCaps at 0x7ffef80064f0)>
+[DEBUG] frame width: 640, height: 360
+[DEBUG] buffer map success: True
+[DEBUG] Mapping buffer to frame of size w=640, h=360
+[DEBUG] Frame shape: (360, 640, 3)
+[DEBUG] faces detected: 0
+[DEBUG] Unmapping buffer
+[DEBUG] _on_new_sample called
+[DEBUG] sink: <__gi__.GstAppSink object at 0x7fff7afa9a00 (GstAppSink at 0x43a0c4b0)>, user_data: None
+[DEBUG] sample: <Gst.Sample object at 0x7fff784214f0 (GstSample at 0x42741480)>
+[DEBUG] buffer: <Gst.Buffer object at 0x7fff78421490 (GstBuffer at 0x7fff2c0d9a20)>
+[DEBUG] caps: <Gst.Caps object at 0x7fff78421430 (GstCaps at 0x7ffef80064f0)>
+[DEBUG] frame width: 640, height: 360
+[DEBUG] buffer map success: True
+[DEBUG] Mapping buffer to frame of size w=640, h=360
+[DEBUG] Frame shape: (360, 640, 3)
+Crestron Connected: ('172.31.31.52', 60894)
+[DEBUG] faces detected: 0
+[DEBUG] Unmapping buffer
+[DEBUG] _on_new_sample called
+[DEBUG] sink: <__gi__.GstAppSink object at 0x7fff7afa9a00 (GstAppSink at 0x43a0c4b0)>, user_data: None
+[DEBUG] sample: <Gst.Sample object at 0x7fff78420fb0 (GstSample at 0x42741480)>
+[DEBUG] buffer: <Gst.Buffer object at 0x7fff784212b0 (GstBuffer at 0x7fff2c0d9900)>
+[DEBUG] caps: <Gst.Caps object at 0x7fff78421310 (GstCaps at 0x7ffef80064f0)>
+[DEBUG] frame width: 640, height: 360
+[DEBUG] buffer map success: True
+[DEBUG] Mapping buffer to frame of size w=640, h=360
+[DEBUG] Frame shape: (360, 640, 3)
+[DEBUG] faces detected: 0
+[DEBUG] Unmapping buffer
+[DEBUG] _on_new_sample called
+[DEBUG] sink: <__gi__.GstAppSink object at 0x7fff7afa9a00 (GstAppSink at 0x43a0c4b0)>, user_data: None
+[DEBUG] sample: <Gst.Sample object at 0x7fff784214f0 (GstSample at 0x42741480)>
+[DEBUG] buffer: <Gst.Buffer object at 0x7fff78421490 (GstBuffer at 0x7fff2c0d9a20)>
+[DEBUG] caps: <Gst.Caps object at 0x7fff78421430 (GstCaps at 0x7ffef80064f0)>
+[DEBUG] frame width: 640, height: 360
+[DEBUG] buffer map success: True
+[DEBUG] Mapping buffer to frame of size w=640, h=360
+[DEBUG] Frame shape: (360, 640, 3)
+[DEBUG] faces detected: 0
+[DEBUG] Unmapping buffer
+[DEBUG] _on_new_sample called
+[DEBUG] sink: <__gi__.GstAppSink object at 0x7fff7afa9a00 (GstAppSink at 0x43a0c4b0)>, user_data: None
+[DEBUG] sample: <Gst.Sample object at 0x7fff78420fb0 (GstSample at 0x42741480)>
+[DEBUG] buffer: <Gst.Buffer object at 0x7fff784212b0 (GstBuffer at 0x7fff2c0d9900)>
+[DEBUG] caps: <Gst.Caps object at 0x7fff78421310 (GstCaps at 0x7ffef80064f0)>
+[DEBUG] frame width: 640, height: 360
+[DEBUG] buffer map success: True
+[DEBUG] Mapping buffer to frame of size w=640, h=360
+[DEBUG] Frame shape: (360, 640, 3)
+[DEBUG] faces detected: 0
+[DEBUG] Unmapping buffer
+[DEBUG] _on_new_sample called
+[DEBUG] sink: <__gi__.GstAppSink object at 0x7fff7afa9a00 (GstAppSink at 0x43a0c4b0)>, user_data: None
+[DEBUG] sample: <Gst.Sample object at 0x7fff784214f0 (GstSample at 0x42741480)>
+[DEBUG] buffer: <Gst.Buffer object at 0x7fff78421490 (GstBuffer at 0x7fff2c0d9a20)>
+[DEBUG] caps: <Gst.Caps object at 0x7fff78421430 (GstCaps at 0x7ffef80064f0)>
+[DEBUG] frame width: 640, height: 360
+[DEBUG] buffer map success: True
+[DEBUG] Mapping buffer to frame of size w=640, h=360
+[DEBUG] Frame shape: (360, 640, 3)
+[DEBUG] faces detected: 0
+[DEBUG] Unmapping buffer
+[DEBUG] _on_new_sample called
+[DEBUG] sink: <__gi__.GstAppSink object at 0x7fff7afa9a00 (GstAppSink at 0x43a0c4b0)>, user_data: None
+[DEBUG] sample: <Gst.Sample object at 0x7fff78420fb0 (GstSample at 0x42741480)>
+[DEBUG] buffer: <Gst.Buffer object at 0x7fff784212b0 (GstBuffer at 0x7fff2c0d9900)>
+[DEBUG] caps: <Gst.Caps object at 0x7fff78421310 (GstCaps at 0x7ffef80064f0)>
+[DEBUG] frame width: 640, height: 360
+[DEBUG] buffer map success: True
+[DEBUG] Mapping buffer to frame of size w=640, h=360
+[DEBUG] Frame shape: (360, 640, 3)
+[DEBUG] faces detected: 0
+[DEBUG] Unmapping buffer
+[DEBUG] _on_new_sample called
+[DEBUG] sink: <__gi__.GstAppSink object at 0x7fff7afa9a00 (GstAppSink at 0x43a0c4b0)>, user_data: None
+[DEBUG] sample: <Gst.Sample object at 0x7fff784214f0 (GstSample at 0x42741480)>
+[DEBUG] buffer: <Gst.Buffer object at 0x7fff78421490 (GstBuffer at 0x7fff2c0d9a20)>
+[DEBUG] caps: <Gst.Caps object at 0x7fff78421430 (GstCaps at 0x7ffef80064f0)>
+[DEBUG] frame width: 640, height: 360
+[DEBUG] buffer map success: True
+[DEBUG] Mapping buffer to frame of size w=640, h=360
+[DEBUG] Frame shape: (360, 640, 3)
+[DEBUG] faces detected: 0
+[DEBUG] Unmapping buffer
+[DEBUG] _on_new_sample called
+[DEBUG] sink: <__gi__.GstAppSink object at 0x7fff7afa9a00 (GstAppSink at 0x43a0c4b0)>, user_data: None
+[DEBUG] sample: <Gst.Sample object at 0x7fff78420fb0 (GstSample at 0x42741480)>
+[DEBUG] buffer: <Gst.Buffer object at 0x7fff784212b0 (GstBuffer at 0x7fff2c0d9900)>
+[DEBUG] caps: <Gst.Caps object at 0x7fff78421310 (GstCaps at 0x7ffef80064f0)>
+[DEBUG] frame width: 640, height: 360
+[DEBUG] buffer map success: True
+[DEBUG] Mapping buffer to frame of size w=640, h=360
+[DEBUG] Frame shape: (360, 640, 3)
+[DEBUG] faces detected: 0
+[DEBUG] Unmapping buffer
+[DEBUG] _on_new_sample called
+[DEBUG] sink: <__gi__.GstAppSink object at 0x7fff7afa9a00 (GstAppSink at 0x43a0c4b0)>, user_data: None
+[DEBUG] sample: <Gst.Sample object at 0x7fff784214f0 (GstSample at 0x42741480)>
+[DEBUG] buffer: <Gst.Buffer object at 0x7fff78421490 (GstBuffer at 0x7fff2c0d9a20)>
+[DEBUG] caps: <Gst.Caps object at 0x7fff78421430 (GstCaps at 0x7ffef80064f0)>
+[DEBUG] frame width: 640, height: 360
+[DEBUG] buffer map success: True
+[DEBUG] Mapping buffer to frame of size w=640, h=360
+[DEBUG] Frame shape: (360, 640, 3)
+[DEBUG] faces detected: 0
+[DEBUG] Unmapping buffer
+[DEBUG] _on_new_sample called
+[DEBUG] sink: <__gi__.GstAppSink object at 0x7fff7afa9a00 (GstAppSink at 0x43a0c4b0)>, user_data: None
+[DEBUG] sample: <Gst.Sample object at 0x7fff78420fb0 (GstSample at 0x42741480)>
+[DEBUG] buffer: <Gst.Buffer object at 0x7fff784212b0 (GstBuffer at 0x7fff2c0d9900)>
+[DEBUG] caps: <Gst.Caps object at 0x7fff78421310 (GstCaps at 0x7ffef80064f0)>
+[DEBUG] frame width: 640, height: 360
+[DEBUG] buffer map success: True
+[DEBUG] Mapping buffer to frame of size w=640, h=360
+[DEBUG] Frame shape: (360, 640, 3)
+[DEBUG] faces detected: 0
+[DEBUG] Unmapping buffer
+[DEBUG] _on_new_sample called
+[DEBUG] sink: <__gi__.GstAppSink object at 0x7fff7afa9a00 (GstAppSink at 0x43a0c4b0)>, user_data: None
+[DEBUG] sample: <Gst.Sample object at 0x7fff784214f0 (GstSample at 0x42741480)>
+[DEBUG] buffer: <Gst.Buffer object at 0x7fff78421490 (GstBuffer at 0x7fff2c0d9a20)>
+[DEBUG] caps: <Gst.Caps object at 0x7fff78421430 (GstCaps at 0x7ffef80064f0)>
+[DEBUG] frame width: 640, height: 360
+[DEBUG] buffer map success: True
+[DEBUG] Mapping buffer to frame of size w=640, h=360
+[DEBUG] Frame shape: (360, 640, 3)
+[DEBUG] faces detected: 0
+[DEBUG] Unmapping buffer
+[DEBUG] _on_new_sample called
+[DEBUG] sink: <__gi__.GstAppSink object at 0x7fff7afa9a00 (GstAppSink at 0x43a0c4b0)>, user_data: None
+[DEBUG] sample: <Gst.Sample object at 0x7fff78420fb0 (GstSample at 0x42741480)>
+[DEBUG] buffer: <Gst.Buffer object at 0x7fff784212b0 (GstBuffer at 0x7fff2c0d9900)>
+[DEBUG] caps: <Gst.Caps object at 0x7fff78421310 (GstCaps at 0x7ffef80064f0)>
+[DEBUG] frame width: 640, height: 360
+[DEBUG] buffer map success: True
+[DEBUG] Mapping buffer to frame of size w=640, h=360
+[DEBUG] Frame shape: (360, 640, 3)
+[DEBUG] faces detected: 0
+[DEBUG] Unmapping buffer
+[DEBUG] _on_new_sample called
+[DEBUG] sink: <__gi__.GstAppSink object at 0x7fff7afa9a00 (GstAppSink at 0x43a0c4b0)>, user_data: None
+[DEBUG] sample: <Gst.Sample object at 0x7fff784214f0 (GstSample at 0x42741480)>
+[DEBUG] buffer: <Gst.Buffer object at 0x7fff78421490 (GstBuffer at 0x7fff2c0d9a20)>
+[DEBUG] caps: <Gst.Caps object at 0x7fff78421430 (GstCaps at 0x7ffef80064f0)>
+[DEBUG] frame width: 640, height: 360
+[DEBUG] buffer map success: True
+[DEBUG] Mapping buffer to frame of size w=640, h=360
+[DEBUG] Frame shape: (360, 640, 3)
+[DEBUG] faces detected: 0
+[DEBUG] Unmapping buffer
+[DEBUG] _on_new_sample called
+[DEBUG] sink: <__gi__.GstAppSink object at 0x7fff7afa9a00 (GstAppSink at 0x43a0c4b0)>, user_data: None
+[DEBUG] sample: <Gst.Sample object at 0x7fff78420fb0 (GstSample at 0x42741480)>
+[DEBUG] buffer: <Gst.Buffer object at 0x7fff784212b0 (GstBuffer at 0x7fff2c0d9900)>
+[DEBUG] caps: <Gst.Caps object at 0x7fff78421310 (GstCaps at 0x7ffef80064f0)>
+[DEBUG] frame width: 640, height: 360
+[DEBUG] buffer map success: True
+[DEBUG] Mapping buffer to frame of size w=640, h=360
+[DEBUG] Frame shape: (360, 640, 3)
