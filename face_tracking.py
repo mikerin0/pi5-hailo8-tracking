@@ -183,3 +183,4 @@ def stop():
             cv2.imshow("Face Tracking Preview", frame_bgr)
             cv2.waitKey(1)
         except Exception as e:
+            print(f"[FaceTracking] Exception in video preview: {e}")
