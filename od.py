@@ -2714,6 +2714,7 @@ def camera_loop():
                 and os.path.isfile(getattr(config, "TABLE_OBJECT_SO_PATH", ""))
             )
             try:
+
                 selected_target_type = str(
                     brain.tuner.shared_params.get(
                         "table_object_target_type",
