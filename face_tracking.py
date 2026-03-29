@@ -74,9 +74,8 @@ def _on_new_sample(sink, _user_data=None):
         print(f"[DEBUG] Mapping buffer to frame of size w={w}, h={h}")
         frame = np.frombuffer(mapinfo.data, dtype=np.uint8).reshape((h, w, 3))
         print(f"[DEBUG] Frame shape: {frame.shape}")
-        # Show video preview window
-        cv2.imshow("Face Tracking Preview", frame)
-        cv2.waitKey(1)
+        # Convert RGB to BGR for OpenCV display
+        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
         gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
         faces = _face_cascade.detectMultiScale(
             gray,
@@ -92,6 +91,9 @@ def _on_new_sample(sink, _user_data=None):
             face_x, face_y, face_w, face_h = faces[int(np.argmax(areas))]
             cx = face_x + face_w // 2
             cy = face_y + face_h // 2
+
+            # Draw rectangle overlay for the detected face
+            cv2.rectangle(frame_bgr, (face_x, face_y), (face_x + face_w, face_y + face_h), (0, 255, 0), 2)
 
             print(f"[DEBUG] Largest face center: cx={cx}, cy={cy}")
             tx, ty, tz = _map_face_to_arm(cx, cy, w, h)
@@ -110,6 +112,9 @@ def _on_new_sample(sink, _user_data=None):
                     _smooth_x, _smooth_y, _smooth_z,
                     int(params.get("speed", 800)),
                 )
+        # Show video preview window with overlays and correct color
+        cv2.imshow("Face Tracking Preview", frame_bgr)
+        cv2.waitKey(1)
     finally:
         print("[DEBUG] Unmapping buffer")
         buf.unmap(mapinfo)
