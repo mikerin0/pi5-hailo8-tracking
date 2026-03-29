@@ -2643,22 +2643,7 @@ def camera_loop():
     prev_mode = None
 
     main_window_name = "Pi5 AI Vision"
-    main_window_ready = False
-    last_preview_ok_t = 0.0
-    last_preview_warn_t = 0.0
-    last_preview_reset_t = 0.0
-
-    def _open_main_preview_window():
-        try:
-            cv2.namedWindow(main_window_name, cv2.WINDOW_NORMAL)
-            _apply_saved_video_window_state(main_window_name, config.FRAME_W, config.FRAME_H)
-            cv2.waitKey(1)
-            return True
-        except Exception as e:
-            print(f"Preview window disabled: {e}")
-            return False
-
-    main_window_ready = _open_main_preview_window()
+    # Remove all preview window logic in HIGH_CAM mode; face_tracking.py owns the camera and preview
 
     global _table_obj_dualcam_disabled_warned
     while not brain.shutdown_event.is_set():
@@ -2694,9 +2679,11 @@ def camera_loop():
                 print("WARNING: DUAL_CAM object worker disabled for stability (gst-libcamera crash guard)")
                 _table_obj_dualcam_disabled_warned = True
         else:
+            # HIGH_CAM: do not start or own any camera/video pipeline or preview window here
             cam_path = config.PI_CAMERA_DEVICE
             _stop_table_preview()
             _stop_table_object_worker()
+            # Do not create any pipeline or preview window; face_tracking.py owns the camera
 
         _restart_event.clear()
 
@@ -2735,227 +2722,8 @@ def camera_loop():
                 ).strip().lower()
             except Exception:
                 selected_target_type = "any"
-            summary_enabled = bool(getattr(config, "TABLE_OBJECT_SUMMARY_ENABLED", True))
-            # Keep AI-hat model active for vision summaries even when a color target
-            # is selected, unless summary mode is explicitly disabled.
-            # This lets "WHAT DO YOU SEE" describe detector labels instead of only
-            # color/blob fallback labels like "object".
-            if selected_target_type != "any" and not summary_enabled:
-                table_model_branch_enabled = False
-            if bool(brain.tuner.shared_params.get("table_follow_color_active", 0)):
-                table_model_branch_enabled = False
-            table_object_branch_enabled = (
-                mode == "TABLE_CAM"
-                and (
-                    bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False))
-                    or bool(getattr(config, "TABLE_OBJECT_SUMMARY_ENABLED", True))
-                )
-                and not table_model_branch_enabled
-            )
-
-            if finger_branch_enabled:
-                # Keep finger gestures on a clean raw branch (no overlay artifacts),
-                # while preview stays annotated from the Hailo branch.
-                launch_str = (
-                    src_segment +
-                    f"videoconvert ! tee name=t "
-                    f"t. ! queue leaky=downstream max-size-buffers=1 ! "
-                    f"videoconvert ! videoscale ! video/x-raw,format=RGB,width={config.FRAME_W},height={config.FRAME_H} ! "
-                    f"appsink name=finger_sink emit-signals=false sync=false drop=true max-buffers=1 "
-                    f"t. ! queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
-                    f"videoscale ! video/x-raw,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
-                    f"hailonet hef-path={HEF_PATH} force-writable=true ! "
-                    f"hailofilter name=hailofilter so-path={SO_PATH} ! "
-                    f"hailotracker ! hailooverlay ! "
-                    f"videoconvert ! videoscale ! video/x-raw,format=RGB,width={config.FRAME_W},height={config.FRAME_H} ! "
-                    f"videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1"
-                )
-            elif table_model_branch_enabled:
-                launch_str = (
-                    src_segment +
-                    f"videoconvert ! tee name=t "
-                    f"t. ! queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
-                    f"videoscale ! video/x-raw,format=RGB,width={config.FRAME_W},height={config.FRAME_H} ! "
-                    f"videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1 "
-                    f"t. ! queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
-                    f"videoscale ! video/x-raw,format=RGB,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
-                    f"hailonet hef-path={config.TABLE_OBJECT_HEF_PATH} force-writable=true ! "
-                    f"hailofilter name=table_hailofilter so-path={config.TABLE_OBJECT_SO_PATH} ! "
-                    f"hailooverlay ! videoconvert ! fakesink sync=false"
-                )
-            elif table_object_branch_enabled:
-                launch_str = (
-                    src_segment +
-                    f"videoconvert ! videoscale ! "
-                    f"video/x-raw,format=RGB,width={config.FRAME_W},height={config.FRAME_H} ! "
-                    f"tee name=t "
-                    f"t. ! queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
-                    f"videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1 "
-                    f"t. ! queue leaky=downstream max-size-buffers=1 ! "
-                    f"appsink name=table_obj_sink emit-signals=false sync=false drop=true max-buffers=1"
-                )
-            else:
-                # Route inference → hailooverlay → scale to widescreen → preview_sink
-                # so skeleton/detection marks are visible in the display window.
-                launch_str = (
-                    src_segment +
-                    f"videoconvert ! "
-                    f"videoscale ! video/x-raw,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
-                    f"hailonet hef-path={HEF_PATH} force-writable=true ! "
-                    f"hailofilter name=hailofilter so-path={SO_PATH} ! "
-                    f"hailotracker ! hailooverlay ! "
-                    f"videoconvert ! videoscale ! video/x-raw,format=RGB,width={config.FRAME_W},height={config.FRAME_H} ! "
-                    f"videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1"
-                )
-
-            if overlay_enabled:
-                launch_str = launch_str.replace(
-                    "videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1",
-                    "cairooverlay name=release_overlay ! videoconvert ! appsink name=preview_sink emit-signals=false sync=false drop=true max-buffers=1",
-                )
-
-            try:
-                pipe = Gst.parse_launch(launch_str)
-            except Exception as e:
-                # Some images may lack cairooverlay; fall back without the visual marker.
-                fallback = launch_str.replace("cairooverlay name=release_overlay ! ", "")
-                pipe = Gst.parse_launch(fallback)
-                if overlay_enabled:
-                    print(f"WARNING: release overlay disabled ({e})")
-
-            hailofilter = pipe.get_by_name("hailofilter")
-            if hailofilter:
-                hailofilter.get_static_pad("src").add_probe(
-                    Gst.PadProbeType.BUFFER, app_callback, None
-                )
-            else:
-                if not table_object_branch_enabled:
-                    print("WARNING: hailofilter element not found – probe not attached")
-
-            table_hailofilter = pipe.get_by_name("table_hailofilter") if table_model_branch_enabled else None
-            if table_hailofilter:
-                table_hailofilter.get_static_pad("src").add_probe(
-                    Gst.PadProbeType.BUFFER, _table_object_model_callback, None
-                )
-
-            if overlay_enabled:
-                release_overlay = pipe.get_by_name("release_overlay")
-                if release_overlay:
-                    release_overlay.connect("caps-changed", _release_overlay_caps_changed)
-                    release_overlay.connect("draw", _release_overlay_draw)
-
-            finger_sink = pipe.get_by_name("finger_sink") if finger_branch_enabled else None
-            table_obj_sink = pipe.get_by_name("table_obj_sink") if table_object_branch_enabled else None
-            preview_sink = pipe.get_by_name("preview_sink")
-
-            pipe.set_state(Gst.State.PLAYING)
-            print("--- Hailo AI Hat Active: yolov8m_pose running ---")
-            _bind_main_preview_window(pre_window_ids)
-            _ensure_main_preview_window_visible()
-            _reapply_main_preview_window_state_delayed()
-
-            while not _restart_event.is_set() and not brain.shutdown_event.is_set():
-                live_mode = brain.tuner.shared_params.get("camera_mode", "HIGH_CAM")
-                if live_mode != mode:
-                    if {live_mode, mode} <= {"HIGH_CAM", "DUAL_CAM"}:
-                        mode = live_mode
-                        if mode == "DUAL_CAM":
-                            if bool(getattr(config, "TABLE_OBJECT_PICKUP_ENABLED", False)):
-                                _stop_table_preview()
-                                _start_table_object_worker()
-                            else:
-                                _stop_table_object_worker()
-                                _start_table_preview()
-                        else:
-                            _stop_table_preview()
-                            _stop_table_object_worker()
-                        continue
-                    _restart_event.set()
-                    continue
-
-                if finger_sink is not None:
-                    sample = finger_sink.emit("try-pull-sample", int(0.02 * Gst.SECOND))
-                    if sample is not None:
-                        _maybe_send_finger_gesture_events_from_sample(sample, time.time())
-                if table_obj_sink is not None:
-                    sample = table_obj_sink.emit("try-pull-sample", int(0.03 * Gst.SECOND))
-                    if sample is not None:
-                        _maybe_pick_table_object_from_sample(sample, time.time())
-                if preview_sink is not None and not main_window_ready:
-                    now = time.time()
-                    if (now - last_preview_warn_t) > 2.0:
-                        print("Preview window not ready; retrying window create")
-                        last_preview_warn_t = now
-                    main_window_ready = _open_main_preview_window()
-
-                if preview_sink is not None and main_window_ready:
-                    sample = preview_sink.emit("try-pull-sample", int(0.03 * Gst.SECOND))
-                    if sample is None:
-                        now = time.time()
-                        if (now - last_preview_ok_t) > 2.0 and (now - last_preview_warn_t) > 2.0:
-                            print("Preview warning: no samples from preview sink")
-                            last_preview_warn_t = now
-                    else:
-                        try:
-                            buf = sample.get_buffer()
-                            caps = sample.get_caps()
-                            struct = caps.get_structure(0)
-                            w = int(struct.get_value("width"))
-                            h = int(struct.get_value("height"))
-                            ok, mapinfo = buf.map(Gst.MapFlags.READ)
-                            if ok:
-                                try:
-                                    frame_rgb = np.frombuffer(mapinfo.data, dtype=np.uint8).reshape((h, w, 3))
-                                    frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
-                                    cv2.imshow(main_window_name, frame_bgr)
-                                    cv2.waitKey(1)
-                                    last_preview_ok_t = time.time()
-                                finally:
-                                    try:
-                                        buf.unmap(mapinfo)
-                                    except Exception:
-                                        pass
-                        except Exception as e:
-                            print(f"Preview render error: {e}")
-                            try:
-                                cv2.destroyWindow(main_window_name)
-                            except Exception:
-                                pass
-                            main_window_ready = False
-
-                # Window watchdog: if preview has not rendered for a while,
-                # force-reset and let saved window geometry be reapplied.
-                now = time.time()
-                if preview_sink is not None and (now - last_preview_ok_t) > 3.0 and (now - last_preview_reset_t) > 3.0:
-                    print("Preview watchdog: no rendered frames recently; resetting preview window")
-                    last_preview_reset_t = now
-                    try:
-                        cv2.destroyWindow(main_window_name)
-                    except Exception:
-                        pass
-                    main_window_ready = _open_main_preview_window()
-                time.sleep(0.1)
-
-        except Exception as e:
-            print(f"Pipeline Error: {e}")
-            time.sleep(2)
-        finally:
-            _save_main_preview_window_state()
-            if pipe is not None:
-                _graceful_stop_pipeline(pipe)
-        time.sleep(0.5)
-
-    if main_window_ready:
-        # Use wmctrl-based save (real screen coords) rather than cv2.getWindowImageRect
-        # which only returns image-relative (always x=0, y=0) coordinates.
-        _save_main_preview_window_state()
-        try:
-            cv2.destroyWindow(main_window_name)
-        except Exception:
-            pass
-
-    _stop_table_preview()
-    _stop_table_object_worker()
+            # Remove all pipeline creation and preview logic in HIGH_CAM mode; face_tracking.py owns the camera
+            pipe = None
 
 if __name__ == "__main__":
     print(f"--- od.py version {_VERSION} ---")
