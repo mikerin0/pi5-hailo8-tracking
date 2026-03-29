@@ -27042,3 +27042,152 @@ Shelly set output failed (http://172.31.31.166/rpc/Switch.Set?id=0&on=false): <u
 [DEBUG] Mapping buffer to frame of size w=640, h=360
 [DEBUG] Frame shape: (360, 640, 3)
 [DEBUG] faces detected: 0
+Displayed thinking face on LCD
+--- od.py version 2026.03.01-03 ---
+[STARTUP +  0.000s] od.py main: startup begin
+[STARTUP +  0.000s] startup config: power_on=False coord_move=False slow_home=True
+[STARTUP +  0.000s] startup hard no-motion override active
+[STARTUP +  0.000s] step 1/3: power up board (auto)
+Startup safety: servo power remains OFF until an explicit motion command
+[STARTUP +  0.000s] startup path: power remains off
+[STARTUP +  0.000s] step 3 confirmed: startup complete, tracking remains paused
+Startup complete. Tracking remains paused; press RESUME when ready.
+[STARTUP +  0.000s] startup path: steer worker started
+[STARTUP +  0.001s] startup path: camera_thread started
+[STARTUP +  0.001s] startup path: entering brain UI
+Gripper microswitch: enabled on BCM 17
+HIGH_CAM reacquire grace active: 2.5s
+--- Pi Server Active: Waiting for Crestron on 50005 ---
+--- USB Mic Voice Commands: listener starting ---
+Crestron Connected: ('172.31.31.52', 60840)
+[STARTUP + 43.773s] robot_brain: _ensure_servo_power_for_motion: invoking power-up callback
+[STARTUP + 43.679s] _set_servo_power(enabled=True)
+[STARTUP + 43.684s] power-on: Shelly rail enable begin
+Shelly set output failed (http://172.31.31.166/rpc/Switch.Set?id=0&on=true): <urlopen error timed out>
+[STARTUP + 45.790s] power-on: Shelly rail state=None
+[STARTUP + 45.796s] power-on: waiting controller boot settle 2.00s
+[STARTUP + 47.816s] power-on: controller stop_all sent
+[STARTUP + 48.407s] power-on: read current positions {1: None, 2: None, 3: None, 4: None, 5: None, 6: None}
+[STARTUP + 48.412s] power-on: torque enable begin step=0.150s
+[STARTUP + 49.395s] power-on: torque enable complete
+[STARTUP + 49.400s] power-on: _servo_power_on=None
+[STARTUP + 49.515s] robot_brain: _ensure_servo_power_for_motion: invoking power-up callback
+[STARTUP + 49.421s] _set_servo_power(enabled=True)
+[STARTUP + 49.426s] power-on: Shelly rail enable begin
+Shelly set output failed (http://172.31.31.166/rpc/Switch.Set?id=0&on=true): <urlopen error timed out>
+[STARTUP + 51.469s] power-on: Shelly rail state=None
+[STARTUP + 51.474s] power-on: waiting controller boot settle 2.00s
+[STARTUP + 53.494s] power-on: controller stop_all sent
+[STARTUP + 54.077s] power-on: read current positions {1: None, 2: None, 3: None, 4: None, 5: None, 6: None}
+[STARTUP + 54.082s] power-on: torque enable begin step=0.150s
+[STARTUP + 55.065s] power-on: torque enable complete
+[STARTUP + 55.070s] power-on: _servo_power_on=None
+[STARTUP + 55.205s] robot_brain: _ensure_servo_power_for_motion: invoking power-up callback
+[STARTUP + 55.111s] _set_servo_power(enabled=True)
+[STARTUP + 55.116s] power-on: Shelly rail enable begin
+Shelly set output failed (http://172.31.31.166/rpc/Switch.Set?id=0&on=true): <urlopen error timed out>
+[STARTUP + 57.149s] power-on: Shelly rail state=None
+[STARTUP + 57.154s] power-on: waiting controller boot settle 2.00s
+[STARTUP + 59.169s] power-on: controller stop_all sent
+[STARTUP + 59.759s] power-on: read current positions {1: None, 2: None, 3: None, 4: None, 5: None, 6: None}
+[STARTUP + 59.764s] power-on: torque enable begin step=0.150s
+[STARTUP + 60.754s] power-on: torque enable complete
+[STARTUP + 60.759s] power-on: _servo_power_on=None
+[STARTUP + 60.899s] robot_brain: _ensure_servo_power_for_motion: invoking power-up callback
+[STARTUP + 60.805s] _set_servo_power(enabled=True)
+[STARTUP + 60.810s] power-on: Shelly rail enable begin
+Shelly set output failed (http://172.31.31.166/rpc/Switch.Set?id=0&on=true): <urlopen error timed out>
+[STARTUP + 62.837s] power-on: Shelly rail state=None
+[STARTUP + 62.842s] power-on: waiting controller boot settle 2.00s
+[STARTUP + 64.862s] power-on: controller stop_all sent
+[STARTUP + 65.502s] power-on: read current positions {1: None, 2: None, 3: None, 4: None, 5: None, 6: None}
+[STARTUP + 65.507s] power-on: torque enable begin step=0.150s
+[STARTUP + 66.498s] power-on: torque enable complete
+[STARTUP + 66.503s] power-on: _servo_power_on=None
+[STARTUP + 66.875s] _set_servo_power(enabled=False)
+[STARTUP + 66.875s] power-off: torque disable begin step=0.150s
+Set torque failed for servo 1: Attempting to use a port that is not open
+Set torque failed for servo 2: Attempting to use a port that is not open
+Set torque failed for servo 3: Attempting to use a port that is not open
+Set torque failed for servo 4: Attempting to use a port that is not open
+Set torque failed for servo 5: Attempting to use a port that is not open
+Set torque failed for servo 6: Attempting to use a port that is not open
+Shelly set output failed (http://172.31.31.166/rpc/Switch.Set?id=0&on=false): <urlopen error timed out>
+[STARTUP + 69.779s] power-off: _servo_power_on=None
+Displayed thinking face on LCD
+--- od.py version 2026.03.01-03 ---
+[STARTUP +  0.000s] od.py main: startup begin
+[STARTUP +  0.000s] startup config: power_on=False coord_move=False slow_home=True
+[STARTUP +  0.000s] startup hard no-motion override active
+[STARTUP +  0.000s] step 1/3: power up board (auto)
+Startup safety: servo power remains OFF until an explicit motion command
+[STARTUP +  0.000s] startup path: power remains off
+[STARTUP +  0.000s] step 3 confirmed: startup complete, tracking remains paused
+Startup complete. Tracking remains paused; press RESUME when ready.
+[STARTUP +  0.000s] startup path: steer worker started
+[STARTUP +  0.001s] startup path: camera_thread started
+[STARTUP +  0.001s] startup path: entering brain UI
+Gripper microswitch: enabled on BCM 17
+HIGH_CAM reacquire grace active: 2.5s
+--- USB Mic Voice Commands: listener starting ---
+--- Pi Server Active: Waiting for Crestron on 50005 ---
+Crestron Connected: ('172.31.31.52', 60844)
+Camera already in mode: HIGH_CAM
+Camera already in mode: HIGH_CAM
+Camera already in mode: HIGH_CAM
+Camera already in mode: HIGH_CAM
+Camera switched to: TABLE_CAM
+[STARTUP + 77.911s] robot_brain: _ensure_servo_power_for_motion: invoking power-up callback
+[STARTUP + 77.818s] _set_servo_power(enabled=True)
+[STARTUP + 77.828s] power-on: Shelly rail enable begin
+Shelly set output failed (http://172.31.31.166/rpc/Switch.Set?id=0&on=true): <urlopen error timed out>
+[STARTUP + 79.972s] power-on: Shelly rail state=None
+[STARTUP + 79.988s] power-on: waiting controller boot settle 2.00s
+[STARTUP + 82.003s] power-on: controller stop_all sent
+[STARTUP + 82.642s] power-on: read current positions {1: None, 2: None, 3: None, 4: None, 5: None, 6: None}
+[STARTUP + 82.647s] power-on: torque enable begin step=0.150s
+[STARTUP + 83.662s] power-on: torque enable complete
+[STARTUP + 83.667s] power-on: _servo_power_on=None
+[STARTUP + 83.801s] robot_brain: _ensure_servo_power_for_motion: invoking power-up callback
+[STARTUP + 83.708s] _set_servo_power(enabled=True)
+[STARTUP + 83.718s] power-on: Shelly rail enable begin
+Shelly set output failed (http://172.31.31.166/rpc/Switch.Set?id=0&on=true): <urlopen error timed out>
+[STARTUP + 85.773s] power-on: Shelly rail state=None
+[STARTUP + 85.778s] power-on: waiting controller boot settle 2.00s
+[STARTUP + 87.803s] power-on: controller stop_all sent
+[STARTUP + 88.457s] power-on: read current positions {1: None, 2: None, 3: None, 4: None, 5: None, 6: None}
+[STARTUP + 88.462s] power-on: torque enable begin step=0.150s
+[STARTUP + 89.459s] power-on: torque enable complete
+[STARTUP + 89.464s] power-on: _servo_power_on=None
+[STARTUP + 89.623s] robot_brain: _ensure_servo_power_for_motion: invoking power-up callback
+[STARTUP + 89.529s] _set_servo_power(enabled=True)
+[STARTUP + 89.535s] power-on: Shelly rail enable begin
+Shelly set output failed (http://172.31.31.166/rpc/Switch.Set?id=0&on=true): <urlopen error timed out>
+[STARTUP + 91.587s] power-on: Shelly rail state=None
+[STARTUP + 91.593s] power-on: waiting controller boot settle 2.00s
+[STARTUP + 93.617s] power-on: controller stop_all sent
+[STARTUP + 94.264s] power-on: read current positions {1: None, 2: None, 3: None, 4: None, 5: None, 6: None}
+[STARTUP + 94.269s] power-on: torque enable begin step=0.150s
+[STARTUP + 95.272s] power-on: torque enable complete
+[STARTUP + 95.277s] power-on: _servo_power_on=None
+[STARTUP + 95.437s] robot_brain: _ensure_servo_power_for_motion: invoking power-up callback
+[STARTUP + 95.343s] _set_servo_power(enabled=True)
+[STARTUP + 95.354s] power-on: Shelly rail enable begin
+Shelly set output failed (http://172.31.31.166/rpc/Switch.Set?id=0&on=true): <urlopen error timed out>
+[STARTUP + 97.387s] power-on: Shelly rail state=None
+[STARTUP + 97.392s] power-on: waiting controller boot settle 2.00s
+[STARTUP + 99.423s] power-on: controller stop_all sent
+[STARTUP +100.109s] power-on: read current positions {1: None, 2: None, 3: None, 4: None, 5: None, 6: None}
+[STARTUP +100.114s] power-on: torque enable begin step=0.150s
+[STARTUP +101.118s] power-on: torque enable complete
+[STARTUP +101.123s] power-on: _servo_power_on=None
+[STARTUP +101.573s] _set_servo_power(enabled=False)
+[STARTUP +101.573s] power-off: torque disable begin step=0.150s
+Set torque failed for servo 1: Attempting to use a port that is not open
+Set torque failed for servo 2: Attempting to use a port that is not open
+Set torque failed for servo 3: Attempting to use a port that is not open
+Set torque failed for servo 4: Attempting to use a port that is not open
+Set torque failed for servo 5: Attempting to use a port that is not open
+Set torque failed for servo 6: Attempting to use a port that is not open
+Shelly set output failed (http://172.31.31.166/rpc/Switch.Set?id=0&on=false): <urlopen error timed out>
+[STARTUP +104.478s] power-off: _servo_power_on=None
