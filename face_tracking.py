@@ -127,16 +127,19 @@ def _build_pipeline():
     launch_str = (
         f"libcamerasrc camera-name={config.PI_CAMERA_DEVICE} ! "
         f"videoconvert ! "
-        f"video/x-raw,format=RGB,width={config.FRAME_W},height={config.FRAME_H} ! "
-        f"queue leaky=downstream max-size-buffers={config.GST_LEAKY_QUEUE_SIZE} ! "
-        f"appsink name=sink emit-signals=true sync={config.GST_SYNC}"
+        f"videoscale ! video/x-raw,width={config.MODEL_INPUT_SIZE},height={config.MODEL_INPUT_SIZE} ! "
+        f"hailonet hef-path={config.HEF_PATH} force-writable=true ! "
+        f"hailofilter name=hailofilter so-path={config.SO_PATH} ! "
+        f"hailotracker ! hailooverlay ! "
+        f"videoconvert ! videoscale ! video/x-raw,format=RGB,width={config.FRAME_W},height={config.FRAME_H} ! "
+        f"videoconvert ! appsink name=preview_sink emit-signals=true sync={config.GST_SYNC}"
     )
-    print("[DEBUG] _build_pipeline called")
+    print("[DEBUG] _build_pipeline called (Hailo pose pipeline)")
     print(f"[DEBUG] Building pipeline with device: {config.PI_CAMERA_DEVICE}, width: {config.FRAME_W}, height: {config.FRAME_H}")
     pipe = Gst.parse_launch(launch_str)
-    sink = pipe.get_by_name("sink")
+    sink = pipe.get_by_name("preview_sink")
     sink.connect("new-sample", _on_new_sample)
-    print("[DEBUG] Registered _on_new_sample callback with appsink")
+    print("[DEBUG] Registered _on_new_sample callback with appsink (preview_sink)")
     return pipe
 
 
@@ -164,31 +167,19 @@ def stop():
             return
         _pipe.set_state(Gst.State.NULL)
         _pipe = None
-        _running = False
-        print("--- Face Tracking: Pipeline Stopped ---")
-
-
-def camera_loop():
-    """Blocking loop that starts face tracking and restarts on failure."""
-    print("[DEBUG] face_tracking.camera_loop() called")
-    while True:
-        start()
         try:
-            while True:
-                time.sleep(1)
-                with _lock:
-                    if not _running:
-                        break
-        except KeyboardInterrupt:
-            stop()
-            break
+            print(f"[DEBUG] Mapping buffer to frame of size w={w}, h={h}")
+            frame = np.frombuffer(mapinfo.data, dtype=np.uint8).reshape((h, w, 3))
+            print(f"[DEBUG] Frame shape: {frame.shape}")
+            # Convert RGB to BGR for OpenCV display
+            frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+            # Parse pose keypoints from Hailo tracker metadata (if available)
+            # This assumes the hailotracker element attaches keypoints as buffer metadata
+            # For demonstration, we just show the frame; for real use, parse and overlay keypoints here
+            # TODO: Implement keypoint extraction from buffer metadata if available
+
+            # Show video preview window with overlays and correct color
+            cv2.imshow("Face Tracking Preview", frame_bgr)
+            cv2.waitKey(1)
         except Exception as e:
-            print(f"Face Tracking Error: {e}")
-            stop()
-            time.sleep(2)
-
-
-if __name__ == "__main__":
-    import threading
-    threading.Thread(target=brain.start_brain_ui, daemon=True).start()
-    camera_loop()
