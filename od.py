@@ -2222,6 +2222,8 @@ def app_callback(pad, info, user_data):
 
     cooldown = max(2.0, float(getattr(config, "TABLE_OBJECT_COOLDOWN_SEC", 20.0)))
     color_follow_active = bool(brain.tuner.shared_params.get("table_follow_color_active", 0))
+    # Ensure global is used in this block as well
+    global _last_table_obj_trigger_time
     if (not color_follow_active) and (now - _last_table_obj_trigger_time < cooldown):
         if now - _last_table_obj_block_log_time > 2.0:
             print("DUAL_CAM auto-pick blocked: cooldown active")
