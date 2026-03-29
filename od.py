@@ -2714,15 +2714,12 @@ def camera_loop():
                 and os.path.isfile(getattr(config, "TABLE_OBJECT_SO_PATH", ""))
             )
             try:
-
-                selected_target_type = str(
-                    brain.tuner.shared_params.get(
-                        "table_object_target_type",
-                        getattr(config, "TABLE_OBJECT_TARGET_TYPE", "any"),
-                    )
-                ).strip().lower()
-            except Exception:
-                selected_target_type = "any"
+            selected_target_type = str(
+                brain.tuner.shared_params.get(
+                    "table_object_target_type",
+                    getattr(config, "TABLE_OBJECT_TARGET_TYPE", "any"),
+                )
+            ).strip().lower()
             # Remove all pipeline creation and preview logic in HIGH_CAM mode; face_tracking.py owns the camera
             pipe = None
 
