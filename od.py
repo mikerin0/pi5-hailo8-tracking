@@ -2653,11 +2653,11 @@ def camera_loop():
     brain.camera_switch_handlers["HIGH_CAM"] = _high_cam_handler
     brain.camera_switch_handlers["TABLE_CAM"] = _table_cam_handler
     brain.camera_switch_handlers["DUAL_CAM"] = _dual_cam_handler
-        mode = brain.tuner.shared_params.get("camera_mode", "HIGH_CAM")
-        if mode == "DUAL_CAM" and not bool(getattr(config, "ALLOW_DUAL_CAM", False)):
-            brain.tuner.shared_params["camera_mode"] = "HIGH_CAM"
-            mode = "HIGH_CAM"
-            print("Camera safety: DUAL_CAM disabled by config, forced HIGH_CAM")
+    mode = brain.tuner.shared_params.get("camera_mode", "HIGH_CAM")
+    if mode == "DUAL_CAM" and not bool(getattr(config, "ALLOW_DUAL_CAM", False)):
+        brain.tuner.shared_params["camera_mode"] = "HIGH_CAM"
+        mode = "HIGH_CAM"
+        print("Camera safety: DUAL_CAM disabled by config, forced HIGH_CAM")
         if mode != prev_mode:
             if mode == "TABLE_CAM":
                 _table_cam_enter_time = time.time()
