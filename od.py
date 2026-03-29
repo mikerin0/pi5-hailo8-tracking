@@ -1,3 +1,4 @@
+    global _last_table_obj_trigger_time
 # Standard library imports
 import os
 import sys
