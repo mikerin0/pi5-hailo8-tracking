@@ -10,9 +10,10 @@ import time
 
 import threading
 
-# Ensure _table_preview_thread and _table_obj_stop are defined at module level to avoid NameError
+# Ensure _table_preview_thread, _table_obj_stop, and _table_obj_thread are defined at module level to avoid NameError
 _table_preview_thread = None
 _table_obj_stop = threading.Event()
+_table_obj_thread = None
 
 # Third-party imports
 import numpy as np
