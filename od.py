@@ -1122,14 +1122,15 @@ def _table_pick_steer_worker():
             and bool(getattr(config, "TABLE_PICK_MANUAL_HUNT_ENABLED", True))
             and int(_table_obj_center_hits) <= 0
             and (now - float(_last_table_pick_target_update)) > max(0.25, float(getattr(config, "TABLE_PICK_STEER_PERIOD_SEC", 0.25)) * 1.5)
+        ):
             selected_target_type = str(
                 brain.tuner.shared_params.get(
                     "table_object_target_type",
                     getattr(config, "TABLE_OBJECT_TARGET_TYPE", "any"),
                 )
             ).strip().lower()
-                time.sleep(0.04)
-                continue
+            time.sleep(0.04)
+            continue
 
         speed = int(getattr(config, "TABLE_PICK_STEER_SPEED", 800))
         try:
