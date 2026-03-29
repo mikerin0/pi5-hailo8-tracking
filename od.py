@@ -2105,6 +2105,7 @@ def app_callback(pad, info, user_data):
     """GStreamer pad probe: parse Hailo pose detections and drive the arm."""
     global _smooth_x, _smooth_y, _last_move_time, _search_mode, _last_seen_time
     global _tracking_prev_busy, _tracking_resume_warmup_until
+    global _last_table_obj_trigger_time
 
     buffer = info.get_buffer()
     if not buffer:
