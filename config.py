@@ -75,7 +75,7 @@ ARM_Y_RANGE = 0.15         # ± lateral swing across full frame height
 ARM_Z_DEFAULT = 0.15       # fixed height while face tracking
 
 # --- Smooth Tracking ---
-TRACKING_ALPHA = 0.15      # EMA coefficient (lower = smoother but more lag)
+TRACKING_ALPHA = 0.5      # EMA coefficient (lower = smoother but more lag)
 ARM_Y_DEFAULT = 0.0        # starting lateral position for smooth tracking
 
 # --- Thermal idle auto-park timeout (arm motion timeout) ---

@@ -2628,27 +2628,31 @@ def camera_loop():
         except Exception:
             pass
         _restart_event.set()
+    def _high_cam_handler():
+        try:
+            face_tracking.start()
+        except Exception as e:
+            print(f"[face_tracking] Failed to start: {e}")
+
+    def _table_cam_handler():
+        try:
+            face_tracking.stop()
+        except Exception:
+            pass
+        # TODO: Start table cam pipeline here if implemented
+        # Example: table_tracking.start() if you have a table_tracking module
+        print("[TABLE_CAM] Switched to TABLE_CAM (face_tracking stopped)")
+
     def _dual_cam_handler():
         try:
             face_tracking.stop()
         except Exception:
             pass
+        print("[DUAL_CAM] Switched to DUAL_CAM (face_tracking stopped)")
+
     brain.camera_switch_handlers["HIGH_CAM"] = _high_cam_handler
     brain.camera_switch_handlers["TABLE_CAM"] = _table_cam_handler
     brain.camera_switch_handlers["DUAL_CAM"] = _dual_cam_handler
-    brain.camera_switch_handlers["TABLE_CAM"] = lambda: _restart_event.set()
-    brain.camera_switch_handlers["DUAL_CAM"] = lambda: None
-
-    global _last_seen_time, _table_cam_enter_time
-    global _search_mode
-    _last_seen_time = time.time() + 5.0  # give Hailo 5 s to find a person at startup
-    prev_mode = None
-
-    main_window_name = "Pi5 AI Vision"
-    # Remove all preview window logic in HIGH_CAM mode; face_tracking.py owns the camera and preview
-
-    global _table_obj_dualcam_disabled_warned
-    while not brain.shutdown_event.is_set():
         mode = brain.tuner.shared_params.get("camera_mode", "HIGH_CAM")
         if mode == "DUAL_CAM" and not bool(getattr(config, "ALLOW_DUAL_CAM", False)):
             brain.tuner.shared_params["camera_mode"] = "HIGH_CAM"
